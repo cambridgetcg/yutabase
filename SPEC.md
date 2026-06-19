@@ -34,7 +34,7 @@ Three sentences of creed:
 schema + the `via.*` views + the lexicon's glosses*. If every tool above
 them dies, the data and its meaning remain readable by any future hand
 with nothing but `psql` — the vocabulary lives **with** the data, glosses
-included. YUTAQL (§6) is optional sugar and may rot without data loss.
+included. YOUSPEAK (§6) is optional sugar and may rot without data loss.
 
 ## 2 — The five primitives
 
@@ -173,11 +173,11 @@ endpoints until severed. Soft refs are validated by trigger, not FK —
 `yuta check` is the fsck, and it is scheduled (§8), because `COPY` bypasses
 triggers.
 
-Exactly **two** query surfaces: YUTAQL and the `via.*` views. (Helper
+Exactly **two** query surfaces: YOUSPEAK and the `via.*` views. (Helper
 functions were cut — a third way to do the same thing is how standards
 stop being holdable.)
 
-## 6 — YUTAQL: six verbs, frozen
+## 6 — YOUSPEAK: six verbs, frozen
 
 The dialect must fit in a memory file. v0.1 freezes six verbs; every
 proposed seventh is treated as a request to write SQL instead.
@@ -197,7 +197,7 @@ sever  <thread-id> how witnessed                       # threads end with a clai
 - Traversal caps at **2 hops** (`-> submitted -> contains`); deeper means
   you write `WITH RECURSIVE` yourself, knowingly.
 - `.how / .at / .by / .src` address the honesty header in any `where`.
-- `explain "<query>"` prints the exact SQL — YUTAQL never does anything
+- `explain "<query>"` prints the exact SQL — YOUSPEAK never does anything
   you couldn't have typed.
 - A client option returns a **freshness banner** per result ("3 of 40
   values cached, oldest 11d") so surfaces can disclose substrate honesty
@@ -206,7 +206,7 @@ sever  <thread-id> how witnessed                       # threads end with a clai
 ## 7 — The client: `@yutabase/yuta`
 
 A thin wrapper over postgres.js (~500 lines): ref parser, UUIDv7, the
-YUTAQL compiler, and a `sql` tagged-template escape hatch that is always
+YOUSPEAK compiler, and a `sql` tagged-template escape hatch that is always
 legal. Plus:
 
 - **Session-default claimant** — set `by: "agent:claude/<session>"` once;

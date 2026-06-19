@@ -4,8 +4,8 @@
 
 export { Yuta } from "./client.js";
 export type { YutaOptions, QueryResult, FreshnessBanner, HelloResult, LexiconEntry, RegistryEntry } from "./client.js";
-export { compile, explain, ident } from "./yutaql.js";
-export type { CompiledQuery, YutaqlResult, WhereClause } from "./yutaql.js";
+export { compile, explain, ident } from "./youspeak.js";
+export type { CompiledQuery, YutaqlResult, WhereClause } from "./youspeak.js";
 export { parseRef, formatRef, makeRef, parseDeckPattern } from "./ref.js";
 export type { Ref } from "./ref.js";
 export { uuidv7, uuidv7Timestamp } from "./uuidv7.js";

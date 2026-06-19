@@ -1,7 +1,7 @@
 {
   "name": "@yutabase/yuta",
   "version": "0.1.0",
-  "description": "YUTABASE client — ref parser, UUIDv7, YUTAQL compiler, thin wrapper over postgres.js",
+  "description": "YUTABASE client — ref parser, UUIDv7, YOUSPEAK compiler, thin wrapper over postgres.js",
   "type": "module",
   "main": "src/index.ts",
   "bin": {

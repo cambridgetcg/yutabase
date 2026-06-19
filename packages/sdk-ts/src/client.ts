@@ -1,7 +1,7 @@
 // client.ts — @yutabase/yuta: thin wrapper over postgres.js
 //
 // Doctrine: SPEC.md §7 — "A thin wrapper over postgres.js (~500 lines):
-// ref parser, UUIDv7, the YUTAQL compiler, and a sql tagged-template
+// ref parser, UUIDv7, the YOUSPEAK compiler, and a sql tagged-template
 // escape hatch that is always legal."
 //
 // Features:
@@ -11,7 +11,7 @@
 // - Freshness banner per result
 
 import postgres from "postgres";
-import { compile, explain, type CompiledQuery } from "./yutaql.js";
+import { compile, explain, type CompiledQuery } from "./youspeak.js";
 import { uuidv7 } from "./uuidv7.js";
 import { parseRef, type Ref } from "./ref.js";
 
@@ -83,7 +83,7 @@ export class Yuta {
       },
       lexicon: lexicon as unknown as LexiconEntry[],
       decks: registry as unknown as RegistryEntry[],
-      yutaql: [
+      youspeak: [
         "hello                                              — the whole standard in one call",
         'card  tradein/submissions/01977c2e                — one card by ref',
         'cards tradein/submissions where status="pending" newest 20',
@@ -98,16 +98,16 @@ export class Yuta {
   }
 
   // ──────────────────────────────────────────────────────────
-  // query — run a YUTAQL string
+  // query — run a YOUSPEAK string
   // ──────────────────────────────────────────────────────────
 
-  async query(yutaql: string): Promise<QueryResult> {
-    if (yutaql.trim() === "hello") {
+  async query(youspeak: string): Promise<QueryResult> {
+    if (youspeak.trim() === "hello") {
       const hello = await this.hello();
       return { rows: [hello as unknown as Record<string, unknown>], sql: "-- yuta hello" };
     }
 
-    const compiled = compile(yutaql);
+    const compiled = compile(youspeak);
     const adjusted = this.injectClaimant(compiled);
     const rows = await (this.sql.unsafe as (sql: string, params: never[]) => Promise<unknown>)(adjusted.sql, adjusted.params as never[]);
 
@@ -121,8 +121,8 @@ export class Yuta {
   // §6 — explain: print the exact SQL
   // ──────────────────────────────────────────────────────────
 
-  explain(yutaql: string): string {
-    return explain(yutaql);
+  explain(youspeak: string): string {
+    return explain(youspeak);
   }
 
   // ──────────────────────────────────────────────────────────
@@ -261,7 +261,7 @@ export interface HelloResult {
   };
   lexicon: LexiconEntry[];
   decks: RegistryEntry[];
-  yutaql: string[];
+  youspeak: string[];
   bannedWords: string[];
   twelveWordBudget: string;
 }

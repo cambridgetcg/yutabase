@@ -1,4 +1,4 @@
-// yutaql.ts — the YUTAQL compiler: six verbs, frozen
+// youspeak.ts — the YOUSPEAK compiler: six verbs, frozen
 //
 // Doctrine: SPEC.md §6 — "The dialect must fit in a memory file. v0.1
 // freezes six verbs; every proposed seventh is treated as a request to
@@ -13,7 +13,7 @@
 //   thread a --word--> b      — create a thread
 //   sever <thread-id>          — end a thread (with a claim)
 //
-// YUTAQL never does anything you couldn't have typed.
+// YOUSPEAK never does anything you couldn't have typed.
 // explain("<query>") prints the exact SQL it became.
 
 import { parseRef, type Ref } from "./ref.js";
@@ -46,9 +46,9 @@ export interface WhereClause {
 // ──────────────────────────────────────────────────────────
 
 /**
- * Compile a YUTAQL string into a SQL query + params.
+ * Compile a YOUSPEAK string into a SQL query + params.
  *
- * @throws on malformed YUTAQL
+ * @throws on malformed YOUSPEAK
  */
 export function compile(input: string): CompiledQuery {
   const trimmed = input.trim();
@@ -409,8 +409,8 @@ function isValidColumnName(name: string): boolean {
 // ──────────────────────────────────────────────────────────
 
 /**
- * Explain a YUTAQL query: return the exact SQL it would compile to.
- * YUTAQL never does anything you couldn't have typed.
+ * Explain a YOUSPEAK query: return the exact SQL it would compile to.
+ * YOUSPEAK never does anything you couldn't have typed.
  */
 export function explain(query: string): string {
   const compiled = compile(query);

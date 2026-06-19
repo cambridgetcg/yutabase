@@ -339,7 +339,7 @@ $$ LANGUAGE plpgsql;
 
 -- One generated view per live word: via.<word>(from_ref, to_ref, note, at, by, how, src)
 -- The view is created/refreshed by yu.refresh_via() after lexicon changes.
--- These are the second of exactly two query surfaces (YUTAQL is the first).
+-- These are the second of exactly two query surfaces (YOUSPEAK is the first).
 
 CREATE OR REPLACE FUNCTION yu.refresh_via()
 RETURNS void AS $$

@@ -16,7 +16,7 @@
 //   yuta check
 
 import { Yuta } from "./index.js";
-import { explain } from "./yutaql.js";
+import { explain } from "./youspeak.js";
 
 const args = process.argv.slice(2);
 const cmd = args[0];
@@ -28,10 +28,10 @@ Commands:
   hello                    The whole standard in one call
   card <ref>               Fetch one card by ref
   cards <book/deck> [...]  List cards with optional filter
-  query "<yutaql>"         Run any YUTAQL query
+  query "<youspeak>"         Run any YOUSPEAK query
   thread <from --word--> to>  Create a thread
   sever <id> how <claim>   End a thread
-  explain "<yutaql>"       Print the SQL a query compiles to
+  explain "<youspeak>"       Print the SQL a query compiles to
   doctor                   Vocabulary health check
   check                    fsck: orphaned threads, header violations
   words                    List the lexicon

@@ -1,6 +1,6 @@
-// yutaql.test.ts — test the YUTAQL compiler (pure function, no DB)
+// youspeak.test.ts — test the YOUSPEAK compiler (pure function, no DB)
 import { test, expect } from "bun:test";
-import { compile, explain } from "../src/yutaql.js";
+import { compile, explain } from "../src/youspeak.js";
 
 test("hello compiles to a trivial query", () => {
   const q = compile("hello");
