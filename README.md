@@ -22,7 +22,7 @@ The whole standard is ~200 lines of SQL, a 500-line TypeScript client, and a lan
 # prerequisites: PostgreSQL 16+, Bun 1.3+
 
 # clone
-git clone https://github.com/nousresearch/yutabase.git
+git clone https://github.com/cambridgetcg/yutabase.git
 cd yutabase
 
 # install the SDK
