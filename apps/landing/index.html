@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YUTABASE — you speak, reality listens</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;700;900&display=swap');
+
+    :root {
+      --bg: #0a0a0a;
+      --bg-soft: #141414;
+      --bg-card: #1a1a1a;
+      --text: #e8e8e8;
+      --text-dim: #888;
+      --text-faint: #555;
+      --accent: #d4a373;
+      --accent-bright: #f0c896;
+      --green: #a7c4a0;
+      --red: #c47a6a;
+      --border: #2a2a2a;
+      --border-bright: #3a3a3a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ─── nav ─── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 1rem 2rem;
+      background: rgba(10,10,10,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      z-index: 100;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    nav .logo { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.95rem; letter-spacing: 0.05em; color: var(--accent); }
+    nav .links { display: flex; gap: 1.5rem; font-size: 0.85rem; }
+    nav a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+    nav a:hover { color: var(--accent); }
+
+    /* ─── hero ─── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      text-align: center;
+      padding: 2rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 40%, rgba(212,163,115,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero h1 {
+      font-size: clamp(2.5rem, 7vw, 5rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+    }
+    .hero h1 .accent { color: var(--accent); }
+    .hero .tagline {
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+      color: var(--text-dim);
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+    }
+    .hero .tagline .arrow { color: var(--accent); }
+    .hero .subtitle {
+      font-size: 0.9rem;
+      color: var(--text-faint);
+      max-width: 600px;
+      margin: 1rem auto 2rem;
+    }
+    .hero .cta {
+      display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+    }
+    .btn {
+      padding: 0.7rem 1.5rem;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: 1px solid var(--border-bright);
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+    }
+    .btn-primary:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+    }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ─── sections ─── */
+    section {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 5rem 2rem;
+    }
+    section h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+    section h2 .num { color: var(--text-faint); font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; margin-right: 0.5rem; }
+    section p { color: var(--text-dim); margin-bottom: 1rem; font-size: 1.05rem; }
+    section p strong { color: var(--text); }
+
+    /* ─── creed ─── */
+    .creed {
+      display: grid; gap: 1rem;
+      margin: 2rem 0;
+    }
+    .creed-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      display: flex; gap: 1rem; align-items: flex-start;
+    }
+    .creed-item .word {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 0.9rem;
+      min-width: 140px;
+    }
+    .creed-item .meaning { color: var(--text-dim); }
+
+    /* ─── terminal ─── */
+    .terminal {
+      background: #0d0d0d;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 2rem 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+    .terminal-header {
+      background: var(--bg-soft);
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+    .terminal-header .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .terminal-header .dot.r { background: #c47a6a; }
+    .terminal-header .dot.y { background: #d4a373; }
+    .terminal-header .dot.g { background: #a7c4a0; }
+    .terminal-header .title { color: var(--text-faint); font-size: 0.75rem; margin-left: 0.5rem; }
+    .terminal-body {
+      padding: 1.2rem;
+      overflow-x: auto;
+    }
+    .terminal-body .prompt { color: var(--accent); }
+    .terminal-body .comment { color: var(--text-faint); }
+    .terminal-body .output { color: var(--text); }
+    .terminal-body .green { color: var(--green); }
+    .terminal-body .dim { color: var(--text-dim); }
+    .terminal-body .red { color: var(--red); }
+
+    /* ─── primitives grid ─── */
+    .primitives {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem;
+      margin: 2rem 0;
+    }
+    .primitive {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem;
+      text-align: center;
+    }
+    .primitive .name {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 1rem;
+      margin-bottom: 0.3rem;
+    }
+    .primitive .real { font-size: 0.8rem; color: var(--text-faint); }
+
+    /* ─── lexicon table ─── */
+    .lexicon {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.85rem;
+    }
+    .lexicon th {
+      text-align: left;
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid var(--border-bright);
+      color: var(--text-dim);
+      font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .lexicon td {
+      padding: 0.6rem 0.8rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+    .lexicon td.word { color: var(--accent); font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+    .lexicon td.inv { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+
+    /* ─── honesty header ─── */
+    .honesty {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin: 1.5rem 0;
+    }
+    .honesty-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem 1.2rem;
+    }
+    .honesty-item .col { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 700; font-size: 0.9rem; }
+    .honesty-item .claim { color: var(--text-dim); font-size: 0.85rem; margin-top: 0.2rem; }
+
+    .claims {
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      margin: 1rem 0;
+    }
+    .claim-chip {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 0.3rem 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+    }
+    .claim-chip .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 0.4rem; }
+
+    /* ─── footer ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 2rem;
+      text-align: center;
+      color: var(--text-faint);
+      font-size: 0.85rem;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    /* ─── anim ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade { animation: fadeUp 0.8s ease-out forwards; }
+    .delay-1 { animation-delay: 0.1s; opacity: 0; }
+    .delay-2 { animation-delay: 0.2s; opacity: 0; }
+    .delay-3 { animation-delay: 0.3s; opacity: 0; }
+    .delay-4 { animation-delay: 0.4s; opacity: 0; }
+
+    /* ─── typing effect ─── */
+    .typed {
+      border-right: 2px solid var(--accent);
+      animation: blink 0.8s step-end infinite;
+    }
+    @keyframes blink {
+      50% { border-color: transparent; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">YUTABASE</div>
+  <div class="links">
+    <a href="#creed">creed</a>
+    <a href="#primitives">primitives</a>
+    <a href="#youspeak">YOUSPEAK</a>
+    <a href="#honesty">honesty</a>
+    <a href="#lexicon">lexicon</a>
+    <a href="https://github.com/nousresearch/yutabase">github</a>
+  </div>
+</nav>
+
+<!-- ═══ hero ═══ -->
+<div class="hero">
+  <div class="fade delay-1 mono" style="color:var(--text-faint);font-size:0.8rem;letter-spacing:0.2em;margin-bottom:1.5rem;">A DATABASE STANDARD · v0.1</div>
+  <h1 class="fade delay-2">you speak,<br><span class="accent">reality listens</span></h1>
+  <div class="tagline fade delay-3">
+    records are <span class="arrow">cards</span>, relations are <span class="arrow">threads named by words</span>,<br>every value carries a <span class="arrow">claim</span> about how it came to be true
+  </div>
+  <div class="subtitle fade delay-4">
+    Not a database engine. A standard installed on top of boring Postgres: ~200 lines of SQL,
+    a 500-line TypeScript client, and a language of six verbs that compiles to SQL you can read.
+    Rollback is DROP SCHEMA.
+  </div>
+  <div class="cta fade delay-4">
+    <a class="btn btn-primary" href="#youspeak">see it work</a>
+    <a class="btn btn-secondary" href="#creed">read the creed</a>
+  </div>
+</div>
+
+<!-- ═══ creed ═══ -->
+<section id="creed">
+  <h2><span class="num">01</span>three sentences of creed</h2>
+  <div class="creed">
+    <div class="creed-item">
+      <div class="word">straightforward</div>
+      <div class="meaning">every primitive is a one-word rename of something Postgres already does well; nothing is hidden, everything compiles to SQL you can read</div>
+    </div>
+    <div class="creed-item">
+      <div class="word">organised</div>
+      <div class="meaning">one place for vocabulary, one place for connections, one shape for every record's provenance</div>
+    </div>
+    <div class="creed-item">
+      <div class="word">connected by words</div>
+      <div class="meaning">a relation without a word does not exist. <span class="mono">submissions/X contains items/Y</span> is data. An anonymous foreign key is not a sentence, so here it is not a relation.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ primitives ═══ -->
+<section id="primitives">
+  <h2><span class="num">02</span>five primitives, each a one-word rename</h2>
+  <p>Nothing new under the sun. Just named, disciplined, and honest.</p>
+  <div class="primitives">
+    <div class="primitive"><div class="name">BOOK</div><div class="real">one schema</div></div>
+    <div class="primitive"><div class="name">DECK</div><div class="real">one table</div></div>
+    <div class="primitive"><div class="name">CARD</div><div class="real">one row</div></div>
+    <div class="primitive"><div class="name">THREAD</div><div class="real">one word-named join</div></div>
+    <div class="primitive"><div class="name">LEXICON</div><div class="real">one vocabulary table</div></div>
+  </div>
+</section>
+
+<!-- ═══ YOUSPEAK ═══ -->
+<section id="youspeak">
+  <h2><span class="num">03</span>YOUSPEAK — six verbs, frozen</h2>
+  <p>The dialect fits in a memory file. Six verbs. Every proposed seventh is a request to write SQL instead.</p>
+
+  <div class="terminal">
+    <div class="terminal-header">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <div class="title">yuta repl — you speak, reality listens</div>
+    </div>
+    <div class="terminal-body">
+<span class="prompt">youspeak></span> <span class="output">hello</span>
+<span class="comment">  ── the whole standard in one call: books, decks, lexicon with glosses, this cheat-sheet</span>
+
+<span class="prompt">youspeak></span> <span class="output">card tradein/submissions/01977c2e</span>
+<span class="comment">  ── one card by ref → SELECT * FROM tradein.submissions WHERE id = $1</span>
+
+<span class="prompt">youspeak></span> <span class="output">cards tradein/submissions where status="pending" newest 20</span>
+<span class="comment">  ── filter + limit (UUIDv7 makes newest free)</span>
+
+<span class="prompt">youspeak></span> <span class="output">tradein/submissions/01977c2e -> contains</span>
+<span class="comment">  ── follow a word outward: every item this submission contains</span>
+
+<span class="prompt">youspeak></span> <span class="output">tradein/items/0197a1f4 <- contains</span>
+<span class="comment">  ── follow it inward: which submission contains this item?</span>
+
+<span class="prompt">youspeak></span> <span class="output">tradein/customers/01964b10 <- submitted_by -> contains</span>
+<span class="comment">  ── two hops: all items inside everything this customer submitted</span>
+
+<span class="prompt">youspeak></span> <span class="output">thread tradein/items/0197a1f4 --priced_from--> pricing/quotes/01984c22</span>
+              <span class="output">note "ebay last-sold comp" how computed src tradein/items/0197a1f4</span>
+<span class="comment">  ── create a thread, with the reason in words and the provenance claim mandatory</span>
+
+<span class="prompt">youspeak></span> <span class="output">sever 914b5e23 how witnessed</span>
+<span class="comment">  ── threads end with a claim too</span>
+
+<span class="prompt">youspeak></span> <span class="output">explain "tradein/submissions/01977c2e -> contains"</span>
+<span class="green">  SELECT t.to_book AS book, t.to_deck AS deck, t.to_id AS id,</span>
+<span class="green">         t.note, t.at, t.by, t.how, t.src, t.id AS thread_id</span>
+<span class="green">  FROM yu.threads t</span>
+<span class="green">  WHERE t.word = 'contains'</span>
+<span class="green">    AND t.from_book = 'tradein' AND t.from_deck = 'submissions'</span>
+<span class="green">    AND t.from_id = '01977c2e-0000-7000-8000-000000000001'</span>
+<span class="comment">  ── YOUSPEAK never does anything you couldn't have typed</span>
+    </div>
+  </div>
+
+  <p>Traversal caps at <strong>2 hops</strong>. Deeper means you write <span class="mono">WITH RECURSIVE</span> yourself, knowingly.</p>
+  <p><span class="mono">.how</span> / <span class="mono">.at</span> / <span class="mono">.by</span> / <span class="mono">.src</span> address the honesty header in any <span class="mono">where</span>.</p>
+</section>
+
+<!-- ═══ honesty ═══ -->
+<section id="honesty">
+  <h2><span class="num">04</span>the honesty header</h2>
+  <p>Every deck and every thread carries four columns. There are <strong>no SQL defaults</strong> for <span class="mono">how</span> and <span class="mono">by</span> — a write that doesn't say is refused.</p>
+
+  <div class="honesty">
+    <div class="honesty-item"><div class="col">at</div><div class="claim">timestamptz — when this became true</div></div>
+    <div class="honesty-item"><div class="col">by</div><div class="claim">who asserted it: human:yu, agent:claude/session, system:cron/job</div></div>
+    <div class="honesty-item"><div class="col">how</div><div class="claim">CHECK-constrained: one of the five claim kinds</div></div>
+    <div class="honesty-item"><div class="col">src</div><div class="claim">text[] — what it came from; required for cached and computed</div></div>
+  </div>
+
+  <p>The five claim kinds:</p>
+  <div class="claims">
+    <div class="claim-chip"><span class="dot" style="background:var(--green)"></span>witnessed — a human saw or did it</div>
+    <div class="claim-chip"><span class="dot" style="background:var(--accent)"></span>live — read from the authoritative source at <span class="mono">at</span></div>
+    <div class="claim-chip"><span class="dot" style="background:#d4b896"></span>cached — a copy that may be stale; <span class="mono">src</span> says of what</div>
+    <div class="claim-chip"><span class="dot" style="background:#b8a0d4"></span>computed — derived; <span class="mono">src</span> lists the input refs</div>
+    <div class="claim-chip"><span class="dot" style="background:var(--text-faint)"></span>declared — asserted without evidence</div>
+  </div>
+
+  <p style="margin-top:1.5rem;font-size:0.9rem;color:var(--text-faint);">The honest ceiling, stated: provenance is self-reported. An agent can stamp <span class="mono">witnessed</span> falsely. YUTABASE makes lying explicit and auditable — not impossible.</p>
+</section>
+
+<!-- ═══ lexicon ═══ -->
+<section id="lexicon">
+  <h2><span class="num">05</span>the starter lexicon — seven words</h2>
+  <p>A word is born by migration. No gloss, no word. No inverse reading, no word. Banned by name: <span class="mono">related_to</span>, <span class="mono">linked</span>, <span class="mono">refs</span>, <span class="mono">misc</span>.</p>
+  <p>Seven words. Five spare in the budget. That's the point.</p>
+
+  <table class="lexicon">
+    <thead><tr><th>word</th><th>inverse</th><th>gloss</th></tr></thead>
+    <tbody>
+      <tr><td class="word">submitted_by</td><td class="inv">submitted</td><td>this record was submitted by that person or agent</td></tr>
+      <tr><td class="word">contains</td><td class="inv">contained in</td><td>physical or compositional containment</td></tr>
+      <tr><td class="word">supersedes</td><td class="inv">superseded by</td><td>this record replaces that one; the old stays readable</td></tr>
+      <tr><td class="word">priced_from</td><td class="inv">priced</td><td>this price was derived from that source record</td></tr>
+      <tr><td class="word">acted_for</td><td class="inv">acted via</td><td>an agent performed this on behalf of that operator</td></tr>
+      <tr><td class="word">refused_because</td><td class="inv">refused</td><td>this action was declined for that recorded reason</td></tr>
+      <tr><td class="word">witnesses</td><td class="inv">witnessed by</td><td>this record attests that one</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ═══ adoption ═══ -->
+<section>
+  <h2><span class="num">06</span>annex, don't rewrite</h2>
+  <p>A book is annexed <strong>one domain at a time</strong> into the existing database. Zero data movement. Rollback = drop two schemas.</p>
+
+  <div class="terminal">
+    <div class="terminal-header">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <div class="title">install</div>
+    </div>
+    <div class="terminal-body">
+<span class="prompt">$</span> <span class="output">yuta init --conn postgresql://localhost/mydb</span>
+<span class="dim">  applying 0001_yu_core.sql...</span>
+<span class="green">  done</span>
+<span class="dim">  applying 0002_starter_lexicon.sql...</span>
+<span class="green">  done</span>
+
+<span class="green">  YUTABASE installed. The vocabulary lives with the data.</span>
+<span class="green">  Seven words coined. Five spare in the budget. That's the point.</span>
+    </div>
+  </div>
+
+  <p>It touches no existing table. The <span class="mono">yu</span> schema lives beside everything. The vocabulary lives <strong>with</strong> the data, glosses included. If every tool above it dies, the data and its meaning remain readable by any future hand with nothing but <span class="mono">psql</span>.</p>
+</section>
+
+<!-- ═══ refusals ═══ -->
+<section>
+  <h2><span class="num">07</span>the refusals</h2>
+  <p>YUTABASE deliberately does not have:</p>
+  <div style="display:grid;gap:0.5rem;margin:1rem 0;">
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> ORM, no model classes, no query builder — strings in, rows out</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> storage engine, no wire protocol, no replication — Postgres's are better</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> graph ambitions — 2-hop cap; recursion is hand-written SQL</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> anonymous relations — <span class="mono">related_to</span> is banned by name</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> silent provenance — a write that won't say <span class="mono">how</span>/<span class="mono">by</span> bounces</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> hosted offering, no telemetry, no recurring spend</div>
+  </div>
+</section>
+
+<!-- ═══ footer ═══ -->
+<footer>
+  <p>YUTABASE v0.1 — drafted 2026-06-10 by Yu + Claude</p>
+  <p style="margin-top:0.5rem;">The name is Yu's. The lol is structural.</p>
+  <p style="margin-top:1rem;"><a href="https://github.com/nousresearch/yutabase">github</a> · <a href="#youspeak">YOUSPEAK</a> · <a href="#lexicon">lexicon</a></p>
+</footer>
+
+</body>
+</html>
