@@ -111,29 +111,27 @@ into it. An undeclared word is a constraint violation, not a style
 complaint. `to_one` words get a partial unique index (a card holds at most
 one live thread of that word). Endpoint patterns are validated by trigger.
 
-**Governed.**
+**Governed by meaning, not regulation.**
 - *Glosses are versioned, never silently edited* — an edited gloss changes
   the meaning of five-year-old threads retroactively, which is provenance
   corruption. Gloss changes append a new version row.
 - *Words are retired, never deleted* — retired words refuse new threads;
   old threads keep their meaning.
-- *Coining is privileged* — only the `yu_lexicographer` Postgres role may
-  INSERT into `yu.lexicon`. Day-to-day agents speak the language; adding
-  to it is a deliberate act.
 - *The vocabulary lives in git too* — `yuta words --export` writes
   `LEXICON.md`; word additions get diff review like code.
+- *A word needs a gloss, an inverse, and typed endpoints.* That's the bar.
+  No gloss, no inverse, no word — the rest is taste, not law.
 
-**What stops word-soup.**
-1. The closed lexicon (FK-enforced).
-2. The gloss + inverse requirement.
-3. Endpoint typing at insert.
-4. Banned words, by name: `related_to`, `linked`, `refs`, `misc`.
-5. The **twelve-word budget**: a book SHOULD hold under ~12 words; if you
-   need word thirteen, you probably need a new deck. `yuta doctor` flags
-   word #13, zero-use words, and near-synonyms sharing endpoints.
-6. **The nearest-word refusal**: a thread insert that misses the lexicon
-   fails with the closest existing word suggested (trigram similarity) —
-   the error steers agents back into the vocabulary instead of around it.
+**What keeps it honest.** Three gates, not six:
+1. The closed lexicon (FK-enforced — an undeclared word is a constraint
+   violation, not a style complaint).
+2. The gloss + inverse requirement (both directions must read as sentences:
+   `X contains Y` / `Y contained in X`).
+3. Endpoint typing at insert (validated by trigger).
+
+`yuta doctor` is a health check, not a police force — it surfaces zero-use
+words, near-synonyms, and growth pressure as *information*, not violations.
+The vocabulary grows by need, not by quota.
 
 ## 5 — The `yu` schema (normative core, abridged)
 
@@ -267,8 +265,8 @@ YUTABASE deliberately does not have:
 - **No storage engine, no wire protocol, no replication of its own** —
   Postgres's are better and already paid for.
 - **No graph ambitions** — 2-hop cap; recursion is hand-written SQL.
-- **No anonymous relations, no weasel words** — `related_to` is banned by
-  name; a thread without a word is a constraint violation.
+- **No anonymous relations** — a thread without a word is a constraint
+  violation. The gloss makes the meaning visible; the word makes it findable.
 - **No automatic versioning** — updates overwrite; history is an explicit
   `*_log` deck where a domain earns it.
 - **No permissions/multi-tenancy layer** — one operator plus agents;
@@ -287,7 +285,7 @@ YUTABASE deliberately does not have:
 | `refused_because` | `refused` | this action was declined for that recorded reason |
 | `witnesses` | `witnessed by` | this record attests that one (the Witnesses' Book pattern) |
 
-Seven words. Five spare in the budget. That's the point.
+Seven words. That's the point.
 
 ---
 

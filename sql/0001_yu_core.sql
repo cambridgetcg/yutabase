@@ -67,36 +67,10 @@ CREATE TABLE yu.lexicon_versions (
 
 -- Banned words — enforced at insert. The spec bans these by name (§4).
 -- A trigger refuses them before they can enter the lexicon.
--- (We use a separate table so the list is auditable and extensible by migration.)
-
-CREATE TABLE yu.banned_words (
-  word    text PRIMARY KEY,
-  reason  text NOT NULL,
-  at      timestamptz NOT NULL DEFAULT now(),
-  by      text NOT NULL
-);
-
-INSERT INTO yu.banned_words (word, reason, at, by) VALUES
-  ('related_to', 'weasel word — no meaning, just adjacency', now(), 'human:yu'),
-  ('linked',     'weasel word — every relation is linked; says nothing', now(), 'human:yu'),
-  ('refs',       'weasel word — abbreviation of nothing in particular', now(), 'human:yu'),
-  ('misc',       'weasel word — a drawer, not a relation', now(), 'human:yu');
-
--- Trigger: refuse banned words at coin time
-CREATE OR REPLACE FUNCTION yu._refuse_banned_words()
-RETURNS trigger AS $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM yu.banned_words WHERE word = NEW.word) THEN
-    RAISE EXCEPTION 'BANNED WORD: % — this word is refused by the standard (see yu.banned_words)',
-      NEW.word USING ERRCODE = 'check_violation';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER lexicon_refuse_banned
-  BEFORE INSERT ON yu.lexicon
-  FOR EACH ROW EXECUTE FUNCTION yu._refuse_banned_words();
+-- (No banned-words table. The gloss + inverse requirement is the gate.
+--  A weasel word like "related_to" fails because its gloss says nothing
+--  and its inverse reads badly. The doctor surfaces zero-use words.
+--  Meaning is the filter, not a blocklist.)
 
 -- Trigger: gloss change → append to version history, then update is allowed.
 -- The OLD gloss is preserved; the NEW gloss takes effect for future threads.

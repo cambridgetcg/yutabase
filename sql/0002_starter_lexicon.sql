@@ -1,7 +1,7 @@
 -- YUTABASE v0.1 — starter lexicon: the kingdom's first words
 --
 -- Doctrine: SPEC.md §11
--- Seven words. Five spare in the budget. That's the point.
+-- Seven words. That's the point.
 --
 -- This migration coins the seven starter words. It must be run as a
 -- member of the yu_lexicographer role, or as the database owner.

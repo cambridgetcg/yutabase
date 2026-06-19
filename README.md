@@ -82,13 +82,13 @@ Every deck and every thread carries four columns. No SQL defaults for `how` and 
 | `how` | text, CHECK-constrained | one of: witnessed · live · cached · computed · declared |
 | `src` | text[] nullable | what it came from; **required** for cached and computed |
 
-Provenance is self-reported. An agent can stamp `witnessed` falsely. YUTABASE makes lying explicit and auditable — not impossible.
+Provenance is self-reported. An agent can stamp `witnessed` falsely. YUTABASE makes lying explicit and auditable — not impossible. A word needs a gloss, an inverse, and typed endpoints. That's the bar — the rest is taste, not law.
 
 ---
 
 ## the starter lexicon
 
-Seven words. Five spare in the budget. That's the point.
+Seven words. That's the point.
 
 | word | inverse | gloss |
 |---|---|---|

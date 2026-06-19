@@ -16,8 +16,7 @@ Every record carries an honesty header: at, by, how, src.
 - cached and computed MUST have src — a write that won't say is refused
 
 Glosses are versioned (never silently edited). Words are retired (never deleted).
-Banned words: related_to, linked, refs, misc.
-Twelve-word budget per book.
+A word needs a gloss, an inverse, and typed endpoints. That's the bar — the rest is taste, not law.
 
 ## YOUSPEAK — six verbs, frozen
 
@@ -70,7 +69,7 @@ yuta explain "<youspeak>"                 — print the SQL (no DB needed)
 | refused_because | refused | this action was declined for that recorded reason |
 | witnesses | witnessed by | this record attests that one |
 
-Seven words. Five spare in the budget. That's the point.
+Seven words. That's the point.
 
 ## the honest ceiling
 
