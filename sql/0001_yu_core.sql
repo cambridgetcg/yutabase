@@ -505,14 +505,13 @@ END $$;
 -- The owner of the schema can do everything; the lexicographer can manage
 -- the lexicon. Other roles get read-only on the lexicon by default.
 GRANT USAGE ON SCHEMA yu TO PUBLIC;
-GRANT SELECT ON yu.lexicon, yu.lexicon_versions, yu.banned_words, yu.registry TO PUBLIC;
+GRANT SELECT ON yu.lexicon, yu.lexicon_versions, yu.registry TO PUBLIC;
 GRANT SELECT ON yu.threads TO PUBLIC;
 GRANT SELECT ON yu.sever_log TO PUBLIC;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA yu TO PUBLIC;
 
 GRANT INSERT, UPDATE ON yu.lexicon TO yu_lexicographer;
 GRANT INSERT ON yu.lexicon_versions TO yu_lexicographer;
-GRANT INSERT, UPDATE, DELETE ON yu.banned_words TO yu_lexicographer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON yu.registry TO yu_lexicographer;
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA yu TO PUBLIC;
 
