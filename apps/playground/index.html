@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOUSPEAK — playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08090a;
+  --panel: #0f1011;
+  --surface: #191a1b;
+  --text: #f7f8f8;
+  --text-2: #d0d6e0;
+  --text-3: #8a8f98;
+  --text-4: #62666d;
+  --accent: #5e6ad2;
+  --accent-2: #7170ff;
+  --border: rgba(255,255,255,0.08);
+  --border-subtle: rgba(255,255,255,0.05);
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
+  --cyan: #22d3ee;
+  --pink: #ec4899;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: "cv01", "ss03";
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.mono { font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace; }
+
+.app {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 56px 28px 80px;
+  min-height: 100%;
+}
+
+/* Header */
+header.hero {
+  text-align: center;
+  margin-bottom: 48px;
+}
+.brand-line {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  margin-bottom: 18px;
+}
+.brand-line .dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--accent-2);
+  border-radius: 50%;
+  margin: 0 10px;
+  vertical-align: middle;
+  box-shadow: 0 0 12px rgba(113,112,255,0.6);
+}
+h1.title {
+  font-size: 44px;
+  font-weight: 600;
+  letter-spacing: -1.4px;
+  line-height: 1.05;
+  margin-bottom: 16px;
+}
+h1.title .accent { color: var(--accent-2); }
+.subtitle {
+  font-size: 17px;
+  font-weight: 300;
+  color: var(--text-3);
+  line-height: 1.6;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+/* Composer */
+.composer {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 24px;
+  transition: border-color 0.15s;
+}
+.composer:focus-within { border-color: rgba(113,112,255,0.35); }
+
+.input-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 16px;
+  transition: border-color 0.15s;
+}
+.input-wrap:focus-within { border-color: rgba(113,112,255,0.4); }
+.prompt-glyph {
+  color: var(--accent-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  margin-right: 10px;
+  user-select: none;
+  opacity: 0.7;
+}
+#input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 400;
+  padding: 14px 0;
+  letter-spacing: 0.1px;
+}
+#input::placeholder { color: var(--text-4); }
+
+button.compile {
+  background: var(--accent-2);
+  color: #0a0a14;
+  border: none;
+  border-radius: 10px;
+  padding: 0 24px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+button.compile:hover { background: #8a89ff; transform: translateY(-1px); }
+button.compile:active { transform: translateY(0); }
+button.compile .kbd {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(0,0,0,0.25);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+/* Examples */
+.examples {
+  margin-bottom: 28px;
+}
+.examples-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.examples-label .verb-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--accent-2);
+  background: rgba(113,112,255,0.1);
+  border: 1px solid rgba(113,112,255,0.2);
+  padding: 1px 6px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  vertical-align: middle;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 7px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.chip:hover {
+  background: rgba(113,112,255,0.1);
+  border-color: rgba(113,112,255,0.35);
+  color: var(--text);
+}
+.chip.active {
+  background: rgba(113,112,255,0.14);
+  border-color: rgba(113,112,255,0.45);
+  color: var(--text);
+}
+
+/* Result */
+.result {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255,255,255,0.015);
+}
+.result-head .label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.verb-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-2);
+  background: rgba(113,112,255,0.1);
+  border: 1px solid rgba(113,112,255,0.2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.result-head .actions { display: flex; gap: 8px; }
+.icon-btn {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+
+/* Explain split view */
+.explain-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.explain-split .col { padding: 20px 22px; }
+.explain-split .col:first-child { border-right: 1px solid var(--border-subtle); }
+.explain-col-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.youspeak-sentence {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--cyan);
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* Code view */
+.code-view {
+  padding: 20px 22px;
+  overflow-x: auto;
+}
+.code-view pre {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+.tok-kw   { color: var(--accent-2); font-weight: 500; }
+.tok-fn   { color: var(--cyan); }
+.tok-str  { color: var(--green); }
+.tok-num  { color: var(--amber); }
+.tok-id   { color: var(--text-2); }
+.tok-param{ color: var(--pink); font-weight: 500; }
+.tok-op   { color: var(--text-3); }
+.tok-com  { color: var(--text-4); font-style: italic; }
+.tok-punc { color: var(--text-3); }
+
+/* Params panel */
+.params-view {
+  padding: 16px 22px;
+  border-top: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.18);
+}
+.params-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.params-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.param-item {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.param-item .pn { color: var(--pink); font-weight: 500; }
+.param-item .pv { color: var(--green); word-break: break-all; }
+.param-item .pv.null { color: var(--text-4); font-style: italic; }
+.param-item .pv.arr { color: var(--cyan); }
+
+/* Empty / error states */
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-4);
+  font-size: 14px;
+  font-weight: 300;
+}
+.empty .glyph {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  color: var(--text-4);
+  margin-bottom: 14px;
+  opacity: 0.5;
+}
+.empty .hint { font-size: 12px; margin-top: 6px; color: var(--text-4); }
+
+.error-box {
+  padding: 18px 22px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.error-box .err-glyph {
+  color: var(--red);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 1px;
+}
+.error-box .err-text {
+  color: var(--text-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.error-box .err-text .err-tag {
+  display: inline-block;
+  color: var(--red);
+  font-weight: 600;
+}
+
+/* Doctrine footer */
+.doctrine {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 13px;
+  color: var(--text-4);
+  line-height: 1.7;
+  text-align: center;
+}
+.doctrine strong { color: var(--text-3); font-weight: 500; }
+.doctrine .verbs {
+  margin-top: 14px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.verb-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-3);
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  padding: 3px 10px;
+}
+
+/* Verb legend */
+.verb-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  margin-bottom: 32px;
+}
+.verb-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  transition: background 0.15s;
+}
+.verb-card:hover { background: rgba(255,255,255,0.04); }
+.verb-card .vc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.verb-card .vc-verb {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-2);
+}
+.verb-card .vc-num {
+  font-size: 10px;
+  color: var(--text-4);
+  font-family: 'JetBrains Mono', monospace;
+}
+.verb-card .vc-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+@media (max-width: 680px) {
+  .app { padding: 36px 16px 60px; }
+  h1.title { font-size: 32px; }
+  .input-row { flex-direction: column; }
+  button.compile { padding: 12px 24px; justify-content: center; }
+  .explain-split { grid-template-columns: 1fr; }
+  .explain-split .col:first-child { border-right: none; border-bottom: 1px solid var(--border-subtle); }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="hero">
+    <div class="brand-line">YUTABASE<span class="dot"></span>the dialect that fits in a memory file</div>
+    <h1 class="title">YOUSPEAK <span class="accent">playground</span></h1>
+    <p class="subtitle">Six frozen verbs. Each one compiles to honest SQL you could have typed yourself. Type a sentence — see exactly what it becomes.</p>
+  </header>
+
+  <!-- Verb legend -->
+  <div class="verb-legend" id="verbLegend"></div>
+
+  <!-- Composer -->
+  <div class="composer">
+    <div class="input-row">
+      <div class="input-wrap">
+        <span class="prompt-glyph mono">youspeak›</span>
+        <input id="input" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          placeholder="cards tradein/submissions where status=&quot;pending&quot; newest 20" />
+      </div>
+      <button class="compile" id="compileBtn">
+        Compile <span class="kbd">⏎</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Examples -->
+  <div class="examples">
+    <div class="examples-label">
+      <span class="verb-tag">try</span>
+      Example sentences — click to compile
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <!-- Result -->
+  <div class="result" id="result">
+    <div class="empty">
+      <div class="glyph mono">▌</div>
+      <div>Nothing compiled yet.</div>
+      <div class="hint">Type a YOUSPEAK sentence above or click an example.</div>
+    </div>
+  </div>
+
+  <!-- Doctrine -->
+  <div class="doctrine">
+    <p>YOUSPEAK never does anything you couldn't have typed. <strong>Six verbs, frozen.</strong><br>
+    Every proposed seventh is treated as a request to write SQL instead.</p>
+    <div class="verbs">
+      <span class="verb-pill">hello</span>
+      <span class="verb-pill">card</span>
+      <span class="verb-pill">cards</span>
+      <span class="verb-pill">→&nbsp;←</span>
+      <span class="verb-pill">thread</span>
+      <span class="verb-pill">sever</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// YOUSPEAK compiler — ported from packages/sdk-ts/src/youspeak.ts
+// Pure. No imports. No dependencies. Six frozen verbs.
+// ══════════════════════════════════════════════════════════════
+
+// ── ref parser (from ref.ts) ──────────────────────────────────
+function parseRef(ref) {
+  const parts = ref.split("/");
+  if (parts.length !== 3) {
+    throw new Error('BAD REF: "' + ref + '" — expected book/deck/id (3 segments, got ' + parts.length + ')');
+  }
+  const [book, deck, id] = parts;
+  if (!book || !deck || !id) {
+    throw new Error('BAD REF: "' + ref + '" — book, deck, and id are all required');
+  }
+  if (!isValidUuid(id)) {
+    throw new Error('BAD REF: "' + ref + '" — id is not a valid UUID');
+  }
+  return { book, deck, id };
+}
+
+function isValidUuid(s) {
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const shortRe = /^[0-9a-f]{8,}$/i;
+  return uuidRe.test(s) || shortRe.test(s);
+}
+
+function isValidColumnName(name) {
+  return /^[a-z_][a-z0-9_]*$/.test(name);
+}
+
+function ident(name) {
+  if (!isValidColumnName(name)) {
+    throw new Error('BAD IDENTIFIER: "' + name + '"');
+  }
+  return '"' + name + '"';
+}
+
+function parseDeckRef(s) {
+  const parts = s.split("/");
+  if (parts.length !== 2) throw new Error('BAD DECK REF: "' + s + '" — expected book/deck');
+  return { book: parts[0], deck: parts[1] };
+}
+
+// ── compile ───────────────────────────────────────────────────
+function compile(input) {
+  const trimmed = input.trim();
+  if (trimmed === "") throw new Error("EMPTY QUERY");
+
+  // hello
+  if (trimmed === "hello") {
+    return { sql: "SELECT 1", params: [], kind: "hello" };
+  }
+
+  // explain "<query>"
+  const explainMatch = trimmed.match(/^explain\s+"(.+)"$/);
+  if (explainMatch) {
+    const inner = compile(explainMatch[1]);
+    return {
+      sql: "SELECT $1::text AS sql",
+      params: [inner.sql],
+      kind: "explain",
+      explainedSql: inner.sql,
+      explainedParams: inner.params,
+      explainedSentence: explainMatch[1],
+    };
+  }
+
+  // card <ref>
+  const cardMatch = trimmed.match(/^card\s+(\S+)$/);
+  if (cardMatch) {
+    const ref = parseRef(cardMatch[1]);
+    return {
+      sql: "SELECT * FROM " + ident(ref.book) + "." + ident(ref.deck) + " WHERE " + ident("id") + " = $1",
+      params: [ref.id],
+      kind: "card",
+    };
+  }
+
+  // cards <book/deck> [where ...] [newest N]
+  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+(.+?))?(?:\s+(?:newest|last)\s+(\d+))?$/);
+  if (cardsMatch) {
+    const dp = parseDeckRef(cardsMatch[1]);
+    const limit = cardsMatch[3] ? parseInt(cardsMatch[3], 10) : undefined;
+    const where = cardsMatch[2] ? parseWhere(cardsMatch[2]) : undefined;
+    return compileCards(dp.book, dp.deck, where, limit);
+  }
+
+  // thread <from-ref> --<word>--> <to-ref> [note "..."] how <claim> [src ...]
+  const threadMatch = trimmed.match(
+    /^thread\s+(\S+)\s+--(\S+?)-->\s+(\S+)(?:\s+note\s+"([^"]*)")?(?:\s+how\s+(\S+))?(?:\s+src\s+(.+))?$/
+  );
+  if (threadMatch) {
+    const from = parseRef(threadMatch[1]);
+    const word = threadMatch[2];
+    const to = parseRef(threadMatch[3]);
+    const note = threadMatch[4];
+    const how = threadMatch[5];
+    const srcPart = threadMatch[6];
+    if (!how) throw new Error("THREAD REQUIRES how — no default (honesty header)");
+    if ((how === "cached" || how === "computed") && !srcPart) {
+      throw new Error("THREAD: how=" + how + " requires src — honesty header");
+    }
+    const src = srcPart ? srcPart.split(/\s+/) : undefined;
+    return compileThread(from, word, to, note, how, src);
+  }
+
+  // sever <thread-id> how <claim> [src ...]
+  const severMatch = trimmed.match(/^sever\s+(\S+)\s+how\s+(\S+)(?:\s+src\s+(.+))?$/);
+  if (severMatch) {
+    const threadId = severMatch[1];
+    const how = severMatch[2];
+    const srcPart = severMatch[3];
+    if ((how === "cached" || how === "computed") && !srcPart) {
+      throw new Error("SEVER: how=" + how + " requires src — honesty header");
+    }
+    const src = srcPart ? srcPart.split(/\s+/) : undefined;
+    return compileSever(threadId, how, src);
+  }
+
+  // traversal
+  const traverseResult = tryTraversal(trimmed);
+  if (traverseResult) return traverseResult;
+
+  throw new Error('UNRECOGNIZED QUERY: "' + trimmed + '" — not one of the six verbs (hello, card, cards, ->, <-, thread, sever)');
+}
+
+function tryTraversal(input) {
+  const twoHopMatch = input.match(/^(\S+)\s+(->|<-)\s+(\S+)\s+(->|<-)\s+(\S+)$/);
+  if (twoHopMatch) {
+    const ref = parseRef(twoHopMatch[1]);
+    return compileTraversal(ref, twoHopMatch[2], twoHopMatch[3], { direction: twoHopMatch[4], word: twoHopMatch[5] });
+  }
+  const oneHopMatch = input.match(/^(\S+)\s+(->|<-)\s+(\S+)$/);
+  if (oneHopMatch) {
+    const ref = parseRef(oneHopMatch[1]);
+    return compileTraversal(ref, oneHopMatch[2], oneHopMatch[3]);
+  }
+  return null;
+}
+
+function compileTraversal(ref, dir, word, secondHop) {
+  const isFirstHopOut = dir === "->";
+  let sql;
+  const params = [ref.book, ref.deck, ref.id];
+  const kind = "traverse";
+
+  if (!secondHop) {
+    if (isFirstHopOut) {
+      sql =
+        "SELECT t.to_book AS book, t.to_deck AS deck, t.to_id AS id,\n" +
+        "       t.note, t.at, t.by, t.how, t.src, t.id AS thread_id\n" +
+        "FROM yu.threads t\n" +
+        "WHERE t.word = $4\n" +
+        "  AND t.from_book = $1 AND t.from_deck = $2 AND t.from_id = $3\n" +
+        "ORDER BY t.at DESC";
+    } else {
+      sql =
+        "SELECT t.from_book AS book, t.from_deck AS deck, t.from_id AS id,\n" +
+        "       t.note, t.at, t.by, t.how, t.src, t.id AS thread_id\n" +
+        "FROM yu.threads t\n" +
+        "WHERE t.word = $4\n" +
+        "  AND t.to_book = $1 AND t.to_deck = $2 AND t.to_id = $3\n" +
+        "ORDER BY t.at DESC";
+    }
+    params.push(word);
+  } else {
+    const isSecondOut = secondHop.direction === "->";
+    const word1Param = word;
+    const word2Param = secondHop.word;
+
+    if (isFirstHopOut && isSecondOut) {
+      sql =
+        "SELECT t2.to_book AS book, t2.to_deck AS deck, t2.to_id AS id,\n" +
+        "       t2.note, t2.at, t2.by, t2.how, t2.src, t2.id AS thread_id\n" +
+        "FROM yu.threads t1\n" +
+        "JOIN yu.threads t2\n" +
+        "  ON t2.from_book = t1.to_book AND t2.from_deck = t1.to_deck AND t2.from_id = t1.to_id\n" +
+        "WHERE t1.word = $4 AND t1.from_book = $1 AND t1.from_deck = $2 AND t1.from_id = $3\n" +
+        "  AND t2.word = $5\n" +
+        "ORDER BY t2.at DESC";
+    } else if (isFirstHopOut && !isSecondOut) {
+      sql =
+        "SELECT t2.from_book AS book, t2.from_deck AS deck, t2.from_id AS id,\n" +
+        "       t2.note, t2.at, t2.by, t2.how, t2.src, t2.id AS thread_id\n" +
+        "FROM yu.threads t1\n" +
+        "JOIN yu.threads t2\n" +
+        "  ON t2.to_book = t1.to_book AND t2.to_deck = t1.to_deck AND t2.to_id = t1.to_id\n" +
+        "WHERE t1.word = $4 AND t1.from_book = $1 AND t1.from_deck = $2 AND t1.from_id = $3\n" +
+        "  AND t2.word = $5\n" +
+        "ORDER BY t2.at DESC";
+    } else if (!isFirstHopOut && isSecondOut) {
+      sql =
+        "SELECT t2.to_book AS book, t2.to_deck AS deck, t2.to_id AS id,\n" +
+        "       t2.note, t2.at, t2.by, t2.how, t2.src, t2.id AS thread_id\n" +
+        "FROM yu.threads t1\n" +
+        "JOIN yu.threads t2\n" +
+        "  ON t2.from_book = t1.from_book AND t2.from_deck = t1.from_deck AND t2.from_id = t1.from_id\n" +
+        "WHERE t1.word = $4 AND t1.to_book = $1 AND t1.to_deck = $2 AND t1.to_id = $3\n" +
+        "  AND t2.word = $5\n" +
+        "ORDER BY t2.at DESC";
+    } else {
+      sql =
+        "SELECT t2.from_book AS book, t2.from_deck AS deck, t2.from_id AS id,\n" +
+        "       t2.note, t2.at, t2.by, t2.how, t2.src, t2.id AS thread_id\n" +
+        "FROM yu.threads t1\n" +
+        "JOIN yu.threads t2\n" +
+        "  ON t2.to_book = t1.from_book AND t2.to_deck = t1.from_deck AND t2.to_id = t1.from_id\n" +
+        "WHERE t1.word = $4 AND t1.to_book = $1 AND t1.to_deck = $2 AND t1.to_id = $3\n" +
+        "  AND t2.word = $5\n" +
+        "ORDER BY t2.at DESC";
+    }
+    params.push(word1Param, word2Param);
+  }
+
+  return { sql: sql.trim(), params, kind };
+}
+
+function compileCards(book, deck, where, limit) {
+  let sql = "SELECT * FROM " + ident(book) + "." + ident(deck);
+  const params = [];
+  let paramIdx = 1;
+
+  if (where && where.conditions.length > 0) {
+    const adjusted = where.conditions.map((c) =>
+      c.replace(/\$(\d+)/g, (_, n) => "$" + (paramIdx + parseInt(n, 10) - 1))
+    );
+    where.params.forEach((p) => params.push(p));
+    paramIdx += where.params.length;
+    sql += " WHERE " + adjusted.join(" AND ");
+  }
+
+  sql += " ORDER BY id DESC";
+
+  if (limit) {
+    sql += " LIMIT $" + paramIdx;
+    params.push(limit);
+  }
+
+  return { sql: sql.trim(), params, kind: "cards" };
+}
+
+function parseWhere(input) {
+  const conditions = [];
+  const params = [];
+  const parts = input.split(/\s+and\s+/i);
+
+  for (const part of parts) {
+    const m = part.match(/^(\.?[\w]+)\s*(=|!=|>=|<=|>|<)\s*(?:"([^"]*)"|(\S+))$/);
+    if (!m) {
+      throw new Error('BAD WHERE: "' + part + '" — expected column op value (e.g. status="pending" or .how="witnessed")');
+    }
+    const col = m[1];
+    const op = m[2];
+    const quotedVal = m[3];
+    const bareVal = m[4];
+    const value = quotedVal !== undefined ? quotedVal : bareVal;
+    const columnName = col.startsWith(".") ? col.slice(1) : col;
+
+    if (!isValidColumnName(columnName)) {
+      throw new Error('BAD COLUMN: "' + columnName + '" — not a valid column name');
+    }
+
+    conditions.push(ident(columnName) + " " + op + " $" + (params.length + 1));
+    params.push(value);
+  }
+
+  return { conditions, params };
+}
+
+function compileThread(from, word, to, note, how, src) {
+  const params = [word, from.book, from.deck, from.id, to.book, to.deck, to.id];
+  let paramIdx = 8;
+
+  let noteParam = "";
+  if (note !== undefined) {
+    noteParam = "$" + paramIdx;
+    params.push(note);
+    paramIdx++;
+  } else {
+    noteParam = "NULL";
+  }
+
+  params.push(how);
+  const howParam = "$" + paramIdx;
+  paramIdx++;
+
+  const byParam = "$" + paramIdx;
+  params.push("__CLAIMANT__");
+  paramIdx++;
+
+  params.push(new Date().toISOString());
+  const atParam = "$" + paramIdx;
+  paramIdx++;
+
+  let srcParam = "NULL";
+  if (src) {
+    srcParam = "$" + paramIdx;
+    params.push(src);
+    paramIdx++;
+  }
+
+  const sql =
+    "INSERT INTO yu.threads (id, word, from_book, from_deck, from_id, to_book, to_deck, to_id, note, at, by, how, src)\n" +
+    "VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, " + noteParam + ", " + atParam + ", " + byParam + ", " + howParam + ", " + srcParam + ")\n" +
+    "RETURNING *";
+
+  return { sql: sql.trim(), params, kind: "thread" };
+}
+
+function compileSever(threadId, how, src) {
+  const params = [threadId, "__CLAIMANT__", how];
+  if (src) {
+    params.push(src);
+  } else {
+    params.push(null);
+  }
+  return { sql: "SELECT yu.sever($1, $2, $3, $4)", params, kind: "sever" };
+}
+
+// explain — substitute params for readability
+function explain(query) {
+  const compiled = compile(query);
+  let sql = compiled.sql;
+  compiled.params.forEach((p, i) => {
+    let val;
+    if (p === null) val = "NULL";
+    else if (typeof p === "string") val = "'" + p + "'";
+    else if (Array.isArray(p)) val = "ARRAY[" + p.map((x) => (typeof x === "string" ? "'" + x + "'" : String(x))).join(", ") + "]";
+    else val = String(p);
+    sql = sql.replace(new RegExp("\\$" + (i + 1), "g"), val);
+  });
+  return sql;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SQL syntax highlighter (tokenizer-based, safe — no innerHTML of user text)
+// ══════════════════════════════════════════════════════════════
+
+const SQL_KEYWORDS = new Set([
+  "SELECT","FROM","WHERE","ORDER","BY","DESC","ASC","LIMIT","INSERT","INTO","VALUES",
+  "RETURNING","JOIN","ON","AND","OR","AS","NULL","NOT","GROUP","HAVING","UPDATE",
+  "SET","DELETE","DISTINCT","CASE","WHEN","THEN","ELSE","END","IS","IN","EXISTS",
+  "UNION","ALL","CREATE","TABLE","IF","TRUE","FALSE"
+]);
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function highlightSql(sql) {
+  // Tokenize: strings, params ($N), numbers, identifiers (incl. quoted), operators, punctuation, whitespace
+  const tokens = [];
+  let i = 0;
+  const n = sql.length;
+  const isWordChar = (c) => /[A-Za-z0-9_]/.test(c);
+
+  while (i < n) {
+    const c = sql[i];
+
+    // whitespace
+    if (/\s/.test(c)) {
+      let j = i;
+      while (j < n && /\s/.test(sql[j])) j++;
+      tokens.push({ type: "ws", text: sql.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // line comment --
+    if (c === "-" && sql[i + 1] === "-") {
+      let j = i;
+      while (j < n && sql[j] !== "\n") j++;
+      tokens.push({ type: "com", text: sql.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // string literal '...'
+    if (c === "'") {
+      let j = i + 1;
+      while (j < n) {
+        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue; }
+        if (sql[j] === "'") { j++; break; }
+        j++;
+      }
+      tokens.push({ type: "str", text: sql.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // parameter $N
+    if (c === "$") {
+      let j = i + 1;
+      while (j < n && /[0-9]/.test(sql[j])) j++;
+      if (j > i + 1) {
+        tokens.push({ type: "param", text: sql.slice(i, j) });
+        i = j;
+        continue;
+      }
+    }
+
+    // quoted identifier "..."
+    if (c === '"') {
+      let j = i + 1;
+      while (j < n && sql[j] !== '"') j++;
+      if (sql[j] === '"') j++;
+      tokens.push({ type: "id", text: sql.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // number
+    if (/[0-9]/.test(c)) {
+      let j = i;
+      while (j < n && /[0-9.]/.test(sql[j])) j++;
+      tokens.push({ type: "num", text: sql.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // word (function name or keyword)
+    if (/[A-Za-z_]/.test(c)) {
+      let j = i;
+      while (j < n && isWordChar(sql[j])) j++;
+      const word = sql.slice(i, j);
+      // function call if followed by '('
+      let k = j;
+      while (k < n && /\s/.test(sql[k])) k++;
+      if (sql[k] === "(") {
+        tokens.push({ type: "fn", text: word });
+      } else if (SQL_KEYWORDS.has(word.toUpperCase())) {
+        tokens.push({ type: "kw", text: word });
+      } else {
+        tokens.push({ type: "id", text: word });
+      }
+      i = j;
+      continue;
+    }
+
+    // operators / punctuation
+    if (/[=<>!]/.test(c)) {
+      let j = i;
+      while (j < n && /[=<>!]/.test(sql[j])) j++;
+      tokens.push({ type: "op", text: sql.slice(i, j) });
+      i = j;
+      continue;
+    }
+
+    // single punctuation
+    tokens.push({ type: "punc", text: c });
+    i++;
+  }
+
+  return tokens
+    .map((t) => {
+      const esc = escapeHtml(t.text);
+      switch (t.type) {
+        case "kw": return '<span class="tok-kw">' + esc + "</span>";
+        case "fn": return '<span class="tok-fn">' + esc + "</span>";
+        case "str": return '<span class="tok-str">' + esc + "</span>";
+        case "num": return '<span class="tok-num">' + esc + "</span>";
+        case "param": return '<span class="tok-param">' + esc + "</span>";
+        case "id": return '<span class="tok-id">' + esc + "</span>";
+        case "op": return '<span class="tok-op">' + esc + "</span>";
+        case "com": return '<span class="tok-com">' + esc + "</span>";
+        case "punc": return '<span class="tok-punc">' + esc + "</span>";
+        default: return esc;
+      }
+    })
+    .join("");
+}
+
+// ══════════════════════════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════════════════════════
+
+const EXAMPLES = [
+  "hello",
+  "card tradein/submissions/01977c2e",
+  'cards tradein/submissions where status="pending" newest 20',
+  "tradein/submissions/01977c2e -> contains",
+  "tradein/items/0197a1f4 <- contains",
+  'thread tradein/submissions/01977c2e --contains--> tradein/items/0197a1f4 note "box A" how witnessed',
+  'explain "cards tradein/submissions newest 5"',
+];
+
+const VERBS = [
+  { n: "1", verb: "hello", desc: "the whole standard in one call — SELECT 1" },
+  { n: "2", verb: "card <ref>", desc: "one card by reference — book/deck/id" },
+  { n: "3", verb: "cards <book/deck>", desc: "list cards, filter with where, newest N" },
+  { n: "4", verb: "ref → word / ref ← word", desc: "follow threads outward or inward" },
+  { n: "5", verb: "thread a --w--> b", desc: "create a thread — requires how (honesty)" },
+  { n: "6", verb: "sever <id>", desc: "end a thread — requires how (honesty)" },
+];
+
+function renderVerbLegend() {
+  document.getElementById("verbLegend").innerHTML = VERBS.map((v) =>
+    '<div class="verb-card">' +
+      '<div class="vc-head"><span class="vc-verb">' + escapeHtml(v.verb) + '</span><span class="vc-num">' + v.n + '</span></div>' +
+      '<div class="vc-desc">' + escapeHtml(v.desc) + "</div>" +
+    "</div>"
+  ).join("");
+}
+
+function renderChips() {
+  document.getElementById("chips").innerHTML = EXAMPLES.map((ex, i) =>
+    '<button class="chip" data-idx="' + i + '">' + escapeHtml(ex) + "</button>"
+  ).join("");
+}
+
+function formatParamValue(p) {
+  if (p === null) return { text: "NULL", cls: "null" };
+  if (Array.isArray(p)) return { text: "[" + p.map((x) => (typeof x === "string" ? '"' + x + '"' : String(x))).join(", ") + "]", cls: "arr" };
+  if (typeof p === "string") return { text: '"' + p + '"', cls: "" };
+  return { text: String(p), cls: "" };
+}
+
+function renderParams(params) {
+  if (!params || params.length === 0) return "";
+  const items = params.map((p, i) => {
+    const fv = formatParamValue(p);
+    return '<div class="param-item"><span class="pn">$' + (i + 1) + '</span><span class="pv ' + fv.cls + '">' + escapeHtml(fv.text) + "</span></div>";
+  }).join("");
+  return (
+    '<div class="params-view">' +
+      '<div class="params-label">params · ' + params.length + "</div>" +
+      '<div class="params-list">' + items + "</div>" +
+    "</div>"
+  );
+}
+
+function kindLabel(kind) {
+  const labels = {
+    hello: "hello",
+    card: "card",
+    cards: "cards",
+    traverse: "traverse →/←",
+    thread: "thread",
+    sever: "sever",
+    explain: "explain",
+  };
+  return labels[kind] || kind;
+}
+
+function runCompile(sentence) {
+  const resultEl = document.getElementById("result");
+  const trimmed = sentence.trim();
+
+  if (trimmed === "") {
+    resultEl.innerHTML =
+      '<div class="empty"><div class="glyph mono">▌</div><div>Nothing compiled yet.</div>' +
+      '<div class="hint">Type a YOUSPEAK sentence above or click an example.</div></div>';
+    return;
+  }
+
+  let compiled;
+  try {
+    compiled = compile(sentence);
+  } catch (err) {
+    resultEl.innerHTML =
+      '<div class="error-box">' +
+        '<span class="err-glyph">✕</span>' +
+        '<div class="err-text"><span class="err-tag">compile error</span><br>' + escapeHtml(err.message) + "</div>" +
+      "</div>";
+    return;
+  }
+
+  const codeHtml = highlightSql(compiled.sql);
+  const paramsHtml = renderParams(compiled.params);
+  const badge = '<span class="verb-badge">' + escapeHtml(kindLabel(compiled.kind)) + "</span>";
+  const copyBtn = '<button class="icon-btn" id="copyBtn">copy sql</button>';
+
+  if (compiled.kind === "explain") {
+    // Explain: show YOUSPEAK sentence + compiled SQL side by side, plus the wrapper query
+    const explainedHtml = highlightSql(compiled.explainedSql);
+    resultEl.innerHTML =
+      '<div class="result-head"><div class="label">explain <span class="verb-badge">youspeak</span> <span style="color:var(--text-3)">→</span> ' + badge + "</div>" +
+      '<div class="actions">' + copyBtn + "</div></div>" +
+      '<div class="explain-split">' +
+        '<div class="col">' +
+          '<div class="explain-col-label">youspeak sentence</div>' +
+          '<div class="youspeak-sentence">' + escapeHtml(compiled.explainedSentence) + "</div>" +
+        "</div>" +
+        '<div class="col">' +
+          '<div class="explain-col-label">compiled sql</div>' +
+          '<div class="code-view" style="padding:0"><pre>' + explainedHtml + "</pre></div>" +
+        "</div>" +
+      "</div>" +
+      paramsHtml;
+  } else {
+    resultEl.innerHTML =
+      '<div class="result-head"><div class="label">' + badge + "</div>" +
+      '<div class="actions">' + copyBtn + "</div></div>" +
+      '<div class="code-view"><pre>' + codeHtml + "</pre></div>" +
+      paramsHtml;
+  }
+
+  // wire copy button
+  const copyBtnEl = document.getElementById("copyBtn");
+  if (copyBtnEl) {
+    copyBtnEl.addEventListener("click", () => {
+      const sqlToCopy = compiled.kind === "explain" ? compiled.explainedSql : compiled.sql;
+      navigator.clipboard.writeText(sqlToCopy).then(() => {
+        copyBtnEl.textContent = "copied ✓";
+        setTimeout(() => { copyBtnEl.textContent = "copy sql"; }, 1400);
+      }).catch(() => {
+        copyBtnEl.textContent = "copy failed";
+        setTimeout(() => { copyBtnEl.textContent = "copy sql"; }, 1400);
+      });
+    });
+  }
+}
+
+function setActiveChip(idx) {
+  document.querySelectorAll(".chip").forEach((c, i) => {
+    c.classList.toggle("active", i === idx);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderVerbLegend();
+  renderChips();
+
+  const input = document.getElementById("input");
+  const compileBtn = document.getElementById("compileBtn");
+
+  const doCompile = () => runCompile(input.value);
+
+  compileBtn.addEventListener("click", doCompile);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); doCompile(); }
+  });
+
+  document.getElementById("chips").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    const idx = parseInt(chip.dataset.idx, 10);
+    const sentence = EXAMPLES[idx];
+    input.value = sentence;
+    setActiveChip(idx);
+    runCompile(sentence);
+  });
+});
+</script>
+</body>
+</html>
