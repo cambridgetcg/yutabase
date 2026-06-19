@@ -111,7 +111,13 @@ export class Yuta {
     const adjusted = this.injectClaimant(compiled);
     const rows = await (this.sql.unsafe as (sql: string, params: never[]) => Promise<unknown>)(adjusted.sql, adjusted.params as never[]);
 
-    const rowsArray = rows as unknown as Record<string, unknown>[];
+    let rowsArray = rows as unknown as Record<string, unknown>[];
+
+    // Enrich traversal results with card names
+    if (rowsArray.length > 0 && rowsArray[0].book && rowsArray[0].deck && rowsArray[0].id) {
+      rowsArray = await this.enrichCards(rowsArray);
+    }
+
     const freshness = this.computeFreshness(rowsArray);
 
     return { rows: rowsArray, sql: adjusted.sql, freshness };
@@ -183,6 +189,39 @@ export class Yuta {
 
   uuid(): string {
     return uuidv7();
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // enrich — join card refs to their card tables for names
+  // ──────────────────────────────────────────────────────────
+
+  private async enrichCards(rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+    // Collect unique book/deck pairs
+    const pairs = new Set<string>();
+    for (const r of rows) {
+      if (r.book && r.deck) pairs.add(r.book + "/" + r.deck);
+    }
+
+    // For each pair, fetch the card names
+    const nameMap = new Map<string, string>();
+    for (const pair of pairs) {
+      const [book, deck] = pair.split("/");
+      try {
+        const cards = await (this.sql.unsafe as (s: string) => Promise<any[]>)(
+          `SELECT id::text, name FROM ${book}.${deck}`
+        );
+        for (const c of cards) {
+          nameMap.set(c.id, c.name);
+        }
+      } catch { /* table might not exist or no name column */ }
+    }
+
+    // Enrich rows with names
+    return rows.map((r) => ({
+      ...r,
+      name: r.id ? (nameMap.get(r.id as string) || null) : null,
+      ref: r.book && r.deck && r.id ? `${r.book}/${r.deck}/${r.id}` : null,
+    }));
   }
 
   // ──────────────────────────────────────────────────────────
