@@ -1,0 +1,22 @@
+{
+  "name": "@yutabase/yuta",
+  "version": "0.1.0",
+  "description": "YUTABASE client — ref parser, UUIDv7, YUTAQL compiler, thin wrapper over postgres.js",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "yuta": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "postgres": "^3.4.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/bun": "^1.2.0"
+  }
+}
