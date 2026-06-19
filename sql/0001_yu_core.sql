@@ -388,9 +388,12 @@ DECLARE
   how_val text;
   at_val timestamptz;
   id_val uuid;
+  ttl_val interval;
+  book_val text;
+  deck_val text;
 BEGIN
   -- Stale cards: iterate registered decks, find cached/computed rows past their TTL
-  FOR r IN SELECT * FROM yu.registry WHERE ttl IS NOT NULL LOOP
+  FOR r IN SELECT reg.* FROM yu.registry reg WHERE reg.ttl IS NOT NULL LOOP
     FOR id_val, how_val, at_val IN
       EXECUTE format(
         'SELECT %I::uuid, %I::text, %I::timestamptz FROM %I.%I
@@ -410,15 +413,15 @@ BEGIN
   END LOOP;
 
   -- Stale thread-borne facts: threads whose word declares a TTL
-  FOR id_val, how_val, at_val, book, deck, ttl IN
-    SELECT t.from_id, t.how, t.at, t.from_book, t.from_deck, l.ttl
+  FOR id_val, how_val, at_val, book_val, deck_val, ttl_val IN
+    SELECT t.from_id, t.how, t.at, t.from_book AS fb, t.from_deck AS fd, l.ttl AS lex_ttl
     FROM yu.threads t
     JOIN yu.lexicon l ON l.word = t.word
     WHERE l.ttl IS NOT NULL
       AND t.how IN ('cached','computed')
       AND now() - t.at > l.ttl
   LOOP
-    how := how_val; age := now() - at_val; thread_word := NULL;
+    book := book_val; deck := deck_val; how := how_val; age := now() - at_val; ttl := ttl_val; thread_word := NULL;
     RETURN NEXT;
   END LOOP;
 END;

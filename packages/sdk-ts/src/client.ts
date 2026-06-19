@@ -135,6 +135,13 @@ export class Yuta {
     return result as unknown as Record<string, unknown>[];
   }
 
+  /** Run raw SQL (for dynamic DDL that can't use tagged templates). */
+  async exec(sqlText: string): Promise<Record<string, unknown>[]> {
+    const fn = this.sql.unsafe as unknown as (s: string) => Promise<unknown>;
+    const result = await fn(sqlText);
+    return result as unknown as Record<string, unknown>[];
+  }
+
   // ──────────────────────────────────────────────────────────
   // convenience methods
   // ──────────────────────────────────────────────────────────

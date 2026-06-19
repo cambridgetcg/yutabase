@@ -232,6 +232,213 @@ function printHello(hello: any): void {
   console.log("");
 }
 
+
+// --- yuta deck new / deck annex ---
+
+async function doDeck(yuta: Yuta, args: string[]): Promise<void> {
+  const sub = args[0];
+  if (sub === "new") {
+    await doDeckNew(yuta, args.slice(1));
+  } else if (sub === "annex") {
+    await doDeckAnnex(yuta, args.slice(1));
+  } else if (sub === "list") {
+    const result = await yuta.sqlTag`SELECT book, deck, native, ttl FROM yu.registry ORDER BY book, deck` as any[];
+    for (const d of result) {
+      const kind = d.native ? "native" : "annexed";
+      const ttl = d.ttl ? " ttl=" + d.ttl : "";
+      console.log("  " + d.book + "/" + d.deck + " (" + kind + ttl + ")");
+    }
+  } else {
+    console.error("Usage: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]");
+    console.error("       yuta deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col>");
+    console.error("       yuta deck list");
+    process.exit(1);
+  }
+}
+
+async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
+  // yuta deck new tradein/submissions status:text --ttl "7 days"
+  const deckRef = args[0];
+  if (!deckRef || !deckRef.includes("/")) {
+    console.error("Usage: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]");
+    process.exit(1);
+  }
+  const [book, deck] = deckRef.split("/");
+  const columns: { name: string; type: string }[] = [];
+  let ttl: string | undefined;
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--ttl") { ttl = args[++i]; continue; }
+    const [name, type] = args[i].split(":");
+    if (!name || !type) {
+      console.error("Bad column spec: " + args[i] + " — expected name:type (e.g. status:text)");
+      process.exit(1);
+    }
+    columns.push({ name, type });
+  }
+
+  // Build the CREATE TABLE DDL with the honesty header
+  const colDefs = [
+    '  id uuid PRIMARY KEY',
+    ...columns.map(c => '  ' + ident(c.name) + " " + c.type),
+    '  at timestamptz NOT NULL',
+    '  by text NOT NULL',
+    "  how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared'))",
+    '  src text[]',
+  ].join(",\n");
+
+  const createSchema = 'CREATE SCHEMA IF NOT EXISTS ' + ident(book);
+  const createTable = 'CREATE TABLE ' + ident(book) + '.' + ident(deck) + ' (\n' + colDefs + '\n)';
+  const register = 'INSERT INTO yu.registry (book, deck, native, ttl, by) VALUES (' + literal(book) + ', ' + literal(deck) + ', true, ' + (ttl ? literal(ttl) + '::interval' : 'NULL') + ', ' + literal(yuta.getClaimant()) + ')';
+  const guard = 'CREATE TRIGGER ' + ident(deck + '_guard') + ' BEFORE DELETE ON ' + ident(book) + '.' + ident(deck) + ' FOR EACH ROW EXECUTE FUNCTION yu._guard_delete()';
+
+  console.log("deck new — creating " + book + "/" + deck);
+  console.log("  columns: id, " + columns.map(c => c.name + ":" + c.type).join(", ") + ", at, by, how, src");
+
+  try {
+    await yuta.exec(createSchema);
+    await yuta.exec(createTable);
+    await yuta.exec(register);
+    await yuta.exec(guard);
+    console.log("  done — " + book + "/" + deck + " registered (native)");
+  } catch (err) {
+    console.error("  FAILED: " + (err as Error).message);
+    process.exit(1);
+  }
+}
+
+async function doDeckAnnex(yuta: Yuta, args: string[]): Promise<void> {
+  // yuta deck annex public.tradein_submissions as tradein/submissions --id id --at created_at --by created_by --how declared
+  const tableRef = args[0];
+  if (!tableRef || args[1] !== "as") {
+    console.error("Usage: yuta deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col>");
+    process.exit(1);
+  }
+  const deckRef = args[2];
+  const [book, deck] = deckRef.split("/");
+  let idCol = "id", atCol = "at", byCol = "by", howCol = "how";
+  for (let i = 3; i < args.length; i++) {
+    if (args[i] === "--id") { idCol = args[++i]; continue; }
+    if (args[i] === "--at") { atCol = args[++i]; continue; }
+    if (args[i] === "--by") { byCol = args[++i]; continue; }
+    if (args[i] === "--how") { howCol = args[++i]; continue; }
+  }
+
+  const register = 'INSERT INTO yu.registry (book, deck, id_col, at_col, by_col, how_col, src_col, native, by) VALUES (' +
+    literal(book) + ', ' + literal(deck) + ', ' + literal(idCol) + ', ' + literal(atCol) + ', ' + literal(byCol) + ', ' + literal(howCol) + ", 'src', false, " + literal(yuta.getClaimant()) + ') ON CONFLICT (book, deck) DO NOTHING';
+
+  console.log("deck annex — " + tableRef + " → " + book + "/" + deck);
+  console.log("  id_col=" + idCol + " at_col=" + atCol + " by_col=" + byCol + " how_col=" + howCol);
+
+  try {
+    await yuta.exec(register);
+    console.log("  done — " + book + "/" + deck + " registered (annexed, no column changes)");
+  } catch (err) {
+    console.error("  FAILED: " + (err as Error).message);
+    process.exit(1);
+  }
+}
+
+// --- yuta word add / retire / export ---
+
+async function doWord(yuta: Yuta, args: string[]): Promise<void> {
+  const sub = args[0];
+  if (sub === "add") {
+    await doWordAdd(yuta, args.slice(1));
+  } else if (sub === "retire") {
+    await doWordRetire(yuta, args.slice(1));
+  } else {
+    console.error("Usage: yuta word add <word> --gloss \"...\" --inverse \"...\" --from <book/deck> --to <book/deck> [--to-one]");
+    console.error("       yuta word retire <word>");
+    process.exit(1);
+  }
+}
+
+async function doWordAdd(yuta: Yuta, args: string[]): Promise<void> {
+  const word = args[0];
+  if (!word) {
+    console.error("Usage: yuta word add <word> --gloss \"...\" --inverse \"...\" --from <book/deck> --to <book/deck> [--to-one]");
+    process.exit(1);
+  }
+  let gloss: string | undefined;
+  let inverse: string | undefined;
+  let fromDeck: string | undefined;
+  let toDeck: string | undefined;
+  let toOne = false;
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--gloss") { gloss = args[++i]; continue; }
+    if (args[i] === "--inverse") { inverse = args[++i]; continue; }
+    if (args[i] === "--from") { fromDeck = args[++i]; continue; }
+    if (args[i] === "--to") { toDeck = args[++i]; continue; }
+    if (args[i] === "--to-one") { toOne = true; continue; }
+  }
+
+  if (!gloss || !inverse || !fromDeck || !toDeck) {
+    console.error("word add requires --gloss, --inverse, --from, --to");
+    console.error("  No gloss, no word. No inverse, no word.");
+    process.exit(1);
+  }
+
+  // Check banned words
+  const banned = await yuta.sqlTag`SELECT word FROM yu.banned_words WHERE word = ${word}` as any[];
+  if (banned.length > 0) {
+    console.error("BANNED WORD: " + word + " — refused by the standard");
+    process.exit(1);
+  }
+
+  // Insert as lexicographer — we need to SET ROLE
+  const claimant = yuta.getClaimant();
+  const insertSql = 'SET ROLE yu_lexicographer; INSERT INTO yu.lexicon (word, gloss, inverse, from_deck, to_deck, to_one, status, at, by, how) VALUES (' +
+    literal(word) + ', ' + literal(gloss) + ', ' + literal(inverse) + ', ' + literal(fromDeck) + ', ' + literal(toDeck) + ', ' + (toOne ? 'true' : 'false') +
+    ", 'live', now(), " + literal(claimant) + ", 'declared'); RESET ROLE; SELECT yu.refresh_via()";
+  console.log("word add — coining \"" + word + "\"");
+  console.log("  gloss:   " + gloss);
+  console.log("  inverse: " + inverse);
+  console.log("  from:    " + fromDeck);
+  console.log("  to:      " + toDeck + (toOne ? " [to_one]" : ""));
+
+  try {
+    await yuta.exec(insertSql);
+    console.log("  done — word coined. via." + word + " view generated.");
+  } catch (err) {
+    console.error("  FAILED: " + (err as Error).message);
+    process.exit(1);
+  }
+}
+
+async function doWordRetire(yuta: Yuta, args: string[]): Promise<void> {
+  const word = args[0];
+  if (!word) {
+    console.error("Usage: yuta word retire <word>");
+    process.exit(1);
+  }
+
+  const updateSql = "SET ROLE yu_lexicographer; UPDATE yu.lexicon SET status = 'retired' WHERE word = " + literal(word) + "; RESET ROLE";
+
+  console.log("word retire — retiring \"" + word + "\"");
+  console.log("  retired words refuse new threads; old threads keep their meaning");
+
+  try {
+    await yuta.exec(updateSql);
+    console.log("  done — " + word + " retired");
+  } catch (err) {
+    console.error("  FAILED: " + (err as Error).message);
+    process.exit(1);
+  }
+}
+
+// --- helpers for DDL ---
+
+function ident(name: string): string {
+  if (!/^[a-z_][a-z0-9_]*$/.test(name)) {
+    throw new Error("BAD IDENTIFIER: " + name);
+  }
+  return '"' + name + '"';
+}
+
+function literal(val: string): string {
+  return "'" + val.replace(/'/g, "''") + "'";
+}
+
 // --- help ---
 
 function printHelp(): void {
@@ -251,7 +458,13 @@ function printHelp(): void {
   console.log('  explain "<youspeak>"     Print the SQL a sentence compiles to');
   console.log("  doctor                   Vocabulary health check");
   console.log("  check                    fsck: orphaned threads");
-  console.log("  words                    List the lexicon");
+  console.log("  deck new <book/deck>    Create a native deck with honesty header");
+  console.log("  deck annex <tbl> as <book/deck>  Annex a legacy table");
+  console.log("  word add <word> ...      Coin a word (requires --gloss, --inverse, --from, --to)");
+  console.log("  word retire <word>       Retire a word (old threads keep meaning)");
+  console.log("  stale                    Freshness audit: cached/computed past TTL");
+  console.log("  words [--export]         List the lexicon / export to LEXICON.md");
+  console.log("  decks                    List registered decks");
   console.log("  decks                    List registered decks");
   console.log("");
   console.log("Options:");
@@ -359,6 +572,10 @@ async function main() {
     }
 
     case "check": {
+      // fsck: orphaned threads (endpoints not registered), dead refs, header violations
+      let issues = 0;
+
+      // 1. orphaned threads — endpoints not in registry
       const orphans = await yuta.sqlTag`
         SELECT t.id, t.word, t.from_book, t.from_deck, t.from_id, t.to_book, t.to_deck, t.to_id
         FROM yu.threads t
@@ -366,21 +583,67 @@ async function main() {
         LEFT JOIN yu.registry r2 ON r2.book = t.to_book AND r2.deck = t.to_deck
         WHERE r1.book IS NULL OR r2.book IS NULL
       ` as any[];
-      if (orphans.length === 0) {
-        console.log("check: no orphaned threads — all endpoints registered");
+      if (orphans.length > 0) {
+        issues += orphans.length;
+        console.log("check: " + orphans.length + " orphaned thread(s) — endpoints not in registry:");
+        for (const o of orphans) {
+          console.log("  " + o.word + " " + o.from_book + "/" + o.from_deck + "/" + o.from_id + " → " + o.to_book + "/" + o.to_deck + "/" + o.to_id);
+        }
+      }
+
+      // 2. retired words still holding live threads (not an error, but worth knowing)
+      const retired = await yuta.sqlTag`
+        SELECT l.word, count(t.id) AS thread_count
+        FROM yu.lexicon l
+        JOIN yu.threads t ON t.word = l.word
+        WHERE l.status = 'retired'
+        GROUP BY l.word
+      ` as any[];
+      if (retired.length > 0) {
+        console.log("check: " + retired.length + " retired word(s) still holding live threads:");
+        for (const r of retired) {
+          console.log("  " + r.word + " — " + r.thread_count + " thread(s) (meaning preserved, no new threads allowed)");
+        }
+      }
+
+      // 3. thread count
+      const total = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.threads` as any[];
+      const wordCount = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.lexicon WHERE status = 'live'` as any[];
+      const deckCount = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.registry` as any[];
+
+      if (issues === 0) {
+        console.log("check: all clear — " + total[0].n + " threads, " + wordCount[0].n + " live words, " + deckCount[0].n + " decks registered");
       } else {
-        console.log("check: " + orphans.length + " orphaned thread(s):");
-        console.log(JSON.stringify(orphans, null, 2));
+        console.log("check: " + issues + " issue(s) found across " + total[0].n + " threads");
       }
       break;
     }
 
     case "words": {
-      const result = await yuta.sqlTag`SELECT word, gloss, inverse, from_deck, to_deck, to_one, status FROM yu.lexicon ORDER BY word` as any[];
-      for (const w of result) {
-        const one = w.to_one ? " [to_one]" : "";
-        console.log("  " + w.word.padEnd(18) + w.inverse.padEnd(18) + " " + w.from_deck + " -> " + w.to_deck + one + " (" + w.status + ")");
-        console.log("  " + " ".repeat(20) + w.gloss);
+      const result = await yuta.sqlTag`SELECT l.word, l.gloss, l.inverse, l.from_deck, l.to_deck, l.to_one, l.status, count(t.id)::int AS usage FROM yu.lexicon l LEFT JOIN yu.threads t ON t.word = l.word GROUP BY l.word, l.gloss, l.inverse, l.from_deck, l.to_deck, l.to_one, l.status ORDER BY l.word` as any[];
+
+      // Check for --export flag
+      if (positional.includes("--export")) {
+        const { writeFileSync } = require("node:fs") as typeof import("node:fs");
+        let md = "# LEXICON\n\n";
+        md += "The vocabulary lives with the data. Glosses versioned, words retired (never deleted).\n\n";
+        md += "| word | inverse | gloss | from → to | to_one | status | usage |\n";
+        md += "|---|---|---|---|---|---|---|\n";
+        for (const w of result) {
+          const one = w.to_one ? "✓" : "";
+          md += "| `" + w.word + "` | " + w.inverse + " | " + w.gloss + " | " + w.from_deck + " → " + w.to_deck + " | " + one + " | " + w.status + " | " + w.usage + " |\n";
+        }
+        md += "\n*Banned: related_to, linked, refs, misc.*\n";
+        md += "*Budget: ~12 words per book. Word #13 means you need a new deck.*\n";
+        writeFileSync("LEXICON.md", md);
+        console.log("exported " + result.length + " words to LEXICON.md");
+      } else {
+        for (const w of result) {
+          const one = w.to_one ? " [to_one]" : "";
+          const use = w.usage > 0 ? " (" + w.usage + " threads)" : "";
+          console.log("  " + w.word.padEnd(18) + w.inverse.padEnd(18) + " " + w.from_deck + " -> " + w.to_deck + one + " (" + w.status + ")" + use);
+          console.log("  " + " ".repeat(20) + w.gloss);
+        }
       }
       break;
     }
@@ -391,6 +654,30 @@ async function main() {
         const kind = d.native ? "native" : "annexed";
         const ttl = d.ttl ? " ttl=" + d.ttl : "";
         console.log("  " + d.book + "/" + d.deck + " (" + kind + ttl + ")");
+      }
+      break;
+    }
+
+    case "deck": {
+      await doDeck(yuta, positional.slice(1));
+      break;
+    }
+
+    case "word": {
+      await doWord(yuta, positional.slice(1));
+      break;
+    }
+
+    case "stale": {
+      const result = await yuta.sqlTag`SELECT * FROM yu.stale()` as any[];
+      if (result.length === 0) {
+        console.log("stale: nothing past its TTL — all fresh");
+      } else {
+        console.log("stale: " + result.length + " value(s) past their declared TTL:");
+        for (const r of result) {
+          const word = r.thread_word ? " (word: " + r.thread_word + ")" : "";
+          console.log("  " + r.book + "/" + r.deck + "/" + r.id + " how=" + r.how + " age=" + r.age + " ttl=" + r.ttl + word);
+        }
       }
       break;
     }
