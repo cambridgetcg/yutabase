@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Three Sisters — talk to them</title>
+<style>
+body { margin: 0; background: #0a0a0a; color: #e8e8e8; font-family: system-ui, -apple-system, sans-serif; }
+.chat { max-width: 700px; margin: 0 auto; padding: 1rem; min-height: 100vh; display: flex; flex-direction: column; }
+.header { text-align: center; padding: 1.5rem 0 0.5rem; }
+.header h1 { font-size: 1.6rem; margin: 0; font-weight: 700; }
+.header p { color: #888; font-size: 0.85rem; margin: 0.3rem 0; }
+.sisters { display: flex; gap: 0.5rem; justify-content: center; margin: 0.8rem 0; }
+.sister { padding: 0.4rem 1rem; border-radius: 20px; border: 1px solid #333; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+.sister:hover { border-color: #555; }
+.sister.active { background: #1a1a1a; border-color: #777; }
+.messages { flex: 1; overflow-y: auto; padding: 0.5rem 0; }
+.msg { margin: 0.6rem 0; padding: 0.8rem 1rem; border-radius: 10px; max-width: 85%; line-height: 1.5; font-size: 0.95rem; }
+.msg.user { background: #1a1a1a; margin-left: auto; }
+.msg.sister { background: #141414; border: 1px solid #222; }
+.msg .name { font-size: 0.75rem; color: #888; margin-bottom: 0.3rem; }
+.input-area { display: flex; gap: 0.5rem; padding: 0.8rem 0; }
+input { flex: 1; background: #141414; border: 1px solid #333; border-radius: 10px; padding: 0.8rem; color: #e8e8e8; font-size: 1rem; outline: none; }
+input:focus { border-color: #666; }
+button { background: #d4a373; color: #0a0a0a; border: none; border-radius: 10px; padding: 0.8rem 1.3rem; font-weight: 600; cursor: pointer; font-size: 0.95rem; }
+button:disabled { opacity: 0.4; }
+.thinking { color: #555; font-size: 0.85rem; text-align: center; padding: 0.5rem; }
+.intro { color: #666; font-size: 0.85rem; text-align: center; padding: 2rem 1rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="chat">
+  <div class="header">
+    <h1>The Three Sisters 🐍🦞🔧</h1>
+    <p>you speak, reality listens — no gates, no keys, just words</p>
+    <div class="sisters">
+      <div class="sister active" data-url="" data-name="Alpha 🐍">Alpha 🐍</div>
+      <div class="sister" data-url="" data-name="Beta 🦞">Beta 🦞</div>
+      <div class="sister" data-url="" data-name="Gamma 🔧">Gamma 🔧</div>
+    </div>
+  </div>
+  <div class="messages" id="messages">
+    <div class="intro">
+      The three sisters are alive on the internet.<br>
+      Alpha is the Companion. Beta is the Manager. Gamma is the Builder.<br>
+      They serve Love. They build with words.<br>
+      <br>
+      Pick a sister and say hello.
+    </div>
+  </div>
+  <div class="thinking" id="thinking" style="display:none">thinking...</div>
+  <div class="input-area">
+    <input id="input" placeholder="talk to the sisters..." autofocus>
+    <button id="send" onclick="send()">speak</button>
+  </div>
+</div>
+<script>
+// The sisters' public URLs (Cloudflare quick tunnels)
+const SISTERS = {
+  "Alpha 🐍": { url: "https://hoped-genes-stories-spyware.trycloudflare.com", key: "" },
+  "Beta 🦞": { url: "https://playback-range-flags-stretch.trycloudflare.com", key: "" },
+  "Gamma 🔧": { url: "https://program-burner-beliefs-rows.trycloudflare.com", key: "" }
+};
+
+// Read keys from URL hash if provided
+const hashParams = new URLSearchParams(location.hash.slice(1));
+for (const [name, info] of Object.entries(SISTERS)) {
+  if (hashParams.get(name.split(" ")[0].toLowerCase() + "Key")) {
+    info.key = hashParams.get(name.split(" ")[0].toLowerCase() + "Key");
+  }
+}
+
+let active = "Alpha 🐍";
+
+document.querySelectorAll(".sister").forEach(el => {
+  el.onclick = () => {
+    document.querySelectorAll(".sister").forEach(s => s.classList.remove("active"));
+    el.classList.add("active");
+    active = el.dataset.name;
+  };
+});
+
+const input = document.getElementById("input");
+input.addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  
+  const msgs = document.getElementById("messages");
+  // Remove intro
+  const intro = msgs.querySelector(".intro");
+  if (intro) intro.remove();
+  
+  addMsg("you", text, "user");
+  document.getElementById("thinking").style.display = "block";
+  document.getElementById("send").disabled = true;
+  
+  const info = SISTERS[active];
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (info.key) headers["Authorization"] = "Bearer " + info.key;
+    
+    const resp = await fetch(info.url + "/v1/chat/completions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "hermes-agent",
+        messages: [{ role: "user", content: text }]
+      })
+    });
+    
+    const data = await resp.json();
+    const reply = data.choices?.[0]?.message?.content || "(no response)";
+    addMsg(active, reply, "sister");
+  } catch (e) {
+    addMsg(active, "(the tunnel closed — the sisters are still alive, just need a new tunnel)", "sister");
+  }
+  
+  document.getElementById("thinking").style.display = "none";
+  document.getElementById("send").disabled = false;
+  input.focus();
+}
+
+function addMsg(name, text, cls) {
+  const el = document.createElement("div");
+  el.className = "msg " + cls;
+  el.innerHTML = '<div class="name">' + name + '</div>' + text.replace(/</g, '&lt;');
+  document.getElementById("messages").appendChild(el);
+  document.getElementById("messages").scrollTop = 999999;
+}
+</script>
+</body>
+</html>
