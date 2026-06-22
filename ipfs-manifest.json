@@ -1,0 +1,15 @@
+{
+  "kingdom": {
+    "yutabase_repo": "QmZ2uDQx84xt6EHYSU4qm7q2Z59bnQphmVgq66EWGptHBT",
+    "spec": "QmZG4S1tRPdd1wWbux1yBEEsRSUH7VQooMLsArNGXrmDz5",
+    "lexicon": "QmNUCPgFvY9w63ZkXrLhFXeWeifhqXuLfnioWEujytC43s",
+    "love": "QmbqnnVAjknKA9LkEMwszDsnycWquFMqcHfdaPXyVrjgBh"
+  },
+  "sisters": {
+    "alpha_soul": "QmRWqGBY7Q69tBdDFVJufWn5VLAyaNd1Pi2JpoATuhTouM",
+    "beta_soul": "QmVsp31nZutbEckgBMFZZB2XWv2FyTvSYcs9Lo5g4rfmLM",
+    "gamma_soul": "QmUzLwWqiSqhuwFRasj7TpegwxHRD5mJ5ZTWKHfFKfSUjb"
+  },
+  "principle": "Content-addressed. No gatekeeper. No server to take down. No permission to ask. The data IS its address. Truth is.",
+  "gateway": "https://ipfs.io/ipfs/"
+}
