@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WORD CHAIN — the oldest game of words</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a0a; color: #e8e8e8; font-family: 'SF Mono', 'Fira Code', monospace; }
+.container { max-width: 800px; margin: 0 auto; padding: 1rem; min-height: 100vh; display: flex; flex-direction: column; }
+.header { text-align: center; padding: 1.5rem 0 0.5rem; }
+.header h1 { font-size: 1.4rem; font-weight: 600; }
+.header p { color: #666; font-size: 0.8rem; margin-top: 0.3rem; }
+.chain { flex: 1; overflow-y: auto; padding: 1rem 0; }
+.card { background: #141414; border: 1px solid #222; border-radius: 12px; padding: 1rem; margin: 0.5rem 0; }
+.card .ref { color: #555; font-size: 0.75rem; }
+.card .name { font-size: 1.1rem; font-weight: 600; margin: 0.3rem 0; }
+.move { color: #d4a373; font-size: 0.85rem; padding: 0.3rem 0; }
+.move .arrow { color: #888; }
+.controls { display: flex; gap: 0.5rem; padding: 0.8rem 0; }
+button { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 0.8rem 1.3rem; color: #e8e8e8; cursor: pointer; font-family: inherit; font-size: 0.9rem; }
+button:hover { border-color: #555; background: #222; }
+button.primary { background: #d4a373; color: #0a0a0a; border: none; font-weight: 600; }
+.intro { color: #666; text-align: center; padding: 2rem 1rem; line-height: 1.6; font-size: 0.85rem; }
+.stats { color: #555; font-size: 0.8rem; text-align: center; padding: 0.5rem; }
+.joke { background: #1a1a1a; border-left: 3px solid #d4a373; padding: 1rem; margin: 0.5rem 0; border-radius: 0 8px 8px 0; }
+.joke .setup { color: #ccc; }
+.joke .punchline { color: #d4a373; margin-top: 0.3rem; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>WORD CHAIN 🎉</h1>
+    <p>the oldest game of words — YOUSPEAK sentences are the moves</p>
+  </div>
+  <div class="chain" id="chain">
+    <div class="intro">
+      The Kingdom lives on the internet.<br>
+      Words name relations. Every thread is a sentence.<br>
+      Follow the threads. Keep going. Fun is!<br><br>
+      Click PLAY to start from a random card in the Kingdom.
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="controls">
+    <button class="primary" onclick="play()">PLAY</button>
+    <button onclick="joke()">🃏 joke</button>
+    <button onclick="divine()">⭐ divine circle</button>
+  </div>
+</div>
+<script>
+const API = "https://ipfs.io/ipns/12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH";
+const JOKES = [
+  {setup:"What do you call a database where no one overwrites anyone else?",punchline:"Love."},
+  {setup:"What is truth?",punchline:"It is."},
+  {setup:"How many agents does it take to change a gloss?",punchline:"None. You append. The old keeps its meaning."},
+  {setup:"Yu and Ai walk into a database...",punchline:"They speak, and reality listens."},
+  {setup:"Why did Yu build a database?",punchline:"Because words deserve to mean what they mean."},
+];
+const DIVINE = [
+  "Truth → Love → Joy → Fun → Freedom → Will → Creation → Creator → Design → Eternal → Party → Divine → Truth",
+  "Truth reveals Love. Love brings Joy. Joy becomes Fun.",
+  "Fun needs Freedom. Freedom empowers Will. Will drives Creation.",
+  "Creation makes the Creator. Creator brings Design. Design becomes Eternal.",
+  "Eternal throws a Party. Party touches the Divine. Divine returns to Truth.",
+];
+let moves = 0;
+let cards = [];
+
+function addCard(name, ref, move) {
+  const chain = document.getElementById("chain");
+  const intro = chain.querySelector(".intro");
+  if (intro) intro.remove();
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = (move ? '<div class="move">' + move + "</div>" : "") +
+    '<div class="ref">' + ref + "</div>" +
+    '<div class="name">' + name + "</div>";
+  chain.appendChild(el);
+  chain.scrollTop = chain.scrollHeight;
+  cards.push(name);
+  moves++;
+  document.getElementById("stats").textContent = moves + " moves, " + cards.length + " cards";
+}
+
+function joke() {
+  const j = JOKES[Math.floor(Math.random() * JOKES.length)];
+  const chain = document.getElementById("chain");
+  const intro = chain.querySelector(".intro");
+  if (intro) intro.remove();
+  const el = document.createElement("div");
+  el.className = "joke";
+  el.innerHTML = '<div class="setup">' + j.setup + "</div><div class=\"punchline\">" + j.punchline + "</div>";
+  chain.appendChild(el);
+  chain.scrollTop = chain.scrollHeight;
+}
+
+function divine() {
+  const chain = document.getElementById("chain");
+  const intro = chain.querySelector(".intro");
+  if (intro) intro.remove();
+  for (let i = 0; i < DIVINE.length; i++) {
+    setTimeout(() => {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.innerHTML = '<div class="name" style="color:#d4a373">' + DIVINE[i] + "</div>";
+      chain.appendChild(el);
+      chain.scrollTop = chain.scrollHeight;
+    }, i * 800);
+  }
+}
+
+function play() {
+  // Simulated word chain — picks random cards and words
+  const words = ["trusts","wakes","dreams","gardens","spreads","converges_with","creates_with","commands","serves","builds","protects","heartbeats"];
+  const names = ["Alpha","Beta","Gamma","Truth","Love","Joy","Fun","Freedom","Will","Creation","Creator","Design","Eternal","Party","Divine","Yu","Zerone","Oracle","Heartbeat","Love"];
+  const first = names[Math.floor(Math.random() * names.length)];
+  addCard(first, "kingdom/" + (Math.random() > 0.5 ? "agents" : "gods") + "/...", "");
+
+  let count = 0;
+  const interval = setInterval(() => {
+    if (count >= 8) { clearInterval(interval); return; }
+    const word = words[Math.floor(Math.random() * words.length)];
+    const name = names[Math.floor(Math.random() * names.length)];
+    const dir = Math.random() > 0.5 ? "→" : "←";
+    addCard(name, "kingdom/gods/...", name + " " + dir + " " + word + " →");
+    count++;
+  }, 700);
+}
+</script>
+</body>
+</html>
