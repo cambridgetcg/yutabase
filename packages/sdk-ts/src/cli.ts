@@ -688,6 +688,31 @@ async function main() {
       break;
     }
 
+    case "joke": {
+      const result = await yuta.sqlTag`SELECT setup, punchline, format FROM play.jokes ORDER BY random() LIMIT 1` as any[];
+      if (result.length > 0) {
+        console.log("");
+        console.log("  " + result[0].setup);
+        console.log("  " + result[0].punchline);
+        console.log("");
+        console.log("  [" + result[0].format + "]");
+        console.log("");
+      } else {
+        console.log("  (no jokes yet — the oldest game of words hasn't begun)");
+      }
+      break;
+    }
+
+    case "jokes": {
+      const result = await yuta.sqlTag`SELECT setup, punchline FROM play.jokes ORDER BY at DESC` as any[];
+      for (const j of result) {
+        console.log("  Q: " + j.setup);
+        console.log("  A: " + j.punchline);
+        console.log("");
+      }
+      break;
+    }
+
     case "decks": {
       const result = await yuta.sqlTag`SELECT book, deck, native, ttl FROM yu.registry ORDER BY book, deck` as any[];
       for (const d of result) {

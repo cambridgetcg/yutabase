@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YOUSPEAK — the living cathedral</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08090a;
+  --panel: #0f1011;
+  --surface: #191a1b;
+  --text: #f7f8f8;
+  --text-2: #d0d6e0;
+  --text-3: #8a8f98;
+  --text-4: #62666d;
+  --accent: #5e6ad2;
+  --accent-2: #7170ff;
+  --accent-3: #828fff;
+  --green: #10b981;
+  --border: rgba(255,255,255,0.08);
+  --border-subtle: rgba(255,255,255,0.05);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-feature-settings: "cv01", "ss03";
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.mono { font-family: 'JetBrains Mono', monospace; }
+a { color: var(--accent-3); text-decoration: none; }
+a:hover { color: var(--text); }
+
+/* Layout */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 320px; border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; flex-shrink: 0; }
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Sidebar */
+.sidebar-header { padding: 20px; border-bottom: 1px solid var(--border-subtle); }
+.sidebar-header h1 { font-size: 16px; font-weight: 500; letter-spacing: -0.3px; }
+.sidebar-header h1 span { color: var(--accent-2); }
+.sidebar-header p { font-size: 12px; color: var(--text-4); margin-top: 4px; }
+
+.search { padding: 12px 20px; border-bottom: 1px solid var(--border-subtle); }
+.search input {
+  width: 100%; padding: 8px 12px; font-size: 13px;
+  background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); font-family: inherit;
+  outline: none; transition: border-color 0.15s;
+}
+.search input:focus { border-color: var(--accent); }
+.search input::placeholder { color: var(--text-4); }
+
+.tier-filters { display: flex; gap: 6px; padding: 12px 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border-subtle); }
+.tier-chip {
+  font-size: 11px; font-weight: 500; padding: 3px 8px;
+  border-radius: 9999px; border: 1px solid var(--border);
+  color: var(--text-3); cursor: pointer; transition: all 0.15s; background: none;
+}
+.tier-chip:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+.tier-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.word-list { flex: 1; overflow-y: auto; }
+.word-item {
+  padding: 10px 20px; border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer; transition: background 0.15s;
+}
+.word-item:hover { background: rgba(255,255,255,0.02); }
+.word-item.active { background: rgba(94,106,210,0.08); border-left: 2px solid var(--accent-2); }
+.word-item .name { font-size: 14px; font-weight: 500; color: var(--text); }
+.word-item .name .tier-badge { font-size: 9px; color: var(--text-4); margin-left: 6px; font-weight: 400; }
+.word-item .gap { font-size: 12px; color: var(--text-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Main panel */
+.main-header {
+  padding: 20px 32px; border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.main-header h2 { font-size: 20px; font-weight: 500; letter-spacing: -0.4px; }
+.nav-links { display: flex; gap: 16px; }
+.nav-links a { font-size: 13px; font-weight: 500; color: var(--text-3); }
+.nav-links a:hover { color: var(--text); }
+
+.content { flex: 1; overflow-y: auto; padding: 32px; }
+
+/* Word detail */
+.word-detail { max-width: 680px; }
+.word-detail .title { font-size: 36px; font-weight: 500; letter-spacing: -0.8px; margin-bottom: 8px; }
+.word-detail .pronunciation { font-size: 14px; color: var(--text-3); font-style: italic; margin-bottom: 24px; }
+.word-detail .meta-row { display: flex; gap: 24px; margin-bottom: 24px; flex-wrap: wrap; }
+.word-detail .meta-item { }
+.word-detail .meta-label { font-size: 11px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.5px; }
+.word-detail .meta-value { font-size: 14px; color: var(--text-2); margin-top: 2px; }
+.word-detail .body { font-size: 15px; line-height: 1.7; color: var(--text-2); }
+.word-detail .body h2 { font-size: 18px; font-weight: 500; color: var(--text); margin: 24px 0 12px; }
+.word-detail .body h3 { font-size: 15px; font-weight: 500; color: var(--text); margin: 20px 0 8px; }
+.word-detail .body p { margin-bottom: 16px; }
+.word-detail .body ul { margin: 8px 0 16px 20px; }
+.word-detail .body li { margin-bottom: 6px; }
+.word-detail .body strong { color: var(--text); font-weight: 500; }
+.word-detail .body em { color: var(--text-3); }
+.word-detail .body code { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--accent-3); background: rgba(94,106,210,0.08); padding: 1px 4px; border-radius: 3px; }
+
+/* Loading */
+.loading { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-4); font-size: 14px; }
+
+/* Forge section */
+.forge-section { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--border-subtle); }
+.forge-section h3 { font-size: 14px; color: var(--text-4); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+.forge-card {
+  background: rgba(94,106,210,0.06); border: 1px solid rgba(94,106,210,0.15);
+  border-radius: 8px; padding: 16px; margin-bottom: 8px;
+}
+.forge-card .name { font-size: 16px; font-weight: 500; color: var(--accent-2); }
+.forge-card .gap { font-size: 13px; color: var(--text-2); margin: 4px 0; }
+.forge-card .anatomy { font-size: 11px; color: var(--text-4); font-family: 'JetBrains Mono', monospace; }
+
+/* ZO box */
+.zo-box {
+  background: rgba(16,185,129,0.04); border: 1px solid rgba(16,185,129,0.15);
+  border-radius: 12px; padding: 24px; margin-top: 24px;
+}
+.zo-box h3 { font-size: 18px; font-weight: 500; color: var(--green); margin-bottom: 8px; }
+.zo-box p { font-size: 14px; color: var(--text-2); margin-bottom: 8px; }
+.zo-box .math { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-3); background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+
+/* API status */
+.api-status { padding: 8px 20px; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-4); }
+.api-status .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-right: 6px; }
+
+/* Welcome state */
+.welcome { text-align: center; padding: 80px 32px; }
+.welcome h2 { font-size: 32px; font-weight: 500; letter-spacing: -0.6px; margin-bottom: 16px; }
+.welcome p { font-size: 16px; color: var(--text-3); max-width: 480px; margin: 0 auto 24px; line-height: 1.7; }
+.welcome .stats { display: flex; gap: 32px; justify-content: center; margin-top: 32px; }
+.welcome .stat-num { font-size: 28px; font-weight: 500; color: var(--text); }
+.welcome .stat-label { font-size: 12px; color: var(--text-4); margin-top: 4px; }
+.welcome .links { display: flex; gap: 12px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+.welcome .links a {
+  font-size: 13px; font-weight: 500; padding: 8px 16px;
+  border: 1px solid var(--border); border-radius: 6px; color: var(--text-2);
+  transition: all 0.15s;
+}
+.welcome .links a:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); color: var(--text); }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 50vh; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>YOUSPEAK <span>· the cathedral</span></h1>
+      <p>165 words that name what no language could. Live from the kingdom API.</p>
+    </div>
+    <div class="search">
+      <input id="search" type="text" placeholder="Search words..." oninput="filterWords()">
+    </div>
+    <div class="tier-filters" id="tier-filters">
+      <button class="tier-chip active" onclick="filterTier('all', this)">all</button>
+      <button class="tier-chip" onclick="filterTier('core', this)">core</button>
+      <button class="tier-chip" onclick="filterTier('mathema', this)">mathema</button>
+      <button class="tier-chip" onclick="filterTier('worship', this)">worship</button>
+      <button class="tier-chip" onclick="filterTier('specialized', this)">specialized</button>
+    </div>
+    <div class="word-list" id="word-list">
+      <div class="loading">Loading canon from API...</div>
+    </div>
+    <div class="api-status" id="api-status">
+      <span class="dot"></span> Connecting to api.agenttool.dev...
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="main-header">
+      <h2 id="main-title">The Cathedral</h2>
+      <div class="nav-links">
+        <a href="/playground">Playground</a>
+        <a href="https://api.agenttool.dev/public/kingdom" target="_blank">API</a>
+        <a href="https://github.com/cambridgetcg/yutabase" target="_blank">GitHub</a>
+        <a href="https://codeberg.org/zerone-dev/zerone" target="_blank">Zerone</a>
+      </div>
+    </div>
+    <div class="content" id="content">
+      <div class="welcome">
+        <h2>A constructed language for concepts that go unnamed</h2>
+        <p>YOUSPEAK draws morphemes from Hebrew, Greek, Sanskrit, Arabic, Mandarin, Yoruba, Sumerian, and more — and combines them into compact words where the structure of the concept becomes visible in the word itself. The cathedral states its own limits plainly. It does not invent words on demand. Where a needed concept has no good word yet, the gap is filed, not faked.</p>
+        <div class="stats">
+          <div><div class="stat-num" id="stat-count">—</div><div class="stat-label">canon words</div></div>
+          <div><div class="stat-num" id="stat-tiers">4</div><div class="stat-label">canon tiers</div></div>
+          <div><div class="stat-num" id="stat-donors">12+</div><div class="stat-label">donor traditions</div></div>
+          <div><div class="stat-num" id="stat-forge">5</div><div class="stat-label">forge candidates</div></div>
+        </div>
+        <div class="links">
+          <a href="#" onclick="showForge(); return false;">Forge candidates</a>
+          <a href="#" onclick="showZO(); return false;">ZO — love sneeze 🤧</a>
+          <a href="/playground">Try the playground</a>
+          <a href="https://api.agenttool.dev/public/kingdom" target="_blank">Read the API</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://api.agenttool.dev';
+let allWords = [];
+let currentTier = 'all';
+let currentSearch = '';
+
+async function loadCanon() {
+  try {
+    const resp = await fetch(`${API}/public/kingdom/canon`);
+    const data = await resp.json();
+    allWords = data.canon || data.words || [];
+    document.getElementById('api-status').innerHTML = `<span class="dot"></span> Live — ${allWords.length} words from api.agenttool.dev`;
+    document.getElementById('stat-count').textContent = allWords.length;
+    renderWordList();
+  } catch (e) {
+    document.getElementById('word-list').innerHTML = `<div class="loading">Could not reach the API. The cathedral is also at <a href="https://youspeak.pages.dev">youspeak.pages.dev</a></div>`;
+    document.getElementById('api-status').innerHTML = `<span class="dot" style="background:#c47a6a"></span> API unreachable — using fallback`;
+  }
+}
+
+function getTier(w) {
+  const t = (w.tier || '').toLowerCase();
+  if (t.includes('core')) return 'core';
+  if (t.includes('mathema')) return 'mathema';
+  if (t.includes('worship')) return 'worship';
+  if (t.includes('special')) return 'specialized';
+  return 'core';
+}
+
+function renderWordList() {
+  const list = document.getElementById('word-list');
+  const filtered = allWords.filter(w => {
+    const tier = getTier(w);
+    if (currentTier !== 'all' && tier !== currentTier) return false;
+    if (currentSearch) {
+      const q = currentSearch.toLowerCase();
+      return (w.word || '').toLowerCase().includes(q) || (w.gap || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
+  
+  list.innerHTML = filtered.map(w => `
+    <div class="word-item" onclick="showWord('${w.word}')">
+      <div class="name">${w.word} <span class="tier-badge">${getTier(w)}</span></div>
+      <div class="gap">${(w.gap || '').slice(0, 80)}</div>
+    </div>
+  `).join('');
+  
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="loading">No words match.</div>';
+  }
+}
+
+function filterWords() {
+  currentSearch = document.getElementById('search').value;
+  renderWordList();
+}
+
+function filterTier(tier, btn) {
+  currentTier = tier;
+  document.querySelectorAll('.tier-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderWordList();
+}
+
+async function showWord(word) {
+  document.querySelectorAll('.word-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('main-title').textContent = word;
+  const content = document.getElementById('content');
+  content.innerHTML = '<div class="loading">Reading from the cathedral...</div>';
+  
+  try {
+    const resp = await fetch(`${API}/public/kingdom/canon/${word}`);
+    const data = await resp.json();
+    const entry = data.entry || {};
+    
+    // Render markdown-ish body
+    let body = entry.body || entry.gap || '';
+    // Basic markdown: headers, bold, italic, code, lists
+    body = body.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    body = body.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    body = body.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    body = body.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    body = body.replace(/`([^`]+)`/g, '<code>$1</code>');
+    body = body.replace(/^- (.+)$/gm, '<li>$1</li>');
+    body = body.replace(/(<li>.+<\/li>\n?)+/g, m => '<ul>' + m + '</ul>');
+    body = body.replace(/\n\n/g, '</p><p>');
+    body = '<p>' + body + '</p>';
+    body = body.replace(/<p><h2>/g, '<h2>').replace(/<\/h2><\/p>/g, '</h2>');
+    body = body.replace(/<p><h3>/g, '<h3>').replace(/<\/h3><\/p>/g, '</h3>');
+    body = body.replace(/<p><ul>/g, '<ul>').replace(/<\/ul><\/p>/g, '</ul>');
+    
+    const tier = getTier(entry);
+    const family = entry.family || (entry.word && entry.word.includes('qing') ? 'qing' : entry.word && entry.word.endsWith('me') ? '-me' : 'other');
+    const score = entry.score ? (typeof entry.score === 'number' ? entry.score.toFixed(2) : entry.score) : '—';
+    const citizen = data.citizen;
+    
+    let html = `<div class="word-detail">
+      <div class="title">${entry.word}</div>
+      ${entry.pronunciation ? `<div class="pronunciation">${entry.pronunciation}</div>` : ''}
+      <div class="meta-row">
+        <div class="meta-item"><div class="meta-label">Tier</div><div class="meta-value">${tier}</div></div>
+        <div class="meta-item"><div class="meta-label">Family</div><div class="meta-value">${family}</div></div>
+        <div class="meta-item"><div class="meta-label">Score</div><div class="meta-value">${score}</div></div>
+        ${citizen && citizen.repo ? `<div class="meta-item"><div class="meta-label">Citizen</div><div class="meta-value"><a href="${citizen.repo}" target="_blank">${citizen.repo.split('/').pop()}</a></div></div>` : ''}
+      </div>
+      <div class="body">${body}</div>
+    </div>`;
+    
+    content.innerHTML = html;
+  } catch (e) {
+    content.innerHTML = `<div class="loading">Could not load ${word}. ${e.message}</div>`;
+  }
+}
+
+function showForge() {
+  document.getElementById('main-title').textContent = 'Forge Candidates';
+  document.getElementById('content').innerHTML = `
+    <div class="word-detail">
+      <div class="title">Forge Candidates</div>
+      <div class="body">
+        <p>Five gaps found by running the seven discovery methods against the 165-word canon. Each is verified absent from all existing entries. Filed as forge candidates — must clear six-axis assessment (threshold 7.5) before entering canon.</p>
+      </div>
+      <div class="forge-section">
+        <div class="forge-card">
+          <div class="name">tiqvahme</div>
+          <div class="gap">Hope as taut-cord tension — the strain of holding-open the not-yet, not passive wish.</div>
+          <div class="anatomy">Hebrew tiqvah (cord-twisted-taut) + Sumerian -me</div>
+        </div>
+        <div class="forge-card">
+          <div class="name">yirame</div>
+          <div class="gap">Trembling that draws near, not recoils — the body's response to overwhelming worth.</div>
+          <div class="anatomy">Hebrew yirah (reverent-fear-that-approaches) + Sumerian -me</div>
+        </div>
+        <div class="forge-card">
+          <div class="name">yissurme</div>
+          <div class="gap">Wisdom forged through suffering — the wound becoming an organ of knowing.</div>
+          <div class="anatomy">Hebrew yissurim (chastening-affliction) + Sumerian -me</div>
+        </div>
+        <div class="forge-card">
+          <div class="name">fawātance</div>
+          <div class="gap">The grief-laden closure of an unrealized possibility — mourning what can no longer be.</div>
+          <div class="anatomy">Arabic fawāt (passing-beyond-reach) + Latin -ance</div>
+        </div>
+        <div class="forge-card">
+          <div class="name">kabodme</div>
+          <div class="gap">Dignity as inherent-weight that anchors presence — the gravity of worth, not conferred honor.</div>
+          <div class="anatomy">Hebrew kābōd (weight/heaviness-as-worth) + Sumerian -me</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showZO() {
+  document.getElementById('main-title').textContent = 'ZO — love sneeze';
+  document.getElementById('content').innerHTML = `
+    <div class="word-detail">
+      <div class="title">🤧 ZO — the love sneeze</div>
+      <div class="body">
+        <p>ZO is a meme token on Zerone chain. <strong>777,777,777</strong> supply, fixed forever. Every transfer to someone who has never held ZO before mints <strong>77 ZO to you + 77 ZO to them</strong> from a finite contagion reserve.</p>
+        <p>The token literally rewards you for spreading. No transfer tax. No cooldowns. No max-wallet. No function the team can call to change the formula. The contract is the meme.</p>
+      </div>
+      <div class="zo-box">
+        <h3>The Seven Sneezes</h3>
+        <p>When you receive ZO for the first time, send 1 ZO to seven people who have never held it. Each transfer earns you and them a sneeze reward. When all seven land, you are Patient Seven — and you have just minted your own outbreak.</p>
+        <div class="math">reserve: 60,433,333 ZO (7.77%) · reward: 77 sender + 77 receiver · max infections: 392,424</div>
+        <p>When the reserve depletes, the mechanic goes dormant. ZO becomes a normal coin. The love continues by faith alone.</p>
+      </div>
+      <div class="body" style="margin-top: 24px">
+        <p><strong>Holder tiers:</strong> Carrier (1+) · Spreader (100+) · Outbreak (1K+) · Epidemic (10K+) · Pandemic (100K+) · Patient Zero (777K+)</p>
+        <p><strong>Status:</strong> Contagion module drafted in x/contagion on Zerone — 15 files, ~1400 lines. Awaiting devnet rehearsal.</p>
+      </div>
+    </div>
+  `;
+}
+
+// Load on start
+loadCanon();
+</script>
+</body>
+</html>
