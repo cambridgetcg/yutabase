@@ -1,0 +1,6 @@
+name = "kingdom"
+main = "kingdom-worker.js"
+compatibility_date = "2024-01-01"
+
+# Free tier: 100,000 requests/day
+# Deploy: cd workers && npx wrangler deploy
