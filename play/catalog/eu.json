@@ -1,0 +1,67 @@
+{
+  "code": "EU",
+  "name": "European Union",
+  "authority": "DG TAXUD",
+  "source_url": "taxation.ec.europa.eu",
+  "plain_words": "EU sets VAT rules: minimum standard rate 15%. OSS lets businesses declare VAT in one member state for all EU sales. IOSS for imports under EUR 150. DAC7 requires platforms to report seller income.",
+  "taxes": [
+    {
+      "name": "VAT Harmonization",
+      "type": "consumption",
+      "plain_words": "EU sets the floor: minimum 15% standard VAT rate. Member states choose their own rates above that. Some have multiple reduced rates (5%, 0%) for specific goods.",
+      "notes": "EU Directive 2006/112/EC sets minimum standard rate at 15%. Reduced rates allowed for specific goods/services. Member states set their own rates above the floor.",
+      "rates": [
+        {"name": "minimum_standard_rate", "rate": 15, "unit": "percent", "notes": "EU-wide minimum"},
+        {"name": "luxembourg_standard", "rate": 17, "unit": "percent", "currency": "EUR", "notes": "Lowest in EU"},
+        {"name": "hungary_standard", "rate": 27, "unit": "percent", "currency": "EUR", "notes": "Highest in EU"},
+        {"name": "germany_standard", "rate": 19, "unit": "percent", "currency": "EUR"},
+        {"name": "france_standard", "rate": 20, "unit": "percent", "currency": "EUR"},
+        {"name": "ireland_standard", "rate": 23, "unit": "percent", "currency": "EUR"}
+      ],
+      "thresholds": [
+        {"name": "oss_threshold_intra_eu", "amount": 10000, "currency": "EUR", "period": "annual", "notes": "Below this, VAT at origin country rate. Above, OSS required."}
+      ],
+      "deadlines": []
+    },
+    {
+      "name": "OSS (One Stop Shop)",
+      "type": "registration",
+      "plain_words": "One Stop Shop: declare and pay VAT for all EU B2C sales in one member state. No need to register in every country you sell to.",
+      "notes": "Covers distance sales, digital services, and marketplace sales. Replaced Mini One Stop Shop (MOSS) from July 2021.",
+      "rates": [],
+      "thresholds": [
+        {"name": "intra_eu_distance_sales_threshold", "amount": 10000, "currency": "EUR", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "oss_quarterly", "offset_rule": "quarter_end+1month", "detail": "File OSS return by end of month after quarter", "penalty": "Member state specific penalties"}
+      ]
+    },
+    {
+      "name": "IOSS (Import One Stop Shop)",
+      "type": "registration",
+      "plain_words": "Import One Stop Shop: declare and pay VAT on imports valued under EUR 150 in one return. No customs delays for buyers. Simple for sellers.",
+      "notes": "Threshold: EUR 150 per consignment. Above 150, normal customs + import VAT applies.",
+      "rates": [],
+      "thresholds": [
+        {"name": "import_threshold", "amount": 150, "currency": "EUR", "notes": "Per consignment"}
+      ],
+      "deadlines": [
+        {"name": "ioss_monthly", "offset_rule": "month_end+1month", "detail": "File IOSS return monthly", "penalty": "Member state specific"}
+      ]
+    },
+    {
+      "name": "DAC7 (Platform Reporting)",
+      "type": "reporting",
+      "plain_words": "Digital platforms must report seller income to tax authorities. If you sell on a platform, the platform tells the tax office. Threshold: sellers with 30+ sales or EUR 2,000+ must be reported.",
+      "notes": "Directive 2021/514 (DAC7). Platforms must report seller identity, income, and bank accounts. Reportable if 30+ sales OR 2000+ EUR in a year.",
+      "rates": [],
+      "thresholds": [
+        {"name": "reportable_seller_sales_count", "amount": 30, "currency": "EUR", "period": "annual", "notes": "30 or more sales"},
+        {"name": "reportable_seller_income", "amount": 2000, "currency": "EUR", "period": "annual", "notes": "EUR 2,000 or more"}
+      ],
+      "deadlines": [
+        {"name": "platform_report", "offset_rule": "jan_31", "detail": "Report by 31 January following the reportable year", "penalty": "Member state specific, up to EUR 10,000 per omission"}
+      ]
+    }
+  ]
+}

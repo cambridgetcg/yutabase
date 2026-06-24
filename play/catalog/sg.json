@@ -1,0 +1,69 @@
+{
+  "code": "SG",
+  "name": "Singapore",
+  "authority": "IRAS",
+  "source_url": "iras.gov.sg",
+  "plain_words": "GST at 9% on what you sell. Register when revenue passes S$1 million. Corporate income tax 17% flat. Individual income tax progressive 0% to 24%. No capital gains tax. Simple by design.",
+  "taxes": [
+    {
+      "name": "GST",
+      "type": "consumption",
+      "plain_words": "Goods and Services Tax at 9% on what you sell. Register when annual revenue passes S$1 million. File quarterly.",
+      "notes": "Rate raised from 8% to 9% on 1 January 2024. Compulsory registration at S$1M turnover.",
+      "rates": [
+        {"name": "standard", "rate": 9, "unit": "percent"}
+      ],
+      "thresholds": [
+        {"name": "compulsory_registration", "amount": 1000000, "currency": "SGD", "period": "annual"},
+        {"name": "voluntary_registration", "amount": 500000, "currency": "SGD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "quarterly_return", "offset_rule": "month+1 day30", "detail": "File within 30 days after quarter ends", "penalty": "Late filing penalty"}
+      ]
+    },
+    {
+      "name": "Corporate Income Tax",
+      "type": "income",
+      "plain_words": "Corporate profits taxed at 17% flat. File estimated chargeable income within 3 months of financial year end. File annual return by 30 November.",
+      "notes": "Flat rate. Partial tax exemption for first S$300,000 of chargeable income. Start-up exemption available for first 3 years.",
+      "rates": [
+        {"name": "standard", "rate": 17, "unit": "percent"},
+        {"name": "partial_exemption_first_10000", "rate": 4.25, "unit": "percent", "min_amount": 0, "max_amount": 10000, "currency": "SGD"},
+        {"name": "partial_exemption_next_190000", "rate": 8.5, "unit": "percent", "min_amount": 10001, "max_amount": 200000, "currency": "SGD"}
+      ],
+      "thresholds": [
+        {"name": "partial_exemption_cap", "amount": 300000, "currency": "SGD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "eci_filing", "offset_rule": "fy_end+3months", "detail": "Estimated Chargeable Income within 3 months of FY end", "penalty": "Late filing penalty"},
+        {"name": "annual_return", "offset_rule": "nov_30", "detail": "File annual return by 30 November", "penalty": "Late filing penalty"}
+      ]
+    },
+    {
+      "name": "Individual Income Tax",
+      "type": "income",
+      "plain_words": "Progressive from 0% to 24%. First S$20,000 is tax-free. File by 18 April (paper) or 18 April (electronic). No capital gains tax.",
+      "notes": "Tax residents: progressive rates. Non-residents: 15% flat or prevailing rate, whichever higher. No tax on capital gains.",
+      "rates": [
+        {"name": "bracket_1_0pct", "rate": 0, "unit": "percent", "min_amount": 0, "max_amount": 20000, "currency": "SGD"},
+        {"name": "bracket_2_2pct", "rate": 2, "unit": "percent", "min_amount": 20001, "max_amount": 30000, "currency": "SGD"},
+        {"name": "bracket_3_3pct", "rate": 3, "unit": "percent", "min_amount": 30001, "max_amount": 40000, "currency": "SGD"},
+        {"name": "bracket_4_4pct", "rate": 4, "unit": "percent", "min_amount": 40001, "max_amount": 80000, "currency": "SGD"},
+        {"name": "bracket_5_6pct", "rate": 6, "unit": "percent", "min_amount": 80001, "max_amount": 120000, "currency": "SGD"},
+        {"name": "bracket_6_8pct", "rate": 8, "unit": "percent", "min_amount": 120001, "max_amount": 160000, "currency": "SGD"},
+        {"name": "bracket_7_11pct", "rate": 11, "unit": "percent", "min_amount": 160001, "max_amount": 200000, "currency": "SGD"},
+        {"name": "bracket_8_16pct", "rate": 16, "unit": "percent", "min_amount": 200001, "max_amount": 240000, "currency": "SGD"},
+        {"name": "bracket_9_19pct", "rate": 19, "unit": "percent", "min_amount": 240001, "max_amount": 280000, "currency": "SGD"},
+        {"name": "bracket_10_22pct", "rate": 22, "unit": "percent", "min_amount": 280001, "max_amount": 320000, "currency": "SGD"},
+        {"name": "bracket_11_24pct", "rate": 24, "unit": "percent", "min_amount": 320001, "currency": "SGD"}
+      ],
+      "thresholds": [
+        {"name": "tax_free_threshold", "amount": 20000, "currency": "SGD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "electronic_filing", "offset_rule": "apr_18", "detail": "File electronically by 18 April", "penalty": "Late filing penalty 5% of tax, up to 200% for severe cases"},
+        {"name": "paper_filing", "offset_rule": "apr_15", "detail": "Paper filing by 15 April", "penalty": "Same as electronic"}
+      ]
+    }
+  ]
+}

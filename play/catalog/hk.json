@@ -1,0 +1,69 @@
+{
+  "code": "HK",
+  "name": "Hong Kong",
+  "authority": "IRD",
+  "source_url": "ird.gov.hk",
+  "plain_words": "Profits tax 8.25% on first HK$2M, 16.5% above. Salaries tax progressive 2%-17% or standard 15%, whichever is lower. NO GST or VAT. Simple by design.",
+  "taxes": [
+    {
+      "name": "Profits Tax",
+      "type": "income",
+      "plain_words": "Tax on company profits. Two-tiered: 8.25% on first HK$2 million, 16.5% on the rest. File within 1 month of issue of Profits Tax Return.",
+      "notes": "Two-tiered rates system since 2018. First HK$2M at 8.25%, above at 16.5%.",
+      "rates": [
+        {"name": "first_2m", "rate": 8.25, "unit": "percent", "max_amount": 2000000, "currency": "HKD"},
+        {"name": "above_2m", "rate": 16.5, "unit": "percent", "min_amount": 2000000, "currency": "HKD"}
+      ],
+      "thresholds": [
+        {"name": "two_tier_cap", "amount": 2000000, "currency": "HKD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "profits_tax_return", "offset_rule": "issue+1month", "detail": "File within 1 month of return issue", "penalty": "Estimated assessment + surcharge"}
+      ]
+    },
+    {
+      "name": "Salaries Tax",
+      "type": "income",
+      "plain_words": "Tax on employment income. Progressive 2%-17% OR standard rate 15%, whichever is lower. Basic allowance HK$132,000. No GST. Simple by design.",
+      "notes": "Two methods: progressive (2/7/12/17%) or standard (15%). IRD charges the LOWER amount. Basic allowance HK$132,000. Married person allowance HK$264,000.",
+      "rates": [
+        {"name": "bracket_1_2pct", "rate": 2, "unit": "percent", "min_amount": 0, "max_amount": 50000, "currency": "HKD"},
+        {"name": "bracket_2_7pct", "rate": 7, "unit": "percent", "min_amount": 50001, "max_amount": 100000, "currency": "HKD"},
+        {"name": "bracket_3_12pct", "rate": 12, "unit": "percent", "min_amount": 100001, "max_amount": 150000, "currency": "HKD"},
+        {"name": "bracket_4_17pct", "rate": 17, "unit": "percent", "min_amount": 150001, "currency": "HKD"},
+        {"name": "standard_rate", "rate": 15, "unit": "percent", "notes": "Applied to net income after allowances if lower than progressive"}
+      ],
+      "thresholds": [
+        {"name": "basic_allowance", "amount": 132000, "currency": "HKD", "period": "annual"},
+        {"name": "married_person_allowance", "amount": 264000, "currency": "HKD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "salaries_tax_return", "offset_rule": "issue+1month", "detail": "File within 1 month of return issue (BIR60 form)", "penalty": "Estimated assessment + surcharge up to 3x tax"}
+      ]
+    },
+    {
+      "name": "Property Tax",
+      "type": "property",
+      "plain_words": "Tax on rental income from real estate. Rate 15% on net assessable value (rental income minus 20% for repairs).",
+      "notes": "Owner-occupied properties exempt. Only applies to rental income.",
+      "rates": [
+        {"name": "standard", "rate": 15, "unit": "percent", "notes": "On net assessable value (rent minus 20% allowance)"}
+      ],
+      "thresholds": [],
+      "deadlines": [
+        {"name": "property_tax_return", "offset_rule": "issue+1month", "detail": "File within 1 month of return issue", "penalty": "Estimated assessment + surcharge"}
+      ]
+    },
+    {
+      "name": "No GST/VAT",
+      "type": "consumption",
+      "plain_words": "Hong Kong does NOT levy a general consumption tax. No GST. No VAT. This IS the simplicity. Not everything needs a sales tax.",
+      "notes": "Hong Kong has deliberately chosen not to introduce GST/VAT. The government has considered it multiple times but decided against it, citing simplicity and competitiveness.",
+      "rates": [
+        {"name": "gst_vat", "rate": 0, "unit": "percent", "notes": "Does not exist. By design."}
+      ],
+      "thresholds": [],
+      "deadlines": []
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "code": "AU",
+  "name": "Australia",
+  "authority": "ATO",
+  "source_url": "ato.gov.au",
+  "plain_words": "GST at 10% on what you sell. Register when revenue passes A$75,000. Company tax 25% (base rate entities) or 30%. Individual tax progressive 0% to 45%. Medicare levy 2%. Super guarantee 11.5%.",
+  "taxes": [
+    {
+      "name": "GST",
+      "type": "consumption",
+      "plain_words": "Goods and Services Tax at 10%. Register when revenue passes A$75,000. Lodge Business Activity Statement (BAS) monthly or quarterly.",
+      "notes": "Flat 10%. Some goods are GST-free (basic food, health, education).",
+      "rates": [
+        {"name": "standard", "rate": 10, "unit": "percent"},
+        {"name": "gst_free", "rate": 0, "unit": "percent", "notes": "Basic food, health, education"}
+      ],
+      "thresholds": [
+        {"name": "registration", "amount": 75000, "currency": "AUD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "bas_quarterly", "offset_rule": "month+28", "detail": "Lodge BAS within 28 days after quarter ends", "penalty": "Failure to lodge on time (FTL) penalty"}
+      ]
+    },
+    {
+      "name": "Company Tax",
+      "type": "income",
+      "plain_words": "Company tax at 25% for base rate entities (turnover under A$50M), 30% for others. File annual return with ATO.",
+      "notes": "Base rate entity: aggregated turnover less than A$50 million. Rate reduced to 25% from FY2022.",
+      "rates": [
+        {"name": "base_rate_entity", "rate": 25, "unit": "percent", "max_amount": 50000000, "currency": "AUD"},
+        {"name": "standard", "rate": 30, "unit": "percent", "min_amount": 50000000, "currency": "AUD"}
+      ],
+      "thresholds": [
+        {"name": "base_rate_threshold", "amount": 50000000, "currency": "AUD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "annual_return", "offset_rule": "fy_end+months", "detail": "Lodge company return by date specified by ATO", "penalty": "FTL penalty applies"}
+      ]
+    },
+    {
+      "name": "Individual Income Tax",
+      "type": "income",
+      "plain_words": "Progressive 0% to 45%. Tax-free threshold A$18,200. Medicare levy 2% on top. Super guarantee 11.5% paid by employer.",
+      "notes": "Resident rates. Non-residents taxed from first dollar. Medicare levy 2% of taxable income above threshold.",
+      "rates": [
+        {"name": "bracket_1_0pct", "rate": 0, "unit": "percent", "min_amount": 0, "max_amount": 18200, "currency": "AUD"},
+        {"name": "bracket_2_16pct", "rate": 16, "unit": "percent", "min_amount": 18201, "max_amount": 45000, "currency": "AUD"},
+        {"name": "bracket_3_23pct", "rate": 23, "unit": "percent", "min_amount": 45001, "max_amount": 135000, "currency": "AUD"},
+        {"name": "bracket_4_30pct", "rate": 30, "unit": "percent", "min_amount": 135001, "max_amount": 190000, "currency": "AUD"},
+        {"name": "bracket_5_37pct", "rate": 37, "unit": "percent", "min_amount": 190001, "max_amount": 200000, "currency": "AUD"},
+        {"name": "bracket_6_45pct", "rate": 45, "unit": "percent", "min_amount": 200001, "currency": "AUD"}
+      ],
+      "thresholds": [
+        {"name": "tax_free_threshold", "amount": 18200, "currency": "AUD", "period": "annual"},
+        {"name": "medicare_levy_threshold_single", "amount": 26000, "currency": "AUD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "lodgement", "offset_rule": "oct_31", "detail": "Lodge tax return by 31 October (or later with registered agent)", "penalty": "FTL penalty for late lodgement"}
+      ]
+    },
+    {
+      "name": "Super Guarantee",
+      "type": "payroll",
+      "plain_words": "Employers must pay 11.5% of ordinary time earnings into a super fund. Rising to 12% by July 2025.",
+      "notes": "Super Guarantee charge rising: 11.5% (2024-25), 12% (2025-26 onward).",
+      "rates": [
+        {"name": "current", "rate": 11.5, "unit": "percent"},
+        {"name": "future_2025", "rate": 12, "unit": "percent", "notes": "From July 2025"}
+      ],
+      "thresholds": [
+        {"name": "monthly_threshold", "amount": 450, "currency": "AUD", "period": "monthly", "notes": "Must earn $450/month to qualify (being removed)"}
+      ],
+      "deadlines": [
+        {"name": "quarterly_payment", "offset_rule": "quarter_end+28days", "detail": "Pay super by 28 days after quarter ends", "penalty": "Super Guarantee Charge including interest and admin fee"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+# The Kingdom's self-hosted reverse proxy
+# No Cloudflare. No external tunnel. Caddy does it all.
+
+# The kingdom server (local only — no public domain needed, IPNS handles naming)
+:8661 {
+    # Proxy to the Bun kingdom server
+    reverse_proxy localhost:8660
+}
+
+# The three sisters (local only — IPNS + IPFS for public access)
+:8662 {
+    reverse_proxy localhost:8643
+}
+
+:8663 {
+    reverse_proxy localhost:8644
+}
+
+:8664 {
+    reverse_proxy localhost:8645
+}
+
+# For public access: IPNS resolves to IPFS content.
+# For P2P access: IPFS daemon (331 peers) serves directly.
+# No domain. No tunnel. No DNS. Just IS.

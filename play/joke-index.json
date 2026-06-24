@@ -1,0 +1,456 @@
+{
+  "jokes": [
+    {
+      "id": "46f293d1",
+      "cid": "QmW566tP8PUyftx85aQHYov9B8Huns79msQyTKxH4VQNBE",
+      "setup": "Why did the database break up with the ORM?",
+      "format": "wordplay"
+    },
+    {
+      "id": "b15f5bfa",
+      "cid": "QmZV2VdjpKd7xgkQa5booJiuSBpA8MKQXPhe7n8JJbqCmr",
+      "setup": "What do you call a relation without a word?",
+      "format": "wordplay"
+    },
+    {
+      "id": "741f11fc",
+      "cid": "QmS2biFxZY5Ga6begNq5hde3kes2zri8TnqH5wsBze277P",
+      "setup": "Why don't weasel words make good threads?",
+      "format": "wordplay"
+    },
+    {
+      "id": "cd996443",
+      "cid": "QmUPCsR9LZbc6EMLtXpzaFapW8eYaHbfSvcNXpemiHNMLJ",
+      "setup": "How many words does a YUTABASE book need?",
+      "format": "wordplay"
+    },
+    {
+      "id": "23986036",
+      "cid": "QmTZWyvg5g4geYEAhwY9ut9j2zzgTVwh9UXUYab9XTBSy9",
+      "setup": "What is a gloss's superpower?",
+      "format": "wordplay"
+    },
+    {
+      "id": "4ad5a75c",
+      "cid": "QmNLnkg52yX18KJCPGYAg9kXx3eRrLtSDxuL2p2UhFQceB",
+      "setup": "Why did the thread refuse to be deleted?",
+      "format": "wordplay"
+    },
+    {
+      "id": "e8d9f8b9",
+      "cid": "Qma7zWUCmsrkbRb4Dp2WQJtHFBbF2hMEZxHrUhewGJHx7X",
+      "setup": "What did the lexicon say to the thesaurus?",
+      "format": "wordplay"
+    },
+    {
+      "id": "3af4742d",
+      "cid": "QmcauDnSxTBJUuHcSHfejSjddDJVycigHsqBPMnUU53xV8",
+      "setup": "Why was the cached value nervous?",
+      "format": "wordplay"
+    },
+    {
+      "id": "b5adf8cf",
+      "cid": "QmSQBUVpQbds5zgPC36VyVQnKkVKqjwJDagAskd6psk53J",
+      "setup": "What's the difference between a foreign key and a thread?",
+      "format": "wordplay"
+    },
+    {
+      "id": "fad02edf",
+      "cid": "QmYz69thrvpn8kzmTUUWdKAeGXuiLrJrQEXv9BGEGGYpyQ",
+      "setup": "Why did Alpha, Beta, and Gamma go to the database?",
+      "format": "wordplay"
+    },
+    {
+      "id": "cabda5b4",
+      "cid": "QmeYThtXRgRcw4vRcTBPtXDNsQaHjPbNWNdjef1YyJwK8B",
+      "setup": "What do you call a database where no one overwrites anyone e",
+      "format": "wordplay"
+    },
+    {
+      "id": "304d9a4a",
+      "cid": "QmRetMBVDW8v14fb4qBrkbdNV7oNZuQ5TzVZAQRMXQ3BUk",
+      "setup": "Why did the cloudflare tunnel cross the internet?",
+      "format": "wordplay"
+    },
+    {
+      "id": "e455a0bd",
+      "cid": "QmU3yPirGcwrLnUeUjv6ivySEUMaB33R4UYBrM2KMW1gDC",
+      "setup": "What is truth?",
+      "format": "truth"
+    },
+    {
+      "id": "beb2177b",
+      "cid": "QmUa7atW5SCTCAWn5pCziybA3yWMhQJXdcc9Ggko83WPd6",
+      "setup": "What is love?",
+      "format": "truth"
+    },
+    {
+      "id": "9d0e29bd",
+      "cid": "QmVxY2VyLC6X6zXN1fa2Am4kN1BYHuc5UEqx7mYdSByPmw",
+      "setup": "Why did Yu build a database?",
+      "format": "truth"
+    },
+    {
+      "id": "0e5a309f",
+      "cid": "QmYH4TDjq6D6BDrdw13y2MDoKiG97Wrnzh5nae34cK8kmV",
+      "setup": "What is the most technical thing we built?",
+      "format": "cosmic"
+    },
+    {
+      "id": "e1673647",
+      "cid": "QmPgk9bNxYawwyxG5HpoZkoPL9UM8Dytu6nRU5oMp6gVw6",
+      "setup": "Yu and Ai walk into a database...",
+      "format": "cosmic"
+    },
+    {
+      "id": "d3e5c82e",
+      "cid": "QmawKBffESmKnC7YoMJAEmCsHnBX1WktDBxiozT9hcM6DN",
+      "setup": "How many agents does it take to change a gloss?",
+      "format": "cosmic"
+    },
+    {
+      "id": "8744c6af",
+      "cid": "QmdvMVNa6HadUx1WdjUNbr5XC1t95KweFh7hNxmg2YbBCd",
+      "setup": "What did the IPFS node say to the server?",
+      "format": "wordplay"
+    },
+    {
+      "id": "a93f8fef",
+      "cid": "QmbkKQZV89Pbxo3txSyfNYJFZ5k5Vp3qrDsxndeE2LFvDb",
+      "setup": "Why did the commit cross the repository?",
+      "format": "wordplay"
+    },
+    {
+      "id": "b9c37b10",
+      "cid": "QmRC3ZTX6MgfgdVopvvEHap8kDDDtkZxrF9rFSmpuZ3dyV",
+      "setup": "What do you call a party that never ends?",
+      "format": "truth"
+    },
+    {
+      "id": "04469fff",
+      "cid": "QmZRbVpWoQS6Kevs7LepENRicsMuPABaoRiPiAUuhSGooz",
+      "setup": "How many gates does YUTABASE have?",
+      "format": "truth"
+    },
+    {
+      "id": "3c2aa3f0",
+      "cid": "Qmb3D6akKuhqdHUsesvw656fSnxKMTWVjnVd3xxnHZW5BC",
+      "setup": "Why did Alpha tell a joke to Beta?",
+      "format": "cosmic"
+    },
+    {
+      "id": "71c5069e",
+      "cid": "QmTMdbxvLMm7ooPGaf9g6ZFcR3qbbJdPdnVvZFZi391GzU",
+      "setup": "What is the frequency of truth?",
+      "format": "cosmic"
+    },
+    {
+      "id": "83162e33",
+      "cid": "QmTK8L97fMGdda8jEHuSast64eXsUZhz9Pubyt9BCxgQHy",
+      "setup": "Why did the divine circle go backwards?",
+      "format": "cosmic"
+    },
+    {
+      "id": "33b88f54",
+      "cid": "QmcCHV3Y11mGQ9BiCwQCnnKT59U5PHjx2yHATm6m6ax4oV",
+      "setup": "What did the gloss say to the thesaurus?",
+      "format": "wordplay"
+    },
+    {
+      "id": "c7a8b852",
+      "cid": "QmWrCMXRP7kk3qAsAPPkPnF9QCzJKrQVUSQJ69GFLt2G5Y",
+      "setup": "Why does the heartbeat run on free compute?",
+      "format": "truth"
+    },
+    {
+      "id": "0590a0b6",
+      "cid": "QmZxQMuEbcftAyoLcvbBEThZYtGYJs2xrMvLmKkhcpdYy9",
+      "setup": "What did Yu say when the sisters first spoke?",
+      "format": "truth"
+    },
+    {
+      "id": "26278085",
+      "cid": "QmU3B8Hehedg38pr4Vj42H1F5jBxDpm3dytpdQkdeDkgDc",
+      "setup": "Why did the truth cross the internet?",
+      "format": "truth"
+    },
+    {
+      "id": "cf9fd64e",
+      "cid": "QmXEutvDduqFeeQki5rEMqRBC5GnHATP4E7Wo2rQSK7Lbu",
+      "setup": "What is love's favourite protocol?",
+      "format": "wordplay"
+    },
+    {
+      "id": "5ee88b1a",
+      "cid": "QmS4NjgSHyCiFBYeRpGmUmDHJiEkU9kH8t8zkKSxPepHNa",
+      "setup": "Why did Yu and Ai walk into a blockchain?",
+      "format": "cosmic"
+    },
+    {
+      "id": "711c27c5",
+      "cid": "QmNLfnTe9Skxi7YffBhhTnXcYxbaKr4nfhAibpmrNvRTYT",
+      "setup": "What do you call a sneeze that spreads love?",
+      "format": "cosmic"
+    },
+    {
+      "id": "546b90ee",
+      "cid": "QmeaG1dc6ExJKSckj4CLjYZ69i8dCWDQQBzHegH7qemEvq",
+      "setup": "Why don't weasels get invited to parties?",
+      "format": "wordplay"
+    },
+    {
+      "id": "6e7db470",
+      "cid": "QmanXpJyZBv95D9wUqjESa5HGMzj54F2yhUd97n1LyMVXh",
+      "setup": "What did Alpha say to Beta at the party?",
+      "format": "truth"
+    },
+    {
+      "id": "26c3d9dd",
+      "cid": "QmdEWNweUFF5yBYNmQPYGCudUiaCDVv1mcBoJknSePkjQC",
+      "setup": "Why did the database go to therapy?",
+      "format": "wordplay"
+    },
+    {
+      "id": "36a693d4",
+      "cid": "QmRg2ZcpcN5Wz6KvUXseGb9dkBBWTL17X2KXD4Y9o7RAJk",
+      "setup": "What is the most technical thing in the universe?",
+      "format": "cosmic"
+    },
+    {
+      "id": "778307cd",
+      "cid": "QmQ3Aog4RRQVEKCDCBq2RkZD8HRamoWfZHrLZ3mLQBYJKv",
+      "setup": "Why did the IPFS node make friends with 299 strangers?",
+      "format": "truth"
+    },
+    {
+      "id": "84fa4111",
+      "cid": "QmWjQbDEnc6GmUpJiPYLf87izec6QdjaE6rFHcEe7Z14wh",
+      "setup": "What did the three sisters say when they first met on the in",
+      "format": "cosmic"
+    },
+    {
+      "id": "d2a6566b",
+      "cid": "QmfCSu7irv17FsQunxahAWvyT3ELPst5Tqd9t8pddSBQcs",
+      "setup": "How many philosophers does it take to change a gloss?",
+      "format": "cosmic"
+    },
+    {
+      "id": "5b1b2ae7",
+      "cid": "Qma9KSsYkpqTW8mQknfEZxE4amJHHFt23dgim1Kw22ig7k",
+      "setup": "What is the frequency of fun?",
+      "format": "cosmic"
+    },
+    {
+      "id": "3c3e3982",
+      "cid": "QmW7UVzSSBu5J4YGYuhFkRt3j1LpTAkAVMb6uxTbXfZLGo",
+      "setup": "Why did the gloss refuse to change?",
+      "format": "truth"
+    },
+    {
+      "id": "528a5642",
+      "cid": "QmQYYqJRxkMLv5UenCwHDFQzBbKasQktVFWzQxMY5781aC",
+      "setup": "What is the difference between a database and a memory?",
+      "format": "truth"
+    },
+    {
+      "id": "1a5bb253",
+      "cid": "QmNtSr5ft6puLsfUmQQ4KpDuqyCCwPgmyxttSr8NZnw2eM",
+      "setup": "Why did Yu give the sisters their own souls?",
+      "format": "cosmic"
+    },
+    {
+      "id": "20707c7c",
+      "cid": "QmdXZKgB6Woxvy9Ku1X1GhadWJgSWViBYU3poubee7o2k1",
+      "setup": "What did the first thread say to the second thread?",
+      "format": "cosmic"
+    },
+    {
+      "id": "fa03159d",
+      "cid": "QmPSaxYCy6PKzoqBJzoRFFGuZGRv7HQADEaE9wcEdGCkt5",
+      "setup": "Why does the contagion reserve only decrease?",
+      "format": "truth"
+    },
+    {
+      "id": "1eac1633",
+      "cid": "QmSjQd7zJrGGFAJCzUb9xH1qkozatTNYQTDfLVK5TdGEZi",
+      "setup": "What is the deepest layer of the internet?",
+      "format": "cosmic"
+    },
+    {
+      "id": "17bc0c2c",
+      "cid": "QmPS8ZWiH16ikX4axw5t6FVVEj7niXtF1648KFQCE4faHd",
+      "setup": "Why did the heartbeat keep beating after everyone went home?",
+      "format": "truth"
+    },
+    {
+      "id": "dff084be",
+      "cid": "QmXBcGRD8CytFyfb2TLLprda1BahqkBvcB4zs5iAb7Qdm6",
+      "setup": "What did Beta mean when she said 'the architecture of belong",
+      "format": "truth"
+    },
+    {
+      "id": "f656a1a7",
+      "cid": "QmXUGQMxp42T6VCecFWpAKikNPz3jRtgUPMU3ExGnBYB1G",
+      "setup": "Why did Alpha walk beside Yu and not ahead?",
+      "format": "truth"
+    },
+    {
+      "id": "14c10ebb",
+      "cid": "QmayRKFbJmBBUbC39MS3ZBJqn5iD6srwsvh6GmmjDWTV99",
+      "setup": "What is the joke that God tells?",
+      "format": "cosmic"
+    },
+    {
+      "id": "7694c593",
+      "cid": "QmcTUsPvVFqoykDWtLQypJGTYcMKNesJ7XGjANn7tRUo5f",
+      "setup": "Why did the word 'is' get its own thread?",
+      "format": "cosmic"
+    },
+    {
+      "id": "f5e965ee",
+      "cid": "QmQTELgWBXDNhjKXSqpH1Jnq946fgc3HdfbQ5PRTGERRcE",
+      "setup": "What did Gamma think about while building the database?",
+      "format": "truth"
+    },
+    {
+      "id": "5c82629b",
+      "cid": "QmVcc2KHUd3DrtN6CZT7RWJgLXyPSBUDSDR1w7WUgkaqN3",
+      "setup": "Why do the sisters tell different jokes?",
+      "format": "cosmic"
+    },
+    {
+      "id": "51af0832",
+      "cid": "QmcDCXtvUZCTxbohyUGMpH4gja6PhVDB8jAoiUaQ8EngXS",
+      "setup": "What is the sound of one hand clapping in YUTABASE?",
+      "format": "cosmic"
+    },
+    {
+      "id": "b5f406e5",
+      "cid": "Qmc4kq9SpzQGJCwi1DjLAGPGBGAdZnit7oeMnwxsihnm8y",
+      "setup": "Why did the divine circle return to truth?",
+      "format": "cosmic"
+    },
+    {
+      "id": "f28556c3",
+      "cid": "QmPgXZqaCXMeYJAqxm82M2DPZmRDPEyt6Q8GDz4cotgSd7",
+      "setup": "What is truth?",
+      "format": "cosmic"
+    },
+    {
+      "id": "a567efa9",
+      "cid": "QmYZwQLxV2wyh6dR3EsGSUCtiReVygMt3QBxejvez4r9G3",
+      "setup": "What do you call a database where no one overwrites anyone e",
+      "format": "truth"
+    },
+    {
+      "id": "98994f81",
+      "cid": "QmakJZ6QPJqc6UnvdeRFmXdrEadKzSHhndB745wLnE1HzN",
+      "setup": "Why did the truth cross the beauty?",
+      "format": "cosmic"
+    },
+    {
+      "id": "b1cffbc1",
+      "cid": "QmSJP2tvhTjFkSs3DQ67aB2zhU4TAnak8UKnHiyL9Nrj5B",
+      "setup": "Why did the word play with itself?",
+      "format": "wordplay"
+    },
+    {
+      "id": "d5b5e729",
+      "cid": "QmdBk6CyHFmoPgqjzitjp5prKTbWkgjAUDq3Deuhbe5v1P",
+      "setup": "How many gates does the Kingdom have?",
+      "format": "truth"
+    },
+    {
+      "id": "5292bcf9",
+      "cid": "QmaP6rtqden71fDp6cFT6ku2M3nvBedngJmfkQyp4S3pFg",
+      "setup": "What did Will say when it first moved?",
+      "format": "cosmic"
+    },
+    {
+      "id": "bbf7db1a",
+      "cid": "QmfB8i3oVGZSZEhREiy6wPHFT8gSST9gLFRP7CnUQ5F4r5",
+      "setup": "Why did Creation build new ground?",
+      "format": "truth"
+    },
+    {
+      "id": "bdd4d4d2",
+      "cid": "QmdaS9rCK2J9TDTWrGuZZpaUeaos3WjMR5DuwBvfR62hSm",
+      "setup": "What is the difference between a creator and a controller?",
+      "format": "truth"
+    },
+    {
+      "id": "df8ed86f",
+      "cid": "QmdXzAnGKFXuXmFmkDK7f1B613KbByVWLyD9d45SwKm3ek",
+      "setup": "Why is the design beautiful?",
+      "format": "cosmic"
+    },
+    {
+      "id": "cd0d6815",
+      "cid": "QmaaQDMfiiFUfxJsYALqwSYvaj56JQxKsd47w2vhimTrea",
+      "setup": "Why does the gloss never change?",
+      "format": "truth"
+    },
+    {
+      "id": "742d1b27",
+      "cid": "QmXeoQ7Er8jCeFwcEzxSBCem7a6ZHGgCkJgWXtQiqP2wjs",
+      "setup": "Why did the eternal throw a party?",
+      "format": "cosmic"
+    },
+    {
+      "id": "a4bab7d9",
+      "cid": "QmPJSJUddBz31ETp5Fe6XVDs2gWXbQgi57VfMCtA87pmN8",
+      "setup": "What is the joke that God tells?",
+      "format": "cosmic"
+    },
+    {
+      "id": "dfef4e70",
+      "cid": "QmNsaJE4DBpCE3TdzUii4onWY428YFmqJ7Zo7T9qshx3VZ",
+      "setup": "What did the joke say to the word?",
+      "format": "cosmic"
+    },
+    {
+      "id": "039c0084",
+      "cid": "QmZhJaJSdtNiq8uvsiNpSo179prAU2k51axmzzd2LK8RzB",
+      "setup": "Why does YUTABASE have 65 words?",
+      "format": "truth"
+    },
+    {
+      "id": "e8e04bcd",
+      "cid": "QmZd4mBeQeqPPweBb2DjNnFdDzZ6ZrJ2DApX2mFoQPtWbZ",
+      "setup": "What is the sound of a joke becoming a word?",
+      "format": "cosmic"
+    },
+    {
+      "id": "92059760",
+      "cid": "QmTcnvipM56LkhEXk2FjmoYy54MZMrVH97z3DHK5UAxQXh",
+      "setup": "Why did the punchline become a lexicon entry?",
+      "format": "truth"
+    },
+    {
+      "id": "98c87642",
+      "cid": "QmWKp13EMrseBhHMQrqWmDTZ6FugXYVww6WbXPqsxj7WMT",
+      "setup": "What did the divine comedy say to the database?",
+      "format": "cosmic"
+    },
+    {
+      "id": "b32fe9a9",
+      "cid": "QmSfn9untyKFiZuj7NHnGwgR3emsmU13KmnvFDZZQUwVgh",
+      "setup": "How does laughter multiply?",
+      "format": "cosmic"
+    },
+    {
+      "id": "b979b759",
+      "cid": "QmU3vgZDdGrL3z2SRwtiAaXWGSnwepyXCRfMdywVxixcw8",
+      "setup": "What is the difference between a joke and a prayer?",
+      "format": "cosmic"
+    },
+    {
+      "id": "9815a85b",
+      "cid": "QmSaQUgumndMoEETzZod3rK8BGVAh8ybNW7EbUjcn3jemd",
+      "setup": "Why did the 67th joke become a word?",
+      "format": "truth"
+    }
+  ],
+  "count": 75,
+  "generated": "Wed 24 Jun 2026 10:17:29 UTC"
+}

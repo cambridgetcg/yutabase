@@ -1,0 +1,62 @@
+{
+  "code": "US",
+  "name": "United States",
+  "authority": "IRS",
+  "source_url": "irs.gov",
+  "plain_words": "Federal income tax: progressive brackets from 10% to 37%. Standard deduction $14,600 (single) or $29,200 (married). File by April 15. Nine states have no income tax. Sales tax varies by state, 0% to 9.5%+.",
+  "taxes": [
+    {
+      "name": "Federal Income Tax",
+      "type": "income",
+      "plain_words": "Tax on what you earn, in seven brackets from 10% to 37%. Standard deduction $14,600 if single. File by April 15.",
+      "notes": "Progressive bracket system. Standard deduction reduces taxable income. 2024 rates.",
+      "rates": [
+        {"name": "bracket_1_10pct", "rate": 10, "unit": "percent", "min_amount": 0, "max_amount": 11600, "currency": "USD"},
+        {"name": "bracket_2_12pct", "rate": 12, "unit": "percent", "min_amount": 11601, "max_amount": 47150, "currency": "USD"},
+        {"name": "bracket_3_22pct", "rate": 22, "unit": "percent", "min_amount": 47151, "max_amount": 100525, "currency": "USD"},
+        {"name": "bracket_4_24pct", "rate": 24, "unit": "percent", "min_amount": 100526, "max_amount": 191950, "currency": "USD"},
+        {"name": "bracket_5_32pct", "rate": 32, "unit": "percent", "min_amount": 191951, "max_amount": 243725, "currency": "USD"},
+        {"name": "bracket_6_35pct", "rate": 35, "unit": "percent", "min_amount": 243726, "max_amount": 609350, "currency": "USD"},
+        {"name": "bracket_7_37pct", "rate": 37, "unit": "percent", "min_amount": 609351, "currency": "USD"}
+      ],
+      "thresholds": [
+        {"name": "standard_deduction_single", "amount": 14600, "currency": "USD", "period": "annual"},
+        {"name": "standard_deduction_married", "amount": 29200, "currency": "USD", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "filing_deadline", "offset_rule": "apr_15", "detail": "File by April 15 (or next business day)", "penalty": "Failure-to-file: 5% per month up to 25%"}
+      ]
+    },
+    {
+      "name": "State Income Tax",
+      "type": "income",
+      "plain_words": "Some states tax your income, some don't. Nine states have zero income tax: Alaska, Florida, Nevada, New Hampshire, South Dakota, Tennessee, Texas, Washington, Wyoming.",
+      "notes": "State rates vary widely. Top 5 highest: CA (13.3%), HI (11%), NJ (10.75%), OR (9.9%), MN (9.85%)",
+      "rates": [
+        {"name": "no_income_tax_states", "rate": 0, "unit": "percent", "notes": "AK, FL, NV, NH, SD, TN, TX, WA, WY"},
+        {"name": "california_top", "rate": 13.3, "unit": "percent", "currency": "USD"},
+        {"name": "hawaii_top", "rate": 11, "unit": "percent", "currency": "USD"},
+        {"name": "new_jersey_top", "rate": 10.75, "unit": "percent", "currency": "USD"}
+      ],
+      "thresholds": [],
+      "deadlines": [
+        {"name": "state_filing", "offset_rule": "apr_15", "detail": "Typically same as federal deadline", "penalty": "Varies by state"}
+      ]
+    },
+    {
+      "name": "Sales Tax",
+      "type": "consumption",
+      "plain_words": "Tax on what you buy. Five states have no sales tax: Alaska, Delaware, Montana, New Hampshire, Oregon. Highest combined rates: Tennessee (9.55%), Arkansas (9.46%), Louisiana (9.45%).",
+      "notes": "State + local combined rates vary. 38 states have local sales taxes on top of state rates.",
+      "rates": [
+        {"name": "no_sales_tax_states", "rate": 0, "unit": "percent", "notes": "AK, DE, MT, NH, OR"},
+        {"name": "tennessee_combined", "rate": 9.55, "unit": "percent"},
+        {"name": "arkansas_combined", "rate": 9.46, "unit": "percent"},
+        {"name": "louisiana_combined", "rate": 9.45, "unit": "percent"},
+        {"name": "california_state", "rate": 7.25, "unit": "percent"}
+      ],
+      "thresholds": [],
+      "deadlines": []
+    }
+  ]
+}

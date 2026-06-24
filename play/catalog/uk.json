@@ -1,0 +1,84 @@
+{
+  "code": "UK",
+  "name": "United Kingdom",
+  "authority": "HMRC",
+  "source_url": "gov.uk/hmrc",
+  "plain_words": "Tax in the UK: VAT on what you sell, Corporation Tax on profits, PAYE on payroll, Self Assessment for the self-employed. File on time, keep digital records (MTD), and remember: prepared means ready, filed means sent.",
+  "taxes": [
+    {
+      "name": "VAT",
+      "type": "consumption",
+      "plain_words": "VAT is a tax on what you sell. You charge 20% extra, hold it for HMRC, send it quarterly. Register when sales pass £90,000/year.",
+      "notes": "Making Tax Digital requires digital records and quarterly updates",
+      "rates": [
+        {"name": "standard", "rate": 20, "unit": "percent"},
+        {"name": "reduced", "rate": 5, "unit": "percent"},
+        {"name": "zero", "rate": 0, "unit": "percent"}
+      ],
+      "thresholds": [
+        {"name": "registration", "amount": 90000, "currency": "GBP", "period": "annual"},
+        {"name": "deregistration", "amount": 88000, "currency": "GBP", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "quarterly_return", "offset_rule": "month+1 day7", "detail": "File by 7th of the second month after quarter ends", "penalty": "Points-based system"}
+      ]
+    },
+    {
+      "name": "Corporation Tax",
+      "type": "income",
+      "plain_words": "Tax on company profits. Main rate 25%, small profits rate 19%. File CT600 within 12 months of year end.",
+      "notes": "Marginal relief applies between small profits and main rate",
+      "rates": [
+        {"name": "main_rate", "rate": 25, "unit": "percent", "min_amount": 250000, "currency": "GBP"},
+        {"name": "small_profits", "rate": 19, "unit": "percent", "max_amount": 50000, "currency": "GBP"},
+        {"name": "marginal_relief", "rate": 26.5, "unit": "percent", "min_amount": 50000, "max_amount": 250000, "currency": "GBP"}
+      ],
+      "thresholds": [
+        {"name": "small_profits_upper", "amount": 50000, "currency": "GBP", "period": "annual"},
+        {"name": "main_rate_threshold", "amount": 250000, "currency": "GBP", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "ct600_filing", "offset_rule": "year_end+12months", "detail": "File CT600 within 12 months of accounting period end", "penalty": "£100 flat, then daily penalties"}
+      ]
+    },
+    {
+      "name": "PAYE",
+      "type": "payroll",
+      "plain_words": "Pay As You Earn — tax on employees' wages, reported in real time (RTI). FPS before each payday, EPS by 19th of following month.",
+      "notes": "RTI requires real-time reporting via FPS and EPS",
+      "rates": [
+        {"name": "basic_rate", "rate": 20, "unit": "percent", "min_amount": 12570, "max_amount": 50270, "currency": "GBP"},
+        {"name": "higher_rate", "rate": 40, "unit": "percent", "min_amount": 50271, "max_amount": 125140, "currency": "GBP"},
+        {"name": "additional_rate", "rate": 45, "unit": "percent", "min_amount": 125140, "currency": "GBP"}
+      ],
+      "thresholds": [
+        {"name": "personal_allowance", "amount": 12570, "currency": "GBP", "period": "annual"},
+        {"name": "ni_primary_threshold", "amount": 12584, "currency": "GBP", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "fps", "offset_rule": "on_or_before_payday", "detail": "Full Payment Submission on or before each payday", "penalty": "Late filing penalties escalate"},
+        {"name": "eps", "offset_rule": "month+19", "detail": "Employer Payment Summary by 19th of following month", "penalty": "Late filing penalties"}
+      ]
+    },
+    {
+      "name": "Self Assessment",
+      "type": "income",
+      "plain_words": "For self-employed and others with untaxed income. File SA100 online by 31 January. Pay tax by same date.",
+      "notes": "Two payment dates: 31 Jan (balancing payment + first payment on account), 31 Jul (second payment on account)",
+      "rates": [
+        {"name": "basic_rate", "rate": 20, "unit": "percent", "min_amount": 12570, "max_amount": 50270, "currency": "GBP"},
+        {"name": "higher_rate", "rate": 40, "unit": "percent", "min_amount": 50271, "max_amount": 125140, "currency": "GBP"},
+        {"name": "additional_rate", "rate": 45, "unit": "percent", "min_amount": 125140, "currency": "GBP"}
+      ],
+      "thresholds": [
+        {"name": "trading_allowance", "amount": 1000, "currency": "GBP", "period": "annual"},
+        {"name": "filing_threshold", "amount": 1000, "currency": "GBP", "period": "annual"}
+      ],
+      "deadlines": [
+        {"name": "sa100_online", "offset_rule": "tax_year_end_jan_31", "detail": "File online by 31 January after tax year ends", "penalty": "£100 day 1, then £10/day for 90 days, then percentage-based"},
+        {"name": "payment_1", "offset_rule": "jan_31", "detail": "Balancing payment + first payment on account", "penalty": "Interest on late payment"},
+        {"name": "payment_2", "offset_rule": "jul_31", "detail": "Second payment on account", "penalty": "Interest on late payment"}
+      ]
+    }
+  ]
+}
