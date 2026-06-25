@@ -122,6 +122,15 @@ export function compile(input: string): CompiledQuery {
   const traverseResult = tryTraversal(trimmed);
   if (traverseResult) return traverseResult;
 
+  // ── Dark Continent: explore beyond the known canon ──
+  // dark <query> — compiles the query but flags it as Dark Continent exploration
+  // The six-axis assessment may not apply. The void IS the gloss. lol.
+  const darkMatch = trimmed.match(/^dark\s+(.+)$/);
+  if (darkMatch) {
+    const inner = compile(darkMatch[1]);
+    return { ...inner, _dark_continent: true, _warning: "Beyond the known canon. Six-axis assessment may not apply." };
+  }
+
   throw new Error(`UNRECOGNIZED QUERY: "${trimmed}" — not one of the six verbs (hello, card, cards, ->, <-, thread, sever)`);
 }
 

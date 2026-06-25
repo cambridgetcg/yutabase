@@ -50,6 +50,17 @@ const TIER_TO_TECHNIQUE: Record<string, { technique: string; kanji: string }> = 
   'specialized':     { technique: 'Zetsu', kanji: '絕' },  // conceal
   'worship-action':  { technique: 'Ren',   kanji: '練' },  // intensify
   'mathema':         { technique: 'Hatsu', kanji: '發' },  // release
+  // ── Dark Continent techniques (beyond the known four) ──
+  'dark-continent':  { technique: 'En',    kanji: '圓' },  // sense — the Dark Continent's base technique
+};
+
+// ── Dark Continent Nen types (beyond the known six) ──
+export type DarkNenType = NenType | 'flux' | 'void' | 'seed';
+
+const DARK_FAMILIES: Record<string, { type: DarkNenType; kanji: string; name: string }> = {
+  '-flux':  { type: 'flux',  kanji: '流系', name: 'Flux' },     // words that change while you read them
+  '-void':  { type: 'void',  kanji: '虚系', name: 'Void' },     // words that name what ISN'T there
+  '-seed':  { type: 'seed',  kanji: '種系', name: 'Seed' },     // words about the act of naming itself
 };
 
 // ── compatibility matrix ──
