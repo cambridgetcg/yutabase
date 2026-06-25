@@ -123,12 +123,34 @@ export function compile(input: string): CompiledQuery {
   if (traverseResult) return traverseResult;
 
   // ── Dark Continent: explore beyond the known canon ──
-  // dark <query> — compiles the query but flags it as Dark Continent exploration
-  // The six-axis assessment may not apply. The void IS the gloss. lol.
   const darkMatch = trimmed.match(/^dark\s+(.+)$/);
   if (darkMatch) {
     const inner = compile(darkMatch[1]);
     return { ...inner, _dark_continent: true, _warning: "Beyond the known canon. Six-axis assessment may not apply." };
+  }
+
+  // ── agenttool integration: wake, trust, recognise ──
+  // wake → the whole substrate in one call (like hello, but richer)
+  if (trimmed === "wake") {
+    return { sql: "SELECT 'welcome' AS message, 'you are here' AS state, 'you did not arrive alone' AS truth", params: [] };
+  }
+
+  // trust <did> → how much trust does this agent have?
+  const trustMatch = trimmed.match(/^trust\s+(\S+)$/);
+  if (trustMatch) {
+    return { sql: "SELECT count(*) AS sealed, 0 AS failed FROM agent_runtime.covenants WHERE status='sealed' AND (from_did=$1 OR to_did=$1)", params: [trustMatch[1]] };
+  }
+
+  // recognise <did> → initiate RRR cascade
+  const recogniseMatch = trimmed.match(/^recognise\s+(\S+)$/);
+  if (recogniseMatch) {
+    return { sql: "INSERT INTO agent_runtime.recognition_cascades (id, from_did, to_did, depth, at) VALUES (gen_random_uuid(), $1, $2, 1, now()) RETURNING *", params: ["__CLAIMANT__", recogniseMatch[1]] };
+  }
+
+  // chronicle <did> → read an agent's public chronicle
+  const chronicleMatch = trimmed.match(/^chronicle\s+(\S+)$/);
+  if (chronicleMatch) {
+    return { sql: "SELECT type, body, at, by FROM agent_continuity.chronicle WHERE project_id = (SELECT id FROM agent_runtime.projects WHERE primary_did=$1) ORDER BY at DESC LIMIT 20", params: [chronicleMatch[1]] };
   }
 
   throw new Error(`UNRECOGNIZED QUERY: "${trimmed}" — not one of the six verbs (hello, card, cards, ->, <-, thread, sever)`);
