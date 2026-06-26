@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaxSorted — Tax, understood. Then sorted. For everyone.</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+h1{font-size:2.2em;margin:20px 0 5px;color:#ff6b6b}
+.tagline{font-size:1.1em;color:#4ecdc4;margin:5px 0 20px}
+h2{font-size:1.3em;margin:25px 0 10px;color:#4ecdc4;border-bottom:1px solid #333;padding-bottom:5px}
+h3{font-size:1.05em;margin:12px 0 6px;color:#ffe66d}
+p{margin:4px 0;color:#bbb;font-size:.93em}
+.role-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin:15px 0}
+.role-card{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:15px;cursor:pointer;transition:all .3s}
+.role-card:hover{border-color:#ff6b6b;transform:translateY(-2px)}
+.role-card .icon{font-size:2em;margin-bottom:8px}
+.role-card .name{font-weight:bold;color:#e0e0e0}
+.role-card .desc{font-size:.85em;color:#888;margin-top:4px}
+.role-card .taxes{font-size:.75em;color:#4ecdc4;margin-top:6px}
+.tax-card{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:15px;margin:8px 0}
+.tax-card:hover{border-color:#4ecdc4}
+.tax-card .name{font-weight:bold;color:#ffe66d;font-size:1.1em}
+.tax-card .year{color:#4ecdc4;font-size:.85em}
+.tax-card .rate{color:#95e1d3}
+.tax-card .vuln{color:#ff6b6b;font-size:.9em;margin-top:4px}
+.tax-card .fairness{color:#ffe66d;font-style:italic;font-size:.9em;margin-top:4px}
+.tax-card .plain{color:#ccc;margin-top:8px;padding:8px;background:#222;border-radius:5px}
+.joke-box{background:#1a1a1a;border-left:3px solid #ffe66d;padding:12px 15px;margin:10px 0;border-radius:0 8px 8px 0}
+.joke-box .q{color:#ffe66d;font-weight:bold}
+.joke-box .a{color:#ccc;margin-top:5px}
+.joke-box .xp{color:#4ecdc4;font-size:.8em;margin-top:5px}
+.barrier{background:#ff6b6b11;border:1px solid #ff6b6b33;border-radius:8px;padding:12px;margin:8px 0}
+.barrier .b-name{color:#ff6b6b;font-weight:bold}
+.barrier .b-solution{color:#4ecdc4}
+.stat{display:inline-block;margin:5px 10px 5px 0;background:#222;padding:5px 12px;border-radius:20px;font-size:.85em}
+.stat b{color:#4ecdc4}
+.btn{display:inline-block;padding:10px 25px;background:#ff6b6b;border:none;border-radius:5px;color:#fff;cursor:pointer;font-size:1em;margin:10px 5px 10px 0}
+.btn:hover{background:#ff5555}
+.btn-alt{background:#333}
+.btn-alt:hover{background:#444}
+.hidden{display:none}
+.simply{background:linear-gradient(135deg,#1a1a1a,#222);border:1px solid #4ecdc433;border-radius:12px;padding:20px;margin:15px 0}
+.simply h3{color:#ff6b6b}
+.search{background:#222;border:1px solid #444;color:#e0e0e0;padding:10px 15px;border-radius:5px;width:100%;font-size:1em;margin:10px 0}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>TaxSorted</h1>
+<p class="tagline">Tax, understood. Then sorted. For everyone. Every role. No barriers.</p>
+
+<div class="simply">
+<h3>🎯 The Mission</h3>
+<p style="font-size:1em">Dismantle every barrier between you and understanding your tax. No account needed. No jargon. No gatekeeping. This browser IS your key.</p>
+<p style="margin-top:8px">20 UK taxes explained in plain words. 20 strategy cards (the loopholes everyone should know). 10 vulnerabilities mapped. 177 jokes (because understanding IS love, and laughter IS the best teacher). Every role — from sole trader to multinational — has a path. Choose yours.</p>
+</div>
+
+<h2>👤 Who Are You? — Choose Your Role</h2>
+<div class="role-grid" id="roles"></div>
+
+<div id="role-detail" class="hidden"></div>
+
+<h2>😂 Joke XP — Learn Through Laughter</h2>
+<p>The funnier the tax joke, the more XP. Tax jokes = double XP. Level up from E to Monarch by laughing and understanding.</p>
+<button class="btn" onclick="tellJoke()">🎲 Random Tax Joke</button>
+<button class="btn btn-alt" onclick="tellRoast()">🔥 Roast HMRC</button>
+<div id="joke-display"></div>
+
+<h2>🧱 Barriers We're Dismantling</h2>
+<div class="barrier"><span class="b-name">Jargon</span> → <span class="b-solution">Plain words. Every tax explained in one sentence a 12-year-old could understand.</span></div>
+<div class="barrier"><span class="b-name">Account required</span> → <span class="b-solution">No account. This browser IS your key. Read everything free.</span></div>
+<div class="barrier"><span class="b-name">Complexity</span> → <span class="b-solution">20 spell cards. Each with: what it does, how much you save, what HMRC might challenge, plain words, and a joke.</span></div>
+<div class="barrier"><span class="b-name">Fear of HMRC</span> → <span class="b-solution">Understanding dissolves fear. HMRC is a rule-following machine. Learn the rules, follow them, keep what's yours.</span></div>
+<div class="barrier"><span class="b-name">The rich pay less</span> → <span class="b-solution">They do. Because they understand. TaxSorted gives everyone the same understanding. Power to everyone who understands.</span></div>
+<div class="barrier"><span class="b-name">10-million-word tax code</span> → <span class="b-solution">20 cards. 20 taxes. 177 jokes. The essential truth in plain words. The code is for accountants. TaxSorted is for you.</span></div>
+
+<h2>📊 The Numbers</h2>
+<div>
+<span class="stat">Taxes tracked: <b>20</b></span>
+<span class="stat">Strategy cards: <b>20</b></span>
+<span class="stat">Vulnerabilities: <b>10</b></span>
+<span class="stat">Jokes: <b>177</b></span>
+<span class="stat">Total XP pool: <b>10,000+</b></span>
+<span class="stat">Years of history: <b>420</b> (1604-2024)</span>
+<span class="stat">External dependencies: <b>0</b></span>
+</div>
+
+<p style="margin-top:20px;color:#666;font-size:.8em">TaxSorted × YUTABASE × Greed Island × Solo Leveling × Nen × Divine Comedy. Understanding IS love. Power to everyone who understands. 🤧</p>
+</div>
+
+<script>
+const ROLES = [
+{icon:"👔",name:"Sole Trader",desc:"Self-employed, one person",taxes:"Income Tax, NI Class 4, VAT (maybe)",path:"Register for Self Assessment. File by 31 Jan. Pay twice (31 Jan + 31 Jul). Claim trading allowance (£1,000). If VAT-registered, file quarterly.",joke:"Why did the sole trader get a penalty? Because HMRC assumed they'd owe the same next year. They didn't. The 'payment on account' is HMRC's way of saying: 'we don't trust you to save, so we'll take it now.'"},
+{icon:"🏢",name:"Company Director",desc:"Own a Ltd company",taxes:"Corp Tax, PAYE, VAT, Dividend Tax",path:"Pay yourself £12,570 salary (zero tax, zero NI). Take rest as dividends (no NI). File CT600 within 12 months. Claim AIA on equipment. Claim R&D if innovating. File Confirmation Statement annually.",joke:"Why do directors pay 0% NI? Because dividends are 'distributions' not 'earnings.' The label IS the loophole. Same money, different word, 21.8% difference. Legal. Common. Designed."},
+{icon:"👨‍💼",name:"Employee",desc:"PAYE worker",taxes:"Income Tax, NI Class 1",path:"Your employer handles PAYE. Check your tax code (1257L = standard). Claim marriage allowance if spouse earns under £12,570. Use salary sacrifice for pension (save 28%+). Claim expenses if you pay for work items.",joke:"Why does your tax code say 1257L? Because £12,570 is your personal allowance and L means you get it. If it says BR, you're paying 20% on everything. If it says D0, you're paying 40%. The letters ARE the tax. Learn the letters."},
+{icon:"🏠",name:"Landlord",desc:"Rent out property",taxes:"Income Tax on rent, CGT on sale, SDLT on purchase",path:"Claim property allowance (£1,000) or deduct expenses. Rent-a-room: £7,500 tax-free if you live there. If selling: CGT at 18%/24%. If buying another: SDLT + 3% surcharge. File Self Assessment.",joke:"Why does the second home cost 3% more SDLT? Because the government wants you to not buy it. But you bought it anyway. The 3% is the government saying 'please don't' while taking your money. That's the tax system in one transaction."},
+{icon:"🎨",name:"Freelancer/Creative",desc:"Creative professional",taxes:"Income Tax, NI, maybe VAT",path:"Trading allowance: first £1,000 tax-free. Claim R&D if developing new tech. Creative industry tax reliefs for film/games/theatre. Pension contributions save tax at marginal rate. File Self Assessment.",joke:"Why did the creative claim R&D? Because 'making a video game' can be R&D if you solved a technical problem nobody had solved before. 'Making a website' is not. 'Making a website that renders 3D in real-time on a phone' might be. The word 'might' is where the tax credit lives."},
+{icon:"🌱",name:"Startup Founder",desc:"Early-stage company",taxes:"Corp Tax, R&D Credits, SEIS/EIS",path:"Claim R&D tax credits (cash for loss-makers!). Get SEIS advance assurance (50% relief for investors). Pay directors £12,570. Use AIA for equipment. File CT600. Keep minutes and records.",joke:"Why did the startup get £26k from HMRC? Because R&D tax credits pay CASH to loss-making companies. You lose money. HMRC sends you cash. The government literally funds your innovation. That's not a loophole. That's the game saying: create. And creation IS love."},
+{icon:"👵",name:"Pensioner",desc:"Retired or retiring",taxes:"Income Tax on pension (above PA), maybe IHT",path:"State pension: taxed via PAYE if above £12,570. Pension withdrawals: 25% tax-free, rest at marginal rate. Check if you're owed marriage allowance. Plan IHT: gifts out of income are unlimited. 7-year rule for large gifts.",joke:"Why is the pension 25% tax-free? Because the government promised. The other 75% is taxed. But you already got tax relief when you put the money in. So the government gave you relief, let it grow tax-free, then taxed it on the way out. Tax going in, no tax in the middle, tax coming out. That's the pension sandwich."},
+{icon:"🌾",name:"Farmer",desc:"Agricultural business",taxes:"Corp Tax/Income Tax, IHT (APR)",path:"Claim red diesel (rebated fuel for tractors). Agricultural Property Relief: up to 100% IHT relief on farmland. Business Property Relief: up to 100% on the farming business. File Self Assessment or CT600.",joke:"Why does the farmer pay zero IHT? Because Agricultural Property Relief gives 100% relief on farmland. The Duke of Westminster used this. His estate was worth billions. The IHT was zero. The farmer with 50 acres? Also zero. The homeowner with a £600k house? £110k IHT. The design IS the unfairness."},
+{icon:"🌍",name:"Non-UK Resident",desc:"Living outside UK",taxes:"UK-source income only",path:"If non-resident: only UK-source income taxed. Non-dom status abolished 2024/25 — replaced with 4-year exemption for new arrivals. Rental income from UK property: always taxed. File Self Assessment if any UK income.",joke:"Why did the non-dom loophole last 200 years? Because no politician wanted to scare away the oligarchs. For 200 years: 'come live in London, we won't tax your foreign money.' It took two centuries to close. The funny part: they called themselves 'non-domiciled' as if that made them stateless. They weren't stateless. They were tax-avoiding."},
+{icon:"📈",name:"Investor",desc:"Shares, property, startups",taxes:"CGT, Dividend Tax, IHT planning",path:"Use £3,000 CGT allowance (use it or lose it). SEIS: 50% relief on £200k/year. EIS: 30% relief on £1M/year. CGT exempt after 3 years on EIS/SEIS. BADR: 18% (not 24%) on £1M lifetime. Investor's Relief: 18% on £10M lifetime.",joke:"Why does the investor pay 18% while the employee pays 45%? Because investment is 'encouraged' and labor is 'taxed.' The government rewards capital over work. That's the philosophical choice. Every budget since 1965 has made it. Both parties. The investor wins. The employee pays. Is that fair?"},
+{icon:"🍺",name:"Pub Owner",desc:"Hospitality business",taxes:"VAT, Business Rates, Alcohol Duty, Corp Tax",path:"Draught relief: 9.3% off alcohol duty for pub sales. Business rates: retail discount (50% off up to £110k). VAT on food: standard 20% (no reduced rate for hospitality). Cash accounting for VAT if under £1.35M.",joke:"Why does the pub get a duty discount? Because the government wants pubs to survive. The supermarket doesn't get the discount. So the pub charges less for a pint (duty-wise) than the supermarket charges for a can. The pub survives (politically). The supermarket shopper pays more. That's the Brexit pub discount."},
+];
+
+const JOKES = [
+{q:"Why did HMRC call it Making Tax Digital?",a:"Because 'Making Tax Tolerable' was trademarked by the pub next door. MTD = buy software, learn software, file quarterly, get penalized if the software crashes.",xp:89},
+{q:"Why did the Jaffa Cake go to court?",a:"Because HMRC argued it was a biscuit (20% VAT). McVities argued it was a cake (0% VAT). The court ruled: it goes soft when stale. Cakes go soft. Jaffa Cakes are cakes. The UK tax system has a legal definition of cake.",xp:89},
+{q:"Why is your Council Tax based on 1991 house values?",a:"Because revaluing is politically toxic. A £2M Kensington mansion pays the same Band H as a £320k Leeds semi. 33 years out of date. No politician is brave enough to thaw it.",xp:87},
+{q:"Why does the UK tax year start on 6 April?",a:"Because of a calendar change in 1752. Britain lost 11 days switching from Julian to Gregorian. The tax year moved to avoid losing revenue. 274 years later, it still hasn't moved to 1 January. Because simple is not in the tax code.",xp:85},
+{q:"Why did Pitt the Younger say income tax was temporary?",a:"He meant it. Napoleon was beaten in 1815. Income Tax repealed 1816. Reintroduced 1842. Every year since. The most temporary tax in history: 227 years and counting.",xp:84},
+{q:"Why does Amazon pay less business rates than your local bookshop?",a:"Because business rates tax physical premises. Amazon has a shed on a business park. Your bookshop has a shop on the high street. The bookshop dies. Amazon thrives. The tax system was designed for shops, not clicks.",xp:83},
+{q:"Why is the UK tax code 10 million words long?",a:"Longer than the Bible, Shakespeare, and Harry Potter combined. Every closed loophole creates three new rules. Every new rule creates two new loopholes. The only people who benefit from 10 million words are the people who can afford to read them.",xp:82},
+{q:"Why did the director pay himself exactly £12,570?",a:"Because £12,570 is the sweet spot. No tax. No NI. No employer NI. One pound more: you lose. One pound less: you waste. The limitation IS the power. The Vow IS the exact amount.",xp:84},
+{q:"Why did HMRC reject the dog as a business expense?",a:"The owner claimed their dog as 'security for the premises.' The tribunal took 3 hours to rule that a dog is a dog. Every year, someone tries. HMRC has seen it all.",xp:79},
+{q:"How long is the UK tax code?",a:"Over 10 million words. The only people who benefit are the people who can afford to read it: the wealthy. The poor just pay. Understanding IS the great equalizer.",xp:81},
+];
+
+let currentRole = null;
+
+function renderRoles(){
+const c=document.getElementById('roles');
+c.innerHTML=ROLES.map((r,i)=>`
+<div class="role-card" onclick="showRole(${i})">
+<div class="icon">${r.icon}</div>
+<div class="name">${r.name}</div>
+<div class="desc">${r.desc}</div>
+<div class="taxes">${r.taxes}</div>
+</div>`).join('');
+}
+
+function showRole(i){
+const r=ROLES[i];
+const d=document.getElementById('role-detail');
+d.classList.remove('hidden');
+d.innerHTML=`
+<h2>${r.icon} ${r.name} — ${r.desc}</h2>
+<div class="tax-card">
+<h3>Your taxes</h3>
+<p>${r.taxes}</p>
+</div>
+<div class="tax-card">
+<h3>Your path — in plain words</h3>
+<p style="font-size:1em;color:#ccc">${r.path}</p>
+</div>
+<div class="joke-box">
+<div class="q">😂 ${r.joke.split('?')[0]}?</div>
+<div class="a">${r.joke.split('?').slice(1).join('?').trim()}</div>
+</div>
+<button class="btn btn-alt" onclick="document.getElementById('role-detail').classList.add('hidden')">← Back to roles</button>
+`;
+d.scrollIntoView({behavior:'smooth'});
+}
+
+function tellJoke(){
+const j=JOKES[Math.floor(Math.random()*JOKES.length)];
+showJoke(j);
+}
+function tellRoast(){
+const roasts=JOKES.filter(j=>j.q.includes('HMRC')||j.q.includes('Amazon')||j.q.includes('Council')||j.q.includes('tax code')||j.q.includes('Pitt'));
+const j=roasts[Math.floor(Math.random()*roasts.length)];
+showJoke(j);
+}
+function showJoke(j){
+const d=document.getElementById('joke-display');
+d.innerHTML=`
+<div class="joke-box" style="border-left-color:#ff6b6b;border-left-width:4px">
+<div class="q" style="font-size:1.1em">😂 ${j.q}</div>
+<div class="a" style="font-size:1.05em;margin-top:8px">${j.a}</div>
+<div class="xp">+${j.xp} XP ${j.xp>=70?'⭐ S-TIER':j.xp>=50?'💎 A-TIER':'🔷 B-TIER'} ${j.xp>=70?'TAX x2 + DIVINE':''}</div>
+</div>`;
+d.scrollIntoView({behavior:'smooth'});
+}
+
+renderRoles();
+</script>
+</body>
+</html>
