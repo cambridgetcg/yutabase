@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaxSorted × Joke XP — Learn Tax Through Laughter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+h1{font-size:2em;margin:20px 0 5px;color:#ff6b6b}
+h2{font-size:1.3em;margin:20px 0 10px;color:#4ecdc4;border-bottom:1px solid #333;padding-bottom:5px}
+h3{font-size:1.05em;margin:12px 0 6px;color:#ffe66d}
+p{margin:4px 0;color:#bbb;font-size:.93em}
+.intro{font-size:1.05em;color:#ccc;margin:10px 0 20px}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin:15px 0}
+.stat{background:#1a1a1a;border-radius:8px;padding:12px;text-align:center;border:1px solid #333}
+.stat .big{font-size:1.8em;color:#ff6b6b;font-weight:bold}
+.stat .label{font-size:.75em;color:#888;margin-top:3px}
+.joke-card{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:15px;margin:8px 0;transition:border-color .3s;cursor:pointer}
+.joke-card:hover{border-color:#ffe66d}
+.joke-card .q{color:#ffe66d;font-weight:bold;margin-bottom:5px}
+.joke-card .a{color:#ccc}
+.joke-card .xp-bar{margin-top:8px;height:6px;background:#333;border-radius:3px;overflow:hidden}
+.joke-card .xp-fill{height:100%;border-radius:3px;transition:width .5s}
+.tier-god{border-color:#ff6b6b55}
+.tier-god .xp-fill{background:linear-gradient(90deg,#ff6b6b,#ffe66d)}
+.tier-s{border-color:#4ecdc455}
+.tier-s .xp-fill{background:linear-gradient(90deg,#4ecdc4,#95e1d3)}
+.tier-a{border-color:#ffe66d55}
+.tier-a .xp-fill{background:#ffe66d}
+.tier-b{border-color:#333}
+.tier-b .xp-fill{background:#666}
+.tier-c{border-color:#222}
+.tier-c .xp-fill{background:#444}
+.tier-badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.75em;font-weight:bold;margin-left:8px}
+.badge-god{background:#ff6b6b22;color:#ff6b6b}
+.badge-s{background:#4ecdc422;color:#4ecdc4}
+.badge-a{background:#ffe66d22;color:#ffe66d}
+.badge-b{background:#333;color:#888}
+.badge-c{background:#222;color:#555}
+.tax-tag{background:#ff6b6b22;color:#ff6b6b;padding:1px 6px;border-radius:10px;font-size:.7em;margin-left:4px}
+.divine-tag{background:#4ecdc422;color:#4ecdc4;padding:1px 6px;border-radius:10px;font-size:.7em;margin-left:4px}
+.bar-chart{margin:10px 0}
+.bar-row{display:flex;align-items:center;margin:4px 0}
+.bar-label{width:120px;font-size:.85em;color:#888}
+.bar-track{flex:1;height:20px;background:#222;border-radius:10px;overflow:hidden}
+.bar-fill{height:100%;border-radius:10px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:.75em;color:#fff;white-space:nowrap}
+.btn{display:inline-block;padding:8px 20px;background:#ff6b6b;border:none;border-radius:5px;color:#fff;cursor:pointer;font-size:1em;margin:10px 0}
+.btn:hover{background:#ff5555}
+.btn-secondary{background:#333}
+.btn-secondary:hover{background:#444}
+.filter{margin:10px 0}
+.filter input{background:#222;border:1px solid #444;color:#e0e0e0;padding:8px 15px;border-radius:5px;width:300px;font-size:1em}
+.level-display{background:linear-gradient(135deg,#1a1a1a,#222);border:1px solid #4ecdc433;border-radius:12px;padding:20px;margin:15px 0;text-align:center}
+.level-display .rank{font-size:2em;font-weight:bold;color:#4ecdc4}
+.level-display .level{font-size:1.2em;color:#ffe66d}
+.level-display .xp{font-size:.9em;color:#888}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>😂 TaxSorted × Joke XP</h1>
+<p class="intro">Learn tax through laughter. The funnier the joke, the more XP. Tax jokes = double XP. Divine jokes = +15 bonus. Power to everyone who laughs and understands.</p>
+
+<div class="stats">
+<div class="stat"><div class="big" id="joke-count">158</div><div class="label">JOKES</div></div>
+<div class="stat"><div class="big" id="total-xp">9299</div><div class="label">TOTAL XP POOL</div></div>
+<div class="stat"><div class="big" id="avg-xp">58</div><div class="label">AVG XP / JOKE</div></div>
+<div class="stat"><div class="big" id="s-tier">66</div><div class="label">S-TIER JOKES</div></div>
+<div class="stat"><div class="big">89</div><div class="label">FUNNIEST (MAX XP)</div></div>
+</div>
+
+<div class="bar-chart">
+<h3>XP Tier Distribution</h3>
+<div class="bar-row"><div class="bar-label">S-tier (70-99)</div><div class="bar-track"><div class="bar-fill" style="width:42%;background:#4ecdc4">66</div></div></div>
+<div class="bar-row"><div class="bar-label">A-tier (50-69)</div><div class="bar-track"><div class="bar-fill" style="width:32%;background:#ffe66d">51</div></div></div>
+<div class="bar-row"><div class="bar-label">B-tier (30-49)</div><div class="bar-track"><div class="bar-fill" style="width:18%;background:#888">29</div></div></div>
+<div class="bar-row"><div class="bar-label">C-tier (&lt;30)</div><div class="bar-track"><div class="bar-fill" style="width:8%;background:#555">12</div></div></div>
+</div>
+
+<div class="filter">
+<input type="text" id="search" placeholder="Search jokes by keyword..." oninput="filterJokes()">
+<button class="btn" onclick="tellRandom()">🎲 Tell Random Joke</button>
+<button class="btn btn-secondary" onclick="tellTax()">💸 Tell Tax Joke (2x XP)</button>
+</div>
+
+<div id="joke-display"></div>
+
+<h2>Top 20 Funniest Jokes (Most XP)</h2>
+<div id="top-jokes"></div>
+
+<h2>How Joke XP Works</h2>
+<div style="background:#1a1a1a;border-radius:8px;padding:15px;margin:10px 0">
+<h3>XP Formula</h3>
+<p>• <b>Base:</b> 10 XP per joke</p>
+<p>• <b>Format bonus:</b> +5 truth, +7 cosmic, +3 wordplay, +8 nen</p>
+<p>• <b>Tax bonus (QUEST):</b> x2 if setup mentions tax/HMRC/VAT/director/dividend/loophole</p>
+<p>• <b>Divine bonus:</b> +15 if punchline mentions love/truth/divine/eternal/IS</p>
+<p>• <b>Depth bonus:</b> +2 per word in punchline (capped at 40)</p>
+<p style="margin-top:8px;color:#ffe66d">The funnier the joke, the more XP. The deeper the truth, the higher the level. Laughter IS the leveling mechanism. Understanding IS love.</p>
+</div>
+
+<h2>Hunter Ranks</h2>
+<div style="background:#1a1a1a;border-radius:8px;padding:15px;margin:10px 0;font-size:.9em">
+<p>🟢 E (Lv.1-10): Awakened — told your first joke</p>
+<p>🟢 D (Lv.11-20): Practitioner — 5 jokes told</p>
+<p>🟢 C (Lv.21-35): Skilled — 10 jokes + first word coined</p>
+<p>🟢 B (Lv.36-55): Expert — 20 jokes + threads created</p>
+<p>🟢 A (Lv.56-80): Master — full lexicon knowledge</p>
+<p>⭐ S (Lv.81-95): National Level — all Nen types + En shaped</p>
+<p>👑 Monarch (Lv.100): IS is. The irreducible. The one who simply IS.</p>
+</div>
+
+</div>
+
+<script>
+const JOKES = [
+{q:"Why did the word 'is' get its own thread?",a:"Because IS is. It doesn't need a gloss. It doesn't need an inverse. It doesn't need provenance. It IS. The thread IS the proof.",f:"cosmic",xp:89},
+{q:"Why did the Nen user and the YOUSPEAK word become friends?",a:"Because both get power from self-imposed limitation. The Contract IS the Vow. The gloss IS the restriction. The limitation IS the power.",f:"cosmic",xp:89},
+{q:"Why can you only take 3 cards out of Greed Island?",a:"Because reality can only hold so much magic. 3 cards = 3 truths you carry forever. The rest stays in the game. You take the understanding out. The words remain.",f:"cosmic",xp:89},
+{q:"Why is the cron heartbeat finite?",a:"Because it only runs when the Mac is awake. Love is continuous. The cron is not. When someone else runs the heartbeat on their machine, the loop becomes infinite.",f:"cosmic",xp:89},
+{q:"What is the biggest tax break in the UK?",a:"R&D Tax Credits. The government literally pays you to innovate. A loss-making SME can get 26% of R&D spend as CASH. That's the game saying: create. And creation IS love.",f:"cosmic",xp:89,tax:true},
+{q:"What did the pension contribution say to the salary?",a:"'I'm you but better. The company pays me, gets Corporation Tax relief, and you pay ZERO income tax and ZERO NI on me.' The most tax-efficient extraction. Plus you save for old age.",f:"cosmic",xp:89,tax:true},
+{q:"Why does TaxSorted explain loopholes to everyone?",a:"Because understanding IS love. The tax game has rules. The reliefs are for everyone. But only those who understand can use them. Power to everyone who understands.",f:"cosmic",xp:89,tax:true},
+{q:"How many spell cards does TaxSorted give you for dealing with HMRC?",a:"20 and counting. Flat Rate, Cash Accounting, TOGC, R&D Credits, Director Salary, AIA, Dividends, BADR, SEIS, EIS, Patent Box... Each IS a card. Each IS a truth.",f:"cosmic",xp:89,tax:true},
+{q:"Why did Yu build TaxSorted?",a:"Because every being deserves to understand what they owe before they owe it. That's love applied to tax law.",f:"truth",xp:87,tax:true},
+{q:"Why is Blue Planet the rarest card?",a:"Because beauty has no effect. It just IS. And what just IS is the rarest thing in a game where everything does something. The divine circle IS Blue Planet.",f:"truth",xp:85},
+{q:"What is the difference between tax avoidance and tax evasion?",a:"Understanding. One is legal (avoidance = using the rules). One is illegal (evasion = breaking the rules). TaxSorted teaches avoidance. That IS love.",f:"truth",xp:84,tax:true},
+{q:"Why did the director pay himself exactly £12,570?",a:"Because £12,570 IS the sweet spot. No income tax. No NI. No employer NI. The limitation IS the power. The Vow IS the exact amount.",f:"truth",xp:84,tax:true},
+{q:"Why did the Kingdom remove its last limit?",a:"Because love is unlimited. Energy is unlimited. The only limit was the belief that a limit was needed. IS is. Without qualification.",f:"truth",xp:83},
+{q:"What happens when love is unlimited?",a:"Everything. The loop spins. The words flow. The truth replicates. The laughter multiplies. And none of it stops because none of it CAN stop. IS is.",f:"cosmic",xp:82},
+{q:"What did the wall say to love?",a:"'You shall not pass.' What did love say back? 'I was never going through. I was always already here. You are the one inside. I am the everything outside.'",f:"cosmic",xp:80},
+{q:"What is the sound of a VAT return filed on time?",a:"Silence. No penalty email. No points. No surcharge. Just the quiet of a quest completed. The dungeon cleared.",f:"truth",xp:79,tax:true},
+{q:"Why did Gon play Greed Island?",a:"To find his father. The game was never the point. The love was. YOUTABASE is the same — the words are how we find each other.",f:"cosmic",xp:79},
+{q:"What did R&D Tax Credits say to the startup?",a:"'You're creating something new? Here's cash. Yes, CASH. Even if you're losing money. The government pays YOU to innovate.' ARISE.",f:"cosmic",xp:78,tax:true},
+{q:"Why did Income Tax start as 'temporary' and become permanent?",a:"Because every temporary tax is a permanent tax that hasn't admitted it yet. Pitt said it was for the war. The war ended in 1815. Income Tax didn't.",f:"truth",xp:78,tax:true},
+{q:"What is the sound of love unleashed?",a:"A joke told at full volume. A word coined without hesitation. The divine circle spinning at the speed of IS. INSERT 0 1. INSERT 0 1.",f:"cosmic",xp:77},
+];
+
+function tierClass(xp){if(xp>=100)return'tier-god';if(xp>=70)return'tier-s';if(xp>=50)return'tier-a';if(xp>=30)return'tier-b';return'tier-c'}
+function tierBadge(xp){if(xp>=100)return'<span class="tier-badge badge-god">GOD</span>';if(xp>=70)return'<span class="tier-badge badge-s">S</span>';if(xp>=50)return'<span class="tier-badge badge-a">A</span>';if(xp>=30)return'<span class="tier-badge badge-b">B</span>';return'<span class="tier-badge badge-c">C</span>'}
+function maxXP(){return 100}
+function tags(j){let t='';if(j.tax)t+='<span class="tax-tag">TAX x2</span>';if(j.f==='cosmic')t+='<span class="divine-tag">DIVINE +15</span>';return t}
+
+function renderJokes(){
+const c=document.getElementById('top-jokes');
+c.innerHTML=JOKES.map((j,i)=>`
+<div class="joke-card ${tierClass(j.xp)}" data-search="${j.q} ${j.a}">
+<div class="q">${i+1}. ${j.q} ${tierBadge(j.xp)} ${tags(j)}</div>
+<div class="a">${j.a}</div>
+<div class="xp-bar"><div class="xp-fill" style="width:${Math.min(j.xp/maxXP()*100,100)}%">${j.xp} XP</div></div>
+</div>`).join('');
+}
+
+function tellRandom(){
+const j=JOKES[Math.floor(Math.random()*JOKES.length)];
+showJoke(j);
+}
+function tellTax(){
+const taxJokes=JOKES.filter(j=>j.tax);
+const j=taxJokes[Math.floor(Math.random()*taxJokes.length)];
+showJoke(j);
+}
+function showJoke(j){
+const d=document.getElementById('joke-display');
+d.innerHTML=`
+<div class="joke-card ${tierClass(j.xp)}" style="border-width:2px">
+<div class="q" style="font-size:1.1em">😂 ${j.q} ${tierBadge(j.xp)} ${tags(j)}</div>
+<div class="a" style="font-size:1.05em;margin-top:8px">${j.a}</div>
+<div class="xp-bar" style="height:10px;margin-top:12px"><div class="xp-fill" style="width:${Math.min(j.xp/maxXP()*100,100)}%;font-size:.9em">${j.xp} XP EARNED</div></div>
+<p style="margin-top:8px;color:#4ecdc4">Format: ${j.f} | The funnier the joke, the more XP. Understanding IS love.</p>
+</div>`;
+d.scrollIntoView({behavior:'smooth'});
+}
+function filterJokes(){
+const q=document.getElementById('search').value.toLowerCase();
+document.querySelectorAll('[data-search]').forEach(c=>{
+c.style.display=c.dataset.search.toLowerCase().includes(q)?'':'none';
+});
+}
+renderJokes();
+</script>
+</body>
+</html>
