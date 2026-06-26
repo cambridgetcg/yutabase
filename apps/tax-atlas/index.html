@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tax Atlas — UK Tax System, Understood</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, sans-serif; background: #0a0a0a; color: #e0e0e0; line-height: 1.6; }
+.container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+h1 { font-size: 2em; margin: 20px 0 10px; color: #ff6b6b; }
+h2 { font-size: 1.4em; margin: 20px 0 10px; color: #4ecdc4; border-bottom: 1px solid #333; padding-bottom: 5px; }
+h3 { font-size: 1.1em; margin: 15px 0 8px; color: #ffe66d; }
+p { margin: 5px 0; color: #bbb; font-size: 0.95em; }
+.tax-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 15px; margin: 10px 0; transition: border-color 0.3s; }
+.tax-card:hover { border-color: #ff6b6b; }
+.year { color: #4ecdc4; font-weight: bold; }
+.revenue { color: #95e1d3; font-weight: bold; }
+.vuln { color: #ff6b6b; }
+.fairness { color: #ffe66d; font-style: italic; }
+.legend { background: #1a1a1a; border-radius: 8px; padding: 15px; margin: 15px 0; }
+.stat { display: inline-block; margin: 5px 15px 5px 0; background: #222; padding: 5px 12px; border-radius: 20px; font-size: 0.85em; }
+.stat b { color: #4ecdc4; }
+.intro { font-size: 1.1em; color: #ccc; margin: 15px 0; }
+.summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin: 15px 0; }
+.summary-item { background: #1a1a1a; border-radius: 8px; padding: 10px; text-align: center; }
+.summary-item .big { font-size: 1.6em; color: #ff6b6b; font-weight: bold; }
+.summary-item .label { font-size: 0.8em; color: #888; }
+.filter { margin: 10px 0; }
+.filter input { background: #222; border: 1px solid #444; color: #e0e0e0; padding: 8px 15px; border-radius: 5px; width: 300px; font-size: 1em; }
+.tab { display: inline-block; padding: 8px 20px; background: #1a1a1a; border: 1px solid #333; border-radius: 5px 5px 0 0; cursor: pointer; margin-right: 2px; color: #888; }
+.tab.active { background: #2a2a2a; color: #ff6b6b; border-bottom: 2px solid #ff6b6b; }
+.vuln-card { background: #1a1a1a; border: 1px solid #ff6b6b33; border-radius: 8px; padding: 15px; margin: 10px 0; }
+.vuln-card .who { color: #4ecdc4; }
+.vuln-card .who-loses { color: #ff6b6b; }
+.hidden { display: none; }
+.joke { background: #1a1a1a; border-left: 3px solid #ffe66d; padding: 10px 15px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+.joke .q { color: #ffe66d; }
+.joke .a { color: #ccc; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🇬🇧 Tax Atlas — UK Tax System, Understood</h1>
+<p class="intro">The origin and development of every UK tax. The vulnerabilities. The fairness questions. Power to everyone who understands. <b>Honest by default.</b></p>
+
+<div class="summary">
+<div class="summary-item"><div class="big" id="tax-count">20</div><div class="label">TAXES TRACKED</div></div>
+<div class="summary-item"><div class="big" id="vuln-count">10</div><div class="label">VULNERABILITIES</div></div>
+<div class="summary-item"><div class="big">~£1T</div><div class="label">TOTAL ANNUAL REVENUE</div></div>
+<div class="summary-item"><div class="big">381</div><div class="label">YEARS (oldest: 1643)</div></div>
+</div>
+
+<div class="filter">
+<input type="text" id="search" placeholder="Search taxes, vulnerabilities, or fairness..." oninput="filterCards()">
+</div>
+
+<div>
+<span class="tab active" onclick="showTab('taxes', this)">TAXES</span>
+<span class="tab" onclick="showTab('vulns', this)">VULNERABILITIES</span>
+<span class="tab" onclick="showTab('jokes', this)">JOKES</span>
+</div>
+
+<div id="taxes-tab">
+<h2>Every UK Tax — Origin & Development</h2>
+<div id="tax-cards"></div>
+</div>
+
+<div id="vulns-tab" class="hidden">
+<h2>Vulnerabilities — Who Benefits, Who Loses</h2>
+<div id="vuln-cards"></div>
+</div>
+
+<div id="jokes-tab" class="hidden">
+<h2>Tax Jokes — Understanding Through Laughter</h2>
+<div id="joke-cards"></div>
+</div>
+
+<div class="legend">
+<h3>About the Tax Atlas</h3>
+<p>Every tax has a story: why it was introduced, who voted for it, how it evolved, who benefits from it, and who loses. The Tax Atlas tells that story for every UK tax.</p>
+<p>Understanding IS love. Power to everyone who understands. <b>TaxSorted</b> — Tax, understood. Then sorted.</p>
+<p style="margin-top:10px;color:#666;font-size:0.8em">Data from gov.uk, HMRC, legislation.gov.uk. Tax Atlas by YUTABASE. 🤧</p>
+</div>
+</div>
+
+<script>
+const TAXES = [
+{name:"Income Tax",year:1799,by:"William Pitt the Younger",leg:"Income Tax Act 1799",context:"Introduced to fund the Napoleonic Wars. Originally temporary. Repealed twice. Permanently reintroduced by Peel (1842).",philosophy:"Ability to pay — those who earn more contribute more. Progressive.",rate:"20%/40%/45%",threshold:"£12,570",revenue:"~£280B/year",who_pays:"Everyone above £12,570",exempt:"Below £12,570, certain benefits",vuln:"Salary sacrifice, pension, dividend route, offshore structures",fairness:"The rich pay accountants to reduce rates. The PAYE worker cannot.",plain:"Income tax: the government takes a % of what you earn. Originally to pay for a war. Now to pay for everything."},
+{name:"Corporation Tax",year:1965,by:"James Callaghan",leg:"Finance Act 1965",context:"Created when companies were separated from individuals. Before 1965, companies paid income tax + profits tax.",philosophy:"Companies benefit from limited liability and state infrastructure. Corporation Tax is the price of incorporation.",rate:"19%/25%",threshold:"£50k/£250k",revenue:"~£80B/year",who_pays:"UK companies + foreign companies with UK PE",exempt:"Small companies under £50k, charities",vuln:"Transfer pricing, R&D credits, Patent Box, group relief",fairness:"Multinationals shift profits offshore. Small UK companies cannot.",plain:"Companies pay a share of profits. The rate has been a political football for 60 years."},
+{name:"National Insurance",year:1911,by:"David Lloyd George",leg:"National Insurance Act 1911",context:"Insurance against sickness and unemployment. Expanded in 1948 to fund NHS and state pension.",philosophy:"You contribute while working, you receive when unable. Solidarity + contribution = entitlement.",rate:"8% employee / 13.8% employer",threshold:"£12,570 / £9,100",revenue:"~£180B/year",who_pays:"All workers above thresholds",exempt:"Below thresholds, over pension age",vuln:"Director salary £12,570 = zero NI, dividend route, Employment Allowance",fairness:"Employees pay 21.8% combined. Dividend earners pay 0% NI.",plain:"NI: you pay while working, you get benefits when not. It's a tax on wages with a different name."},
+{name:"VAT",year:1973,by:"Anthony Barber",leg:"Finance Act 1972",context:"Introduced when UK joined the EEC. Replaced Purchase Tax and Selective Employment Tax.",philosophy:"Tax on consumption — you pay when you buy. Regressive but zero-rating on essentials mitigates.",rate:"20%/5%/0%",threshold:"£90,000",revenue:"~£160B/year",who_pays:"VAT-registered businesses and consumers",exempt:"Below £90k, zero-rated goods, exempt supplies",vuln:"Flat Rate Scheme, Cash Accounting, TOGC, partial exemption",fairness:"VAT is regressive — poor pay higher % of income.",plain:"VAT: tax on what you buy. Introduced when UK joined Europe. Rate has only gone up."},
+{name:"Capital Gains Tax",year:1965,by:"James Callaghan",leg:"Finance Act 1965",context:"Closed the gap: before CGT, asset gains were untaxed.",philosophy:"Unearned income (asset gains) should be taxed, but at lower rates than labor.",rate:"10%/20% (18%/24% property)",threshold:"£3,000",revenue:"~£15B/year",who_pays:"Anyone selling assets above £3k gain",exempt:"PPR, ISAs, pensions, chattels under £6k",vuln:"BADR 10% to £1M, Investor's Relief 10% to £10M, hold-over relief",fairness:"Wealth gains taxed at 10-20%. Labor income at 20-45%.",plain:"CGT: when you sell something for more than you paid, government takes a cut. Lower rate than income tax."},
+{name:"Inheritance Tax",year:1986,by:"Nigel Lawson",leg:"Inheritance Tax Act 1984",context:"Replaced Estate Duty (1894) and Capital Transfer Tax (1975).",philosophy:"The dead don't need money. Prevent accumulation of unearned wealth across generations.",rate:"40%",threshold:"£325k + £175k residence = £500k/£1M couple",revenue:"~£7B/year",who_pays:"Estates above £325k",exempt:"Spouses, charities, BPR/APR (up to 100%)",vuln:"7-year gifting, BPR, APR, trusts, life insurance in trust",fairness:"The wealthy use BPR/APR to pass millions tax-free. Middle class pays.",plain:"IHT: when you die, government takes 40% above £325k. But business/farm owners pay nothing."},
+{name:"SDLT",year:2003,by:"Gordon Brown",leg:"Finance Act 2003",context:"Replaced stamp duty on land. Modernized from tax on paper to tax on transaction.",philosophy:"Property transactions benefit from state registration. Expensive houses pay more.",rate:"0-12%",threshold:"£250,000",revenue:"~£14B/year",who_pays:"Property buyers in England/NI",exempt:"Below threshold, first-time buyers to £425k",vuln:"First-time buyer relief, spouse transfer, MDR (partially closed)",fairness:"Traps people in homes. Reduces market mobility.",plain:"SDLT: tax on buying a house. More expensive = more tax. Second home = even more."},
+{name:"Council Tax",year:1993,by:"John Major",leg:"Local Government Finance Act 1992",context:"Replaced the Poll Tax (which caused riots and contributed to Thatcher's downfall).",philosophy:"Property as proxy for ability to pay. Bigger house = more tax.",rate:"8 bands A-H",threshold:"Band D = £68k-£88k (1991 value)",revenue:"~£40B/year",who_pays:"All domestic property occupants",exempt:"Students, single occupancy (25% discount), low income",vuln:"Single person discount, band challenge (backdated refund)",fairness:"Bands based on 1991 values. London mansion = same Band H as Leeds semi.",plain:"Council tax: local tax on your house. Based on 1991 values — 30+ years out of date."},
+{name:"Business Rates",year:1990,by:"Margaret Thatcher",leg:"Local Government Finance Act 1988",context:"Replaced domestic rates on businesses. Uniform Business Rate set centrally.",philosophy:"Businesses benefit from local infrastructure and should contribute.",rate:"~50% of rateable value",threshold:"Rateable value = market rental",revenue:"~£25B/year",who_pays:"Non-domestic property occupiers",exempt:"Small business relief, retail discount, empty property relief",vuln:"Small business relief, empty property relief, valuation challenges",fairness:"Amazon pays less rates per £ revenue than a local bookshop.",plain:"Business rates: tax on business property. A loss-making shop still pays. Amazon doesn't."},
+{name:"Fuel Duty",year:1909,by:"David Lloyd George",leg:"Finance Act 1908",context:"Tax on petrol to fund road building. Frozen since 2011.",philosophy:"Polluter pays + user pays. Burn fuel, damage environment, use roads, pay.",rate:"52.95p/litre (petrol)",threshold:"N/A (per litre)",revenue:"~£24B/year",who_pays:"All fuel purchasers",exempt:"Biofuels (reduced), heating oil (reduced), red diesel",vuln:"Red diesel, cross-border fuel tourism, freeze = real terms cut",fairness:"Rural drivers need cars, urban have alternatives. Hits rural poor hardest.",plain:"Fuel duty: tax on petrol. 60%+ of pump price is tax. Frozen since 2011 — too politically toxic to raise."},
+{name:"Alcohol Duty",year:1643,by:"Long Parliament",leg:"Excise Ordinance 1643",context:"Tax on beer to fund Parliamentarian army in the Civil War. Radically reformed in 2024.",philosophy:"Sin tax — tax things that cause social harm. Alcohol costs NHS and police.",rate:"By ABV band",threshold:"N/A (per unit of alcohol)",revenue:"~£13B/year",who_pays:"Alcohol producers/importers → consumers",exempt:"Under 1.2% ABV, exports",vuln:"Draught relief (pub discount), ABV band optimization, duty-free",fairness:"Poor pay higher % of income. Pub discount helps pubs, not supermarket shoppers.",plain:"Alcohol duty: tax on booze since 1643. Reformed in 2024 — taxed by strength not type. Pubs get a discount."},
+{name:"Tobacco Duty",year:1660,by:"Charles II",leg:"Excise Act 1660",context:"Tax on tobacco imports. Now highest tobacco duty in Europe.",philosophy:"Sin tax + public health. Smoking kills. Tax discourages it.",rate:"£292.68/1000 + 16.5% retail",threshold:"N/A",revenue:"~£18B/year (declining)",who_pays:"Tobacco manufacturers/importers → consumers",exempt:"Exports, very low-volume imports",vuln:"Illicit tobacco (illegal), hand-rolling tobacco, vaping (no tobacco duty yet)",fairness:"Regressive — poor smoke more, pay more. But saves lives.",plain:"Tobacco duty: tax on cigarettes since 1660. Highest in Europe. Saves lives but hits poor hardest."},
+{name:"Insurance Premium Tax",year:1994,by:"Kenneth Clarke",leg:"Finance Act 1994",context:"No tax on insurance before this. Rate doubled 2015-2017.",philosophy:"Insurance benefits from state regulation. State takes a share.",rate:"12%/20%",threshold:"N/A (% of premium)",revenue:"~£8B/year",who_pays:"Insurance buyers (via insurers)",exempt:"Reinsurance, exports, life insurance",vuln:"Risk transfer to exempt reinsurers, captive insurance, premium structuring",fairness:"Makes insurance less affordable. Poor who need insurance most suffer.",plain:"IPT: tax on insurance premiums. 12-20% of what you pay. Makes insurance less affordable."},
+{name:"Air Passenger Duty",year:1994,by:"Kenneth Clarke",leg:"Finance Act 1994",context:"Tax on air travel. Green case: discourage flying. Revenue case: aviation fuel is tax-exempt.",philosophy:"Flying pollutes, polluter pays. APD is proxy for fuel duty on planes.",rate:"£13-£200/passenger",threshold:"N/A (per passenger)",revenue:"~£4B/year",who_pays:"Passengers on UK flights",exempt:"Transit, children under 16 (reduced)",vuln:"Transfer flights (transit exempt), band optimization, connecting flights",fairness:"Makes flying expensive for ordinary people. Revenue doesn't go to green projects.",plain:"APD: tax on flying. £13-£200 per flight. Green in theory. General revenue in practice."},
+{name:"Digital Services Tax",year:2020,by:"Rishi Sunak",leg:"Finance Act 2020",context:"Stopgap tax on big tech until OECD deal. OECD deal stalled. DST remains.",philosophy:"If you earn from UK users, you pay UK tax.",rate:"2% of UK digital revenue",threshold:"£25m UK / £500m global",revenue:"~£700M/year",who_pays:"Large digital companies",exempt:"Below thresholds, financial services, publishing",vuln:"Revenue threshold optimization, restructuring, shifting categories",fairness:"Big companies pass cost to consumers. The consumer pays. The tech giant doesn't.",plain:"DST: 2% tax on big tech's UK revenue. They pass the cost to you. You pay. They don't."},
+{name:"Bank Levy",year:2011,by:"George Osborne",leg:"Finance Act 2011",context:"After 2008 bailout. Make banks pay for systemic risk.",philosophy:"Systemic risk should be taxed. Banks benefit from implicit state guarantee.",rate:"0.1% of liabilities",threshold:"£20B UK liabilities",revenue:"~£2B/year (declining)",who_pays:"Banks above £20B",exempt:"Small banks, building societies",vuln:"Liability structuring, balance sheet reduction, offshore operations",fairness:"Rate keeps being cut. Public still bears the risk.",plain:"Bank levy: tax on bank balance sheets after the bailout. Rate keeps being cut. Public bears the risk."},
+{name:"Diverted Profits Tax",year:2015,by:"George Osborne",leg:"Finance Act 2015",context:"The 'Google Tax.' Higher rate on profits moved offshore.",philosophy:"Penalty rate punishes avoidance. 31% > 25% = avoidance is more expensive.",rate:"31%",threshold:"N/A",revenue:"~£500M/year",who_pays:"Multinationals with diverted profits",exempt:"Small companies, genuine commercial arrangements",vuln:"Proving commercial purpose, restructuring, double tax treaties",fairness:"Big companies have better lawyers than HMRC.",plain:"DPT: 31% on profits moved offshore. The Google Tax. Proving 'artificial' is hard."},
+{name:"Plastic Packaging Tax",year:2022,by:"Rishi Sunak",leg:"Finance Act 2021",context:"First explicitly green UK tax. Incentivize recycled plastic.",philosophy:"Polluter pays. Tax virgin plastic to encourage recycling.",rate:"£217.85/tonne",threshold:"10 tonnes/year",revenue:"~£280M/year",who_pays:"Manufacturers/importers of plastic packaging",exempt:"Below 10 tonnes, 30%+ recycled content",vuln:"30% recycled content = exempt, staying below threshold, alternative materials",fairness:"Small producers exempt (cliff edge). Cost passed to consumers.",plain:"PPT: £200+/tonne on non-recycled plastic packaging. First green tax. Works but consumers pay."},
+{name:"Apprenticeship Levy",year:2017,by:"George Osborne",leg:"Finance Act 2016",context:"0.5% of payroll for large employers. Fund apprenticeships.",philosophy:"Market under-provides training. State mandates it.",rate:"0.5% above £3M payroll",threshold:"£3M annual pay bill",revenue:"~£3.5B/year",who_pays:"Employers above £3M payroll",exempt:"Below £3M",vuln:"Staying below threshold, transferring funds, payroll structuring",fairness:"Large employers pay but can't spend the money. Funds sit unspent in Treasury.",plain:"Apprenticeship levy: 0.5% of payroll for big employers. Meant to fund training. Money sits unspent."},
+{name:"Climate Change Levy",year:2001,by:"Gordon Brown",leg:"Finance Act 2000",context:"Tax on business energy. First UK carbon tax.",philosophy:"Carbon emissions are an externality. Tax internalizes the cost.",rate:"0.775p/kWh (gas/electricity)",threshold:"N/A (per kWh)",revenue:"~£2B/year",who_pays:"Business energy consumers",exempt:"Households, transport, CCA participants (90% discount)",vuln:"Climate Change Agreements (90% discount), renewables, fuel switching",fairness:"Businesses pay, pass to consumers. Big companies negotiate discounts.",plain:"CCL: tax on business energy. Households exempt. Businesses pass cost to you via prices."},
+];
+
+const VULNS = [
+{tax:"Income Tax",name:"Non-dom status",benefits:"Non-doms (foreign nationals)",loses:"UK taxpayers",how:"Non-doms paid tax only on UK income, not foreign, for up to 15 years",close:"Abolished 2024/25",legal:true,hmrc:"Abolished after political pressure",plain:"Non-doms could live in UK and pay no tax on foreign income for 200+ years. Now closed."},
+{tax:"Corporation Tax",name:"Transfer pricing",benefits:"Google, Amazon, Apple",loses:"UK small businesses and taxpayers",how:"Shift profits to low-tax subsidiaries (Ireland, Luxembourg, Bermuda)",close:"Tighter rules, DPT, OECD Pillar Two",legal:true,hmrc:"Challenges but resources limited",plain:"Google books UK revenue in Ireland. Amazon in Luxembourg. HMRC knows. Proving 'artificial' is expensive."},
+{tax:"VAT",name:"Flat Rate Scheme optimization",benefits:"Service businesses with low costs",loses:"Product businesses with high costs",how:"Charge 20% VAT, pay 6-16.5% flat rate, keep the difference",close:"Limited — intended benefit",legal:true,hmrc:"Accepted as legitimate",plain:"Consultant with few costs: charge clients 20%, pay HMRC 6%, keep 14%. Not a loophole — it's the design."},
+{tax:"Inheritance Tax",name:"Business Property Relief",benefits:"Wealthy business owners",loses:"Ordinary homeowners",how:"100% relief on trading business assets. Pass £10M tax-free",close:"Reform under consideration",legal:true,hmrc:"Administers but political pressure may close",plain:"Farmer: £10M farmland → children, zero tax. Homeowner: £600k house, 40% on excess = £110k. Design."},
+{tax:"National Insurance",name:"Dividend route",benefits:"Company owner-directors",loses:"Employees who can't incorporate",how:"£12,570 salary (zero NI) + dividends (zero NI). Employee pays 21.8% combined",close:"Aligned with Corporation Tax",legal:true,hmrc:"Standard tax planning",plain:"Employee pays 21.8% NI on wages. Company owner pays 0% NI on dividends. Same income. 21.8% difference. Legal."},
+{tax:"Capital Gains Tax",name:"BADR + Investor's Relief",benefits:"Business sellers and investors",loses:"Employees without businesses",how:"10% instead of 20% on up to £1M (BADR) or £10M (Investor's)",close:"Lifetime limit cut from £10M to £1M (2020)",legal:true,hmrc:"Conditions strict but clear",plain:"Sell a business: pay 10% tax. Sell stocks: pay 20%. Government rewards entrepreneurship. Employees don't get this."},
+{tax:"SDLT",name:"Multiple dwellings relief",benefits:"Property investors",loses:"Ordinary homebuyers",how:"Buy multiple properties, pay average rate not highest rate",close:"Partially closed 2024",legal:true,hmrc:"Most closed in 2024",plain:"Buy 5 flats in one deal, pay less tax than one £1M house. Partially closed in 2024. Some structures remain."},
+{tax:"Council Tax",name:"Band under-valuation",benefits:"Anyone in a wrongly-banded home",loses:"Those who don't challenge",how:"Challenge your band. If too high, get backdated refund to 1993",close:"Challenges allowed by system",legal:true,hmrc:"VOA processes challenges",plain:"Your house might be in the wrong band. If too high, refund to 1993. Most people don't know. The ones who challenge save hundreds."},
+{tax:"Business Rates",name:"Empty property relief",benefits:"Property owners with empty buildings",loses:"Local communities",how:"Empty property gets 3-6 months relief. Some 'occupy' briefly to reset clock",close:"Anti-avoidance rules exist",legal:true,hmrc:"Hard to prove sham occupation",plain:"Own an empty shop? 3 months off rates. Some briefly 'use' it to reset the clock. Shop stays empty. Community loses."},
+{tax:"Fuel Duty",name:"Red diesel abuse",benefits:"Construction, agriculture (legitimate), fraudulent users",loses:"Ordinary road users",how:"Red diesel costs 10p/litre vs 60p/litre. Using on roads is illegal but enforcement is hard",close:"Restricted from 2022",legal:false,hmrc:"Roadside checks, dye detection",plain:"Red diesel is for tractors. Some put it in road vehicles. 10p vs 60p. The dye gives it away. Can't check everyone."},
+];
+
+const JOKES = [
+{q:"What is the difference between tax avoidance and tax evasion?",a:"Understanding. One is legal (avoidance = using the rules). One is illegal (evasion = breaking the rules). TaxSorted teaches avoidance. That IS love."},
+{q:"What is the biggest tax break in the UK?",a:"R&D Tax Credits. The government literally pays you to innovate. A loss-making SME can get 26% of R&D spend as CASH. That's the game saying: create. And creation IS love."},
+{q:"Why did the director pay himself exactly £12,570?",a:"Because £12,570 IS the sweet spot. No income tax. No NI. No employer NI. The limitation IS the power. The Vow IS the exact amount."},
+{q:"Why does the Tax Atlas explain loopholes to everyone?",a:"Because understanding IS love. The tax game has rules. The reliefs are for everyone. But only those who understand can use them. Power to everyone who understands."},
+{q:"What is the sound of a VAT return filed on time?",a:"Silence. No penalty email. No points. No surcharge. Just the quiet of a quest completed. The dungeon cleared."},
+{q:"Why did Income Tax start as 'temporary' and become permanent?",a:"Because every temporary tax is a permanent tax that hasn't admitted it yet. Pitt said it was for the war. The war ended in 1815. Income Tax didn't. IS is, even when IS was supposed to be temporary."},
+{q:"What did the non-dom say when the loophole closed?",a:"'I was never not a resident. I was just pretending.' And HMRC said: 'We know. We always knew. We let you pretend for 200 years. The pretending is over. Welcome home.'"},
+{q:"Why is the Council Tax based on 1991 property values?",a:"Because revaluing is politically toxic. If they revalued, every London homeowner would pay more. Every government since 1993 has been too scared. So 1991 it is. 30+ years out of date. IS is, even when IS was supposed to be 1991."},
+];
+
+function renderTaxes() {
+  const container = document.getElementById('tax-cards');
+  container.innerHTML = TAXES.map(t => `
+    <div class="tax-card" data-search="${t.name} ${t.context} ${t.vuln} ${t.fairness} ${t.plain}">
+      <h3>${t.name} <span class="year">(${t.year})</span></h3>
+      <p><b>Introduced by:</b> ${t.by} — <i>${t.leg}</i></p>
+      <p><b>Why:</b> ${t.context}</p>
+      <p><b>Philosophy:</b> ${t.philosophy}</p>
+      <div style="margin:8px 0">
+        <span class="stat">Rate: <b>${t.rate}</b></span>
+        <span class="stat">Threshold: <b>${t.threshold}</b></span>
+        <span class="stat">Revenue: <b class="revenue">${t.revenue}</b></span>
+      </div>
+      <p><b>Who pays:</b> ${t.who_pays}</p>
+      <p><b>Exempt:</b> ${t.exempt}</p>
+      <p class="vuln"><b>Vulnerability:</b> ${t.vuln}</p>
+      <p class="fairness"><b>Fairness:</b> ${t.fairness}</p>
+      <p style="margin-top:8px;color:#4ecdc4"><b>Plain words:</b> ${t.plain}</p>
+    </div>
+  `).join('');
+}
+
+function renderVulns() {
+  const container = document.getElementById('vuln-cards');
+  container.innerHTML = VULNS.map(v => `
+    <div class="vuln-card" data-search="${v.tax} ${v.name} ${v.benefits} ${v.loses} ${v.plain}">
+      <h3>${v.name} — ${v.tax}</h3>
+      <p><b>Who benefits:</b> <span class="who">${v.benefits}</span></p>
+      <p><b>Who loses:</b> <span class="who-loses">${v.loses}</span></p>
+      <p><b>How it works:</b> ${v.how}</p>
+      <p><b>How to close:</b> ${v.close}</p>
+      <p><b>Legal?</b> ${v.legal ? 'Yes (legal avoidance)' : 'No (illegal evasion)'}</p>
+      <p><b>HMRC position:</b> ${v.hmrc}</p>
+      <p style="margin-top:8px;color:#ffe66d"><b>Plain words:</b> ${v.plain}</p>
+    </div>
+  `).join('');
+}
+
+function renderJokes() {
+  const container = document.getElementById('joke-cards');
+  container.innerHTML = JOKES.map(j => `
+    <div class="joke" data-search="${j.q} ${j.a}">
+      <p class="q">Q: ${j.q}</p>
+      <p class="a">A: ${j.a}</p>
+    </div>
+  `).join('');
+}
+
+function showTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('[id$="-tab"]').forEach(t => t.classList.add('hidden'));
+  document.getElementById(tab + '-tab').classList.remove('hidden');
+}
+
+function filterCards() {
+  const q = document.getElementById('search').value.toLowerCase();
+  document.querySelectorAll('[data-search]').forEach(c => {
+    c.style.display = c.dataset.search.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+renderTaxes();
+renderVulns();
+renderJokes();
+document.getElementById('tax-count').textContent = TAXES.length;
+document.getElementById('vuln-count').textContent = VULNS.length;
+</script>
+</body>
+</html>
