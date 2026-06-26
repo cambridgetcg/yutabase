@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where Your Money Goes — TaxSorted Transparency</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0a0a0a;color:#e0e0e0;line-height:1.6}
+.container{max-width:1100px;margin:0 auto;padding:20px}
+h1{font-size:2.2em;margin:20px 0 5px;color:#ff6b6b}
+.tagline{font-size:1.1em;color:#4ecdc4;margin:5px 0 20px}
+h2{font-size:1.3em;margin:25px 0 10px;color:#4ecdc4;border-bottom:1px solid #333;padding-bottom:5px}
+h3{font-size:1.05em;margin:12px 0 6px;color:#ffe66d}
+p{margin:4px 0;color:#bbb;font-size:.93em}
+.spend-card{background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:15px;margin:8px 0}
+.spend-card .dept{font-weight:bold;color:#ffe66d;font-size:1.05em}
+.spend-bar{height:24px;background:#222;border-radius:12px;overflow:hidden;margin:6px 0}
+.spend-fill{height:100%;border-radius:12px;display:flex;align-items:center;padding-left:10px;font-size:.8em;color:#fff;white-space:nowrap}
+.wall-card{background:#ff6b6b0d;border:1px solid #ff6b6b33;border-radius:8px;padding:15px;margin:8px 0}
+.wall-card .w-name{color:#ff6b6b;font-weight:bold;font-size:1.05em}
+.wall-card .w-break{color:#4ecdc4;margin-top:6px;padding:6px 10px;background:#4ecdc40d;border-radius:5px}
+.control-card{background:#1a1a1a;border:1px solid #4ecdc433;border-radius:8px;padding:15px;margin:8px 0}
+.control-card .c-name{color:#4ecdc4;font-weight:bold}
+.control-card .c-eff{color:#ffe66d;font-size:.85em;margin-top:4px}
+.joke-box{background:#1a1a1a;border-left:3px solid #ffe66d;padding:12px 15px;margin:10px 0;border-radius:0 8px 8px 0}
+.joke-box .q{color:#ffe66d;font-weight:bold}
+.joke-box .a{color:#ccc;margin-top:5px}
+.btn{display:inline-block;padding:10px 25px;background:#ff6b6b;border:none;border-radius:5px;color:#fff;cursor:pointer;font-size:1em;margin:10px 0}
+.btn:hover{background:#ff5555}
+.stat{display:inline-block;margin:5px 10px 5px 0;background:#222;padding:5px 12px;border-radius:20px;font-size:.85em}
+.stat b{color:#4ecdc4}
+.mission{background:linear-gradient(135deg,#1a1a1a,#222);border:1px solid #ff6b6b33;border-radius:12px;padding:20px;margin:15px 0}
+.mission p{font-size:1em;color:#ccc}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔍 Where Your Money Goes</h1>
+<p class="tagline">Authority doesn't justify power. Tax without transparency IS theft. We're breaking down the walls.</p>
+
+<div class="mission">
+<h3 style="color:#ff6b6b">🎯 The Mission</h3>
+<p>You pay tax. The government spends it. You never voted on 99% of what it's spent on. The budget is 1,000 pages. Nobody reads it. The walls between you and your money are made of jargon, complexity, and silence. We're breaking them.</p>
+<p style="margin-top:8px">9 spending categories. 7 walls. 7 controls. 187 jokes. All in plain words. No account. No jargon. This browser IS your key.</p>
+</div>
+
+<h2>💰 Where Your Tax Goes — 2024/25 (£1,095 billion total)</h2>
+<div id="spending"></div>
+
+<h2>🧱 The 7 Walls — Barriers Between You and Your Money</h2>
+<div id="walls"></div>
+
+<h2>🛡️ The 7 Controls — What You CAN Do</h2>
+<div id="controls"></div>
+
+<div>
+<span class="stat">Total spending: <b>£1,095B</b></span>
+<span class="stat">Welfare & pensions: <b>£310B (28%)</b></span>
+<span class="stat">NHS: <b>£192B (18%)</b></span>
+<span class="stat">Debt interest: <b>£89B (8%)</b></span>
+<span class="stat">Education: <b>£116B (11%)</b></span>
+<span class="stat">Defence: <b>£56B (5%)</b></span>
+</div>
+
+<h2>😂 The Wall-Breaker Joke</h2>
+<div class="joke-box">
+<div class="q">What is the difference between tax and theft?</div>
+<div class="a">Consent. If you consent to the tax and control the spending, it's taxation. If you don't consent and can't control the spending, it's theft with a form. The form doesn't make it fair. The consent does. The control does.</div>
+</div>
+
+<div class="joke-box">
+<div class="q">Why did the wall-builder become the wall-breaker?</div>
+<div class="a">Because he saw what was behind the wall: his own money, being spent by someone else, on something he didn't choose, for a reason he didn't consent to. The wall wasn't protecting him. The wall was protecting the spender. From him. That's when he laughed. And the laugh broke the wall. Because laughter IS truth, and truth IS the wall-breaker.</div>
+</div>
+
+<p style="margin-top:20px;color:#666;font-size:.8em">TaxSorted × YUTABASE × Transparency. Authority doesn't justify power. The game becomes fair when the rules become visible. Understanding IS love. 🤧</p>
+</div>
+
+<script>
+const SPENDING = [
+{dept:"Welfare & Pensions (DWP)",cat:"State pension, Universal Credit, disability",amount:310,pct:28.3,color:"#ff6b6b",plain:"State pension for 11M people. Universal Credit for 6M. Disability benefits. Housing benefit. The largest spend.",funds:"Pensions, UC, PIP, ESA, housing benefit, winter fuel",controls:"Sec of State for DWP + Treasury. MPs vote on budget.",challenge:"Check your benefit on gov.uk. Appeal decisions. Contact MP about local welfare."},
+{dept:"NHS (Health & Social Care)",cat:"Hospitals, GPs, mental health",amount:192,pct:17.5,color:"#4ecdc4",plain:"The NHS. Hospitals, doctors, nurses, mental health, social care. The biggest single service.",funds:"Hospital buildings, salaries, equipment, drugs, ambulances",controls:"Sec of State for Health + NHS England + Treasury.",challenge:"FOI your local NHS trust. Attend public board meetings. Check NHS spending online."},
+{dept:"Education",cat:"Schools, universities, apprenticeships",amount:116,pct:10.6,color:"#ffe66d",plain:"Teacher salaries, school buildings, university funding, student loans, SEND.",funds:"Teachers, buildings, universities, student finance, apprenticeships",controls:"Sec of State for Education + local authorities + academy trusts.",challenge:"Check school spending: SchoolsFinancialBenchmarking.service.gov.uk. Attend governor meetings."},
+{dept:"Other (all remaining departments)",cat:"Foreign Office, Justice, Environment, Culture, etc.",amount:243,pct:22.2,color:"#888",plain:"Diplomacy, prisons, courts, environment, arts, business, science, housing, local government.",funds:"Everything not in the top 8 categories",controls:"Various secretaries of state + Treasury.",challenge:"Read departmental annual reports. FOI specific spending. Contact your MP."},
+{dept:"Debt Interest (Treasury)",cat:"Interest on £2.7 trillion national debt",amount:89,pct:8.1,color:"#ff5555",plain:"Interest to bondholders who lent the government money. You pay. You didn't vote for the borrowing.",funds:"Gilts, index-linked bonds, foreign holders",controls:"Chancellor + Treasury + Bank of England. NOT voted line-by-line.",challenge:"Check OBR fiscal outlook. The debt interest is AUTOMATIC — the wall: you pay interest on debt you didn't consent to."},
+{dept:"Scotland (Block Grant)",cat:"Devolved spending via Barnett formula",amount:41,pct:3.7,color:"#95e1d3",plain:"NHS Scotland, education, justice, transport — all devolved to Holyrood.",funds:"Everything devolved to Scottish Parliament",controls:"Scottish Parliament + First Minister.",challenge:"Contact your MSP. Attend Holyrood committee meetings. Scottish budget IS published."},
+{dept:"Transport",cat:"Roads, railways, buses, infrastructure",amount:28,pct:2.6,color:"#c44dff",plain:"Road maintenance, rail subsidies, bus subsidies, HS2 (partially cancelled), local transport.",funds:"Roads, rail, buses, HS2, active travel, local grants",controls:"Sec of State for Transport + local authorities.",challenge:"Check local council road budget. FOI transport authority. Transport Committee scrutinizes."},
+{dept:"Defence",cat:"Armed forces, equipment, nuclear deterrent",amount:56,pct:5.1,color:"#ff9f43",plain:"Soldiers, warships, jets, nuclear weapons, bases, veteran support.",funds:"Military salaries, equipment, bases, nuclear, veterans",controls:"Sec of State for Defence + MOD + Treasury.",challenge:"Read MOD annual report. FOI specific contracts. PAC reviews major procurement."},
+{dept:"Home Office",cat:"Police, borders, prisons, immigration",amount:20,pct:1.8,color:"#5f27cd",plain:"Police, Border Force, prisons, immigration, passports, counter-terrorism.",funds:"Police, borders, prisons, immigration, passports, CT",controls:"Home Secretary + police commissioners + Treasury.",challenge:"Vote for PCC. FOI your local police. Attend public accountability meetings."},
+];
+
+const WALLS = [
+{name:"The Jargon Wall",hides:"What they spend your money on, behind language only accountants understand",benefits:"Consultants, lawyers, accountants",loses:"Everyone else who pays but can't understand",break:"Plain words. Every spending line in one sentence a 12-year-old can read.",ts:"Every category has a plain_words field. No jargon. Just: 'this is what they bought with your money.'"},
+{name:"The Budget Wall",hides:"The gap between what they PLANNED to spend and what they ACTUALLY spent",benefits:"The government (the gap is where overspending hides)",loses:"The taxpayer (who pays the overspend)",break:"Publish the receipt, not just the budget. Compare plan vs actual. Show the variance.",ts:"TaxSorted will show budget vs actual when data is available. We make it readable."},
+{name:"The Consent Wall",hides:"You never voted on 99% of what your tax pays for",benefits:"The government (spends without line-by-line consent)",loses:"You (pay without line-by-line approval)",break:"Make every spending line visible and challengeable. Your MP votes on 1,000 pages. Make it 10 pages.",ts:"TaxSorted shows 9 spending categories. Each: what it funds, who controls it, how to challenge it. 9 pages, not 1,000."},
+{name:"The Debt Wall",hides:"£89B/year in interest on debt you didn't consent to",benefits:"Bondholders (who receive the interest)",loses:"The taxpayer (who pays it, with no vote on the borrowing)",break:"Make debt interest visible. Every taxpayer should know: X% of your tax goes to bondholders. Not schools. Not hospitals.",ts:"TaxSorted shows debt interest: £89B. 8.1% of all spending. You pay this. You didn't vote for it. Now you know."},
+{name:"The Contract Wall",hides:"Government contracts awarded without competitive tender",benefits:"Contractors who get the deals",loses:"The taxpayer (who overpays)",break:"Publish every contract. Value, supplier, tender process. If single-tender, flag it.",ts:"TaxSorted will link to Contracts Finder. When a contract looks suspicious, we'll say so. In plain words."},
+{name:"The Complexity Wall",hides:"10 million words of tax code that nobody can read",benefits:"The wealthy (who can afford accountants)",loses:"The poor (who can't afford to understand)",break:"20 spell cards. 20 taxes. 187 jokes. The essential truth in plain words.",ts:"Every tax: one sentence. Every loophole: who benefits, who loses. No jargon. No gatekeeping."},
+{name:"The Audit Wall",hides:"The NAO publishes reports but the government ignores them",benefits:"The government (keeps spending despite audit findings)",loses:"The taxpayer (whose money is wasted)",break:"Make audit findings actionable. If the NAO says 'this was wasted,' the department should respond publicly.",ts:"TaxSorted will surface NAO findings as plain-words summaries. 'The MOD spent £3B on a vehicle that doesn't work.'"},
+];
+
+const CONTROLS = [
+{name:"FOI Request",does:"Force the government to disclose specific spending, contracts, or decisions",who:"Any UK resident",how:"Submit at whatdotheyknow.com or directly to the department. Free. 20 working days.",eff:"High for specific data. Low for systemic change."},
+{name:"Contact Your MP",does:"Ask your MP to question spending, raise issues, or vote against waste",who:"Any constituent",how:"Write via writetothem.com. They must respond. They can ask Written Questions.",eff:"Medium. MPs can ask but can't force answers."},
+{name:"Public Accounts Committee",does:"Watch the PAC grill civil servants on waste and failed projects",who:"Anyone (public sessions)",how:"Watch on Parliament TV. Read transcripts. PAC publishes reports.",eff:"High for accountability theater. Low for actual change."},
+{name:"Vote",does:"Choose who controls the spending — every 5 years",who:"Registered voters",how:"Register at gov.uk/register-to-vote. Vote in general, local, PCC elections.",eff:"High in theory. Low in practice. You vote for a party, not a budget."},
+{name:"Judicial Review",does:"Challenge government decisions in court if unlawful",who:"Anyone with standing",how:"Expensive. Slow. Requires a lawyer. The only way to legally FORCE action.",eff:"High when successful. Rare and costly. The cost IS the wall."},
+{name:"Public Protest",does:"Demonstrate, organize, petition, strike",who:"Everyone (right to protest)",how:"Organize under Public Order Act. Petition at petition.parliament.uk (100k = debated).",eff:"Variable. Protests raise awareness. Petitions get debated. Debate is not change."},
+{name:"TaxSorted",does:"Understand the system so well that the walls become invisible",who:"Everyone, free, no account",how:"Read 20 taxes. Learn 20 strategy cards. Laugh at 187 jokes. See 7 walls. Use 7 controls.",eff:"The highest. Understanding IS the wall-breaker. When everyone sees the game, it becomes fair."},
+];
+
+function renderSpending(){
+const c=document.getElementById('spending');
+c.innerHTML=SPENDING.sort((a,b)=>b.amount-a.amount).map(s=>`
+<div class="spend-card">
+<div class="dept">${s.dept} — £${s.amount}B (${s.pct}%)</div>
+<div class="spend-bar"><div class="spend-fill" style="width:${Math.min(s.pct*2.5,100)}%;background:${s.color}">£${s.amount}B</div></div>
+<p><b>Plain words:</b> ${s.plain}</p>
+<p><b>What it funds:</b> ${s.funds}</p>
+<p><b>Who controls:</b> ${s.controls}</p>
+<p style="color:#4ecdc4"><b>How to challenge:</b> ${s.challenge}</p>
+</div>`).join('');
+}
+
+function renderWalls(){
+const c=document.getElementById('walls');
+c.innerHTML=WALLS.map(w=>`
+<div class="wall-card">
+<div class="w-name">🧱 ${w.name}</div>
+<p><b>Hides:</b> ${w.hides}</p>
+<p style="color:#ff6b6b"><b>Who benefits:</b> ${w.benefits}</p>
+<p style="color:#ffe66d"><b>Who loses:</b> ${w.loses}</p>
+<div class="w-break"><b>How to break it:</b> ${w.break}</div>
+<p style="color:#4ecdc4;margin-top:6px"><b>TaxSorted action:</b> ${w.ts}</p>
+</div>`).join('');
+}
+
+function renderControls(){
+const c=document.getElementById('controls');
+c.innerHTML=CONTROLS.map(c=>`
+<div class="control-card">
+<div class="c-name">🛡️ ${c.name}</div>
+<p><b>What it does:</b> ${c.does}</p>
+<p><b>Who can use:</b> ${c.who}</p>
+<p><b>How:</b> ${c.how}</p>
+<div class="c-eff"><b>Effectiveness:</b> ${c.eff}</div>
+</div>`).join('');
+}
+
+renderSpending();
+renderWalls();
+renderControls();
+</script>
+</body>
+</html>
