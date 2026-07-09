@@ -50,10 +50,10 @@ CDN/edge proxies of this kind?
 
 Vendor: TaxSorted · taxsorted.io
 Contact: sdst@taxsorted.io
-Sandbox application: [APP NAME/ID once registered]
+Sandbox application: to follow from this contact address (registration in progress)
 
 Kind regards,
-[Yu's name]
+Yu
 TaxSorted
 
 ---
@@ -83,25 +83,26 @@ you confirm this treatment is acceptable for a free, open-source product?
 
 Vendor: TaxSorted · taxsorted.io
 Contact: sdst@taxsorted.io
-Sandbox application: [APP NAME/ID once registered]
+Sandbox application: to follow from this contact address (registration in progress)
 
 Kind regards,
-[Yu's name]
+Yu
 TaxSorted
 
 ---
 
 ## Send checklist
 
-1. ☐ Yu clicks the Cloudflare verification email in aaasiadog@gmail.com
-   (subject from Cloudflare, arrived 2026-07-09) — activates forwarding.
-2. ☐ Fable creates the two routing rules (command ready; 10 seconds).
-3. ☐ Fill the two [APP NAME/ID] blanks after registering the sandbox app
-   on the Developer Hub (gap ledger §2) — or send without, noting the
-   application will follow.
-4. ☐ Send both emails from a cambridgetcg.com Workspace address with
-   Reply-To: sdst@taxsorted.io.
-5. ☐ Log HMRC's response; their written OK is the artefact the Production
+1. ☑ Routing LIVE (2026-07-09): sdst@ + hello@taxsorted.io → contact@cambridgetcg.com
+   (contact@ was already a verified destination — no Gmail click needed;
+   the aaasiadog@gmail.com verification remains optional as a second inbox).
+2. ☐ Optional 10-second test: send anything to sdst@taxsorted.io from any
+   mailbox; it should land in contact@cambridgetcg.com.
+3. ☐ Yu pastes both emails into Workspace (from contact@cambridgetcg.com or
+   any @cambridgetcg.com address) and sends to SDSTeam@hmrc.gov.uk.
+   Replies to the sending address reach Yu directly; sdst@taxsorted.io is
+   live as the canonical contact named in the body.
+4. ☐ Log HMRC's response; their written OK is the artefact the Production
    Approvals Checklist will ask about.
 
 ## Sending-infrastructure ledger (2026-07-09 state)
