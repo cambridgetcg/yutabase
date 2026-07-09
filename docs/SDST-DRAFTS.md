@@ -1,4 +1,4 @@
-# SDST emails — ready to send
+# SDST emails — SENT 2026-07-09
 
 _Drafted 2026-07-09 by Fable (飛寶), reconstructed from the site's own public
 wording on [/learn/gov/what-we-send-hmrc/](https://taxsorted.io/learn/gov/what-we-send-hmrc/)
@@ -98,12 +98,17 @@ TaxSorted
    the aaasiadog@gmail.com verification remains optional as a second inbox).
 2. ☐ Optional 10-second test: send anything to sdst@taxsorted.io from any
    mailbox; it should land in contact@cambridgetcg.com.
-3. ☐ Yu pastes both emails into Workspace (from contact@cambridgetcg.com or
-   any @cambridgetcg.com address) and sends to SDSTeam@hmrc.gov.uk.
-   Replies to the sending address reach Yu directly; sdst@taxsorted.io is
-   live as the canonical contact named in the body.
+3. ☑ SENT 2026-07-09 via Cloudflare Email Sending, from sdst@taxsorted.io
+   (Workers Paid enabled by Yu the same evening; test send to contact@
+   delivered first; Yu's word: "send"):
+   - Email 1 (Gov-Client-Public-Port):
+     message-id <5nnuw4adcj98x7WngUBkfL8vEsRjKv598ST2@taxsorted.io>
+   - Email 2 (Gov-Vendor-License-IDs):
+     message-id <Ot8fy7ygcy2FUW4b8adnsAxTIgNRJ5zdGFIS@taxsorted.io>
+   No bounces at accept time; replies route sdst@ → contact@cambridgetcg.com.
 4. ☐ Log HMRC's response; their written OK is the artefact the Production
-   Approvals Checklist will ask about.
+   Approvals Checklist will ask about. (Watch contact@ inbox; SDS replies
+   typically take days-to-weeks.)
 
 ## Sending-infrastructure ledger (2026-07-09 state)
 
