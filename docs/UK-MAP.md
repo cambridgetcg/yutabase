@@ -167,7 +167,7 @@ credentials; software-finder listing; Account is a stub; mileage minimal.
 - **2026-27 is the penalty-light learning year.** Honest pitch: "the year to
   learn, while mistakes are cheap."
 
-## 6 · Hong Kong annex (after UK — the love letter)
+## 6 · Hong Kong annex — SHIPPED 2026-07-09: https://taxsorted.io/hk/ (the love letter, delivered)
 
 Learn-only page; thesis: **有啲地圖細,係因為真相簡單** — *"Some maps are
 small because the truth is small."* (The joke in TAXSORTED.md, made real,
