@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YUTABASE — the loom · you speak, reality listens</title>
+<style>
+:root{
+  --bg:#0a0a0a; --bg2:#0d0d0d; --panel:#141414; --card:#1a1a1a; --line:#2a2a2a; --line2:#3a3a3a;
+  --ink:#e8e8e8; --dim:#8a8a8a; --faint:#555; --tan:#d4a373; --gold:#f0c896; --sage:#a7c4a0; --clay:#c47a6a;
+  --mono:ui-monospace,"JetBrains Mono","SFMono-Regular",Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:14px;overflow:hidden;
+  background-image:radial-gradient(1200px 600px at 70% -10%,rgba(212,163,115,.06),transparent 60%)}
+#grain{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:.03;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.wrap{display:grid;grid-template-columns:1fr 320px;grid-template-rows:auto 1fr auto;height:100%;position:relative;z-index:2}
+header{grid-column:1/3;display:flex;align-items:baseline;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),transparent)}
+header .brand{font-size:15px;letter-spacing:.14em;color:var(--gold)}
+header .creed{color:var(--dim);font-size:12px;font-style:italic}
+header .creed b{color:var(--tan);font-style:normal}
+#stagewrap{position:relative;overflow:hidden;background:
+  radial-gradient(900px 500px at 40% 45%,rgba(212,163,115,.04),transparent 70%)}
+#stage{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#stage.drag{cursor:grabbing}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--faint);text-align:center;pointer-events:none;font-size:13px;line-height:2}
+aside{border-left:1px solid var(--line);background:var(--bg2);overflow-y:auto;padding:16px 16px 30px}
+aside h2{font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--tan);margin:18px 0 9px}
+aside h2:first-child{margin-top:2px}
+.word{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:7px;
+  padding:7px 10px;margin-bottom:6px;color:var(--ink);cursor:pointer;font-family:var(--mono);font-size:12px;transition:border-color .15s}
+.word:hover{border-color:var(--tan)}
+.word .w{color:var(--gold)}.word .inv{color:var(--dim)}.word .g{display:block;color:var(--faint);font-size:10.5px;margin-top:2px;line-height:1.4}
+.banned{color:var(--clay);font-size:11px;line-height:1.7;margin-top:4px}
+.banned code{color:var(--clay);opacity:.8}
+.hdr{font-size:11px;color:var(--dim);line-height:1.9}
+.hdr .k{color:var(--tan)}
+.btn{display:block;width:100%;background:linear-gradient(180deg,#3a2c1c,#241a10);border:1px solid var(--tan);color:var(--gold);
+  border-radius:8px;padding:10px;margin-top:8px;cursor:pointer;font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+.btn:hover{background:linear-gradient(180deg,#4a381f,#2c2013)}
+.btn.ghost{background:var(--card);border-color:var(--line);color:var(--dim)}
+.btn.ghost:hover{border-color:var(--line2);color:var(--ink)}
+footer{grid-column:1/3;border-top:1px solid var(--line);background:var(--bg2)}
+.feed{max-height:104px;overflow-y:auto;padding:8px 20px}
+.feed .ln{font-size:12px;line-height:1.75;color:var(--dim);white-space:pre-wrap}
+.feed .ok{color:var(--sage)}.feed .no{color:var(--clay)}.feed .sql{color:var(--tan);opacity:.85}
+.feed .you{color:var(--ink)}
+.promptrow{display:flex;align-items:center;gap:10px;padding:11px 20px;border-top:1px solid var(--line)}
+.promptrow .g{color:var(--gold)}
+#input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font-family:var(--mono);font-size:14px}
+#input::placeholder{color:var(--faint)}
+.hint{color:var(--faint);font-size:11px;white-space:nowrap}
+/* clicked-card / thread inspector */
+#pop{position:absolute;z-index:20;background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;
+  font-size:12px;max-width:280px;display:none;box-shadow:0 12px 40px -12px #000}
+#pop .ref{color:var(--gold);font-size:12.5px;margin-bottom:6px}
+#pop .row{color:var(--dim);line-height:1.8}#pop .row .k{color:var(--tan)}
+#pop .sever{margin-top:8px;color:var(--clay);cursor:pointer;border-top:1px solid var(--line);padding-top:7px;display:inline-block}
+@media (max-width:760px){.wrap{grid-template-columns:1fr}aside{display:none}}
+</style>
+</head>
+<body>
+<div id="grain"></div>
+<div class="wrap">
+  <header>
+    <span class="brand">YUTABASE · the loom</span>
+    <span class="creed">you speak, reality listens — <b>a relation without a word does not exist</b></span>
+  </header>
+
+  <div id="stagewrap">
+    <canvas id="stage"></canvas>
+    <div class="empty" id="empty">the loom is empty.<br>speak a sentence below — or press <b style="color:var(--tan)">weave the trade-in story</b> →<br><span style="font-size:11px">every thread must carry a word. that is the whole rule.</span></div>
+    <div id="pop"></div>
+  </div>
+
+  <aside>
+    <h2>the seven words</h2>
+    <div id="lexicon"></div>
+    <div class="banned" id="banned"></div>
+
+    <h2>speak like this</h2>
+    <div class="hdr">
+      <div><span class="k">thread</span> a/b/1 <span style="color:var(--gold)">--contains--&gt;</span> a/c/2</div>
+      <div><span class="k">card</span> people/agents/yu</div>
+      <div>a/b/1 <span style="color:var(--gold)">-&gt; contains</span>   <span style="color:var(--faint)">(follow a word)</span></div>
+      <div><span class="k">how</span> witnessed·computed·declared</div>
+      <div><span class="k">explain</span> "thread …"   <span style="color:var(--faint)">(see the SQL)</span></div>
+    </div>
+
+    <h2>the honesty header</h2>
+    <div class="hdr">every card & thread says <span class="k">at</span> · <span class="k">by</span> · <span class="k">how</span> · <span class="k">src</span>. a write that won't say <span class="k">how</span> bounces. <span class="k">computed</span> without <span class="k">src</span> bounces.</div>
+
+    <button class="btn" id="story">▶ weave the trade-in story</button>
+    <button class="btn ghost" id="clear">clear the loom</button>
+    <div class="hdr" style="margin-top:10px;color:var(--faint)">click a card or a thread to read its provenance.</div>
+  </aside>
+
+  <footer>
+    <div class="feed" id="feed"></div>
+    <div class="promptrow">
+      <span class="g">youspeak›</span>
+      <input id="input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+             placeholder='thread tradein/submissions/01 --contains--> tradein/items/a4  how witnessed'>
+      <span class="hint" id="count"></span>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s){return document.querySelector(s);};
+
+// ── the lexicon (SPEC: seven words, gloss + inverse) ──
+var LEX={
+  submitted_by:{inv:"submitted", g:"this record was submitted by that person/agent"},
+  contains:{inv:"contained in", g:"physical or compositional containment"},
+  supersedes:{inv:"superseded by", g:"this record replaces that one; the old stays readable"},
+  priced_from:{inv:"priced", g:"this price was derived from that source record"},
+  acted_for:{inv:"acted via", g:"an agent performed this on behalf of that operator"},
+  refused_because:{inv:"refused", g:"this action was declined for that recorded reason"},
+  witnesses:{inv:"witnessed by", g:"this record attests that one"}
+};
+var BANNED=["related_to","linked","refs","misc"];
+var HOWS=["witnessed","live","cached","computed","declared"];
+
+// ── state: cards + threads, with the honesty header ──
+var cards={}, threads=[], tick=0, seq=0;
+var W,H,DPR=Math.min(devicePixelRatio||1,2);
+var cv=$("#stage"), ctx=cv.getContext("2d");
+var BOOKCOL={}; var PALETTE=["#d4a373","#a7c4a0","#c47a6a","#9db4c0","#b9a7c4","#c9b98a"];
+function bookColor(book){ if(!BOOKCOL[book]){ BOOKCOL[book]=PALETTE[Object.keys(BOOKCOL).length%PALETTE.length]; } return BOOKCOL[book]; }
+
+function now(){ tick++; return tick; }
+function ensureCard(ref, how){
+  if(cards[ref]) return cards[ref];
+  var parts=ref.split("/");
+  if(parts.length!==3) throw new Error('a ref is book/deck/id — got "'+ref+'"');
+  var c={ref:ref, book:parts[0], deck:parts[1], id:parts[2],
+    x:W/2+(Math.random()-0.5)*160, y:H/2+(Math.random()-0.5)*160, vx:0, vy:0,
+    how:how||"declared", by:"agent:fable/loom", at:now(), born:seq++, glow:1};
+  cards[ref]=c; hideEmpty(); return c;
+}
+
+// ── feed (the loom speaks back, in YOUSPEAK voice) ──
+function say(cls, text){
+  var f=$("#feed"), ln=document.createElement("div");
+  ln.className="ln "+(cls||""); ln.textContent=text;
+  f.appendChild(ln); f.scrollTop=f.scrollHeight;
+}
+function hideEmpty(){ $("#empty").style.display=Object.keys(cards).length?"none":"flex"; }
+function refreshCount(){ $("#count").textContent=Object.keys(cards).length+" cards · "+threads.length+" threads"; }
+
+// ── the SQL a sentence becomes (the yutabase promise: nothing you couldn't type) ──
+function sqlFor(kind, a){
+  if(kind==="thread"){
+    return "INSERT INTO yu.threads (id, from_book, from_deck, from_id, word, to_book, to_deck, to_id, at, by, how"+(a.src?", src":"")+")\n"+
+      "VALUES (uuidv7(), '"+a.f.book+"','"+a.f.deck+"','"+a.f.id+"', '"+a.word+"', '"+a.t.book+"','"+a.t.deck+"','"+a.t.id+"', now(), 'agent:fable/loom', '"+a.how+"'"+(a.src?", '{"+a.src+"}'":"")+");";
+  }
+  if(kind==="card"){ return "-- a card is a row in "+a.book+"."+a.deck+", addressable by ref "+a.ref; }
+  if(kind==="traverse"){
+    var col=a.dir==="->"?"from":"to", got=a.dir==="->"?"to":"from";
+    return "SELECT t."+got+"_book, t."+got+"_deck, t."+got+"_id\nFROM yu.threads t\nWHERE t."+col+"_book='"+a.c.book+"' AND t."+col+"_deck='"+a.c.deck+"' AND t."+col+"_id='"+a.c.id+"' AND t.word='"+a.word+"'  -- capped at 2 hops";
+  }
+  return "";
+}
+
+// ── the compiler / interpreter ──
+function speak(input){
+  var s=input.trim(); if(!s) return;
+  say("you", "youspeak› "+s);
+
+  // hello
+  if(s==="hello"){ say("ok","● the whole standard: five primitives (book·deck·card·thread·lexicon), one honesty header, seven words. speak, and reality listens."); return; }
+
+  // explain "<sentence>"
+  var ex=s.match(/^explain\s+"(.+)"$/);
+  if(ex){ try{ var r=parse(ex[1], true); if(r) say("sql", r.sql); }catch(e){ say("no","✕ "+e.message); } return; }
+
+  try{ parse(s, false); }catch(e){ say("no","✕ "+e.message); }
+}
+
+function parse(s, dryRun){
+  // thread A --word--> B [how <how>] [src <a,b>]
+  var m=s.match(/^thread\s+(\S+)\s+--(.*?)-->\s+(\S+?)(?:\s+how\s+(\w+))?(?:\s+src\s+(\S+))?$/);
+  if(m){
+    var fRef=m[1], word=(m[2]||"").trim().replace(/^-+|-+$/g,""), tRef=m[3], how=m[4], src=m[5];
+    if(word===""){ throw new Error("a thread without a word is not a sentence. name it — the seven words are on the right."); }
+    if(BANNED.indexOf(word)>=0){ throw new Error('"'+word+'" is banned by name. say what you actually mean.'); }
+    if(!LEX[word]){ throw new Error('"'+word+'" is not in the lexicon. a word needs a gloss and an inverse to be coined — for now, weave with the seven.'); }
+    if(how && HOWS.indexOf(how)<0){ throw new Error('how must be one of: '+HOWS.join(" · ")); }
+    how=how||"declared";
+    if((how==="cached"||how==="computed") && !src){ throw new Error('how '+how+' must say src — what it came from. add:  src '+fRef); }
+    if(dryRun){ return {sql: sqlFor("thread",{f:parseRef(fRef),word:word,t:parseRef(tRef),how:how,src:src})}; }
+    var A=ensureCard(fRef), B=ensureCard(tRef);
+    var th={id:"t"+(seq++), from:fRef, word:word, to:tRef, how:how, by:"agent:fable/loom", at:now(), src:src||null, glow:1};
+    threads.push(th); A.glow=B.glow=1;
+    say("ok","● woven:  "+shortRef(fRef)+"  —"+word+"→  "+shortRef(tRef)+"   ("+LEX[word].g+")");
+    refreshCount(); return th;
+  }
+
+  // card A [how <how>]
+  m=s.match(/^card\s+(\S+)(?:\s+how\s+(\w+))?$/);
+  if(m){
+    if(m[2] && HOWS.indexOf(m[2])<0) throw new Error('how must be one of: '+HOWS.join(" · "));
+    if(dryRun){ var p=parseRef(m[1]); return {sql: sqlFor("card",{ref:m[1],book:p.book,deck:p.deck})}; }
+    var c=ensureCard(m[1], m[2]); c.glow=1;
+    say("ok","● placed:  "+shortRef(m[1])+"   ("+c.how+", by "+c.by+")"); refreshCount(); return c;
+  }
+
+  // A -> word   or   A <- word   (follow, 2-hop capped)
+  m=s.match(/^(\S+)\s+(->|<-)\s+(\w+)$/);
+  if(m){
+    var ref=m[1], dir=m[2], w=m[3];
+    if(!LEX[w] && dir==="->") { /* still allow reading */ }
+    var pc=parseRef(ref);
+    if(dryRun){ return {sql: sqlFor("traverse",{c:pc,dir:dir,word:w})}; }
+    if(!cards[ref]) throw new Error("no card "+shortRef(ref)+" on the loom yet — weave it first.");
+    var hits=threads.filter(function(t){ return dir==="->" ? (t.from===ref && t.word===w) : (t.to===ref && t.word===w); });
+    if(!hits.length){ say("no","· nothing "+(dir==="->"?"out along":"into by")+" '"+w+"' from "+shortRef(ref)); return; }
+    highlight(ref, hits, dir);
+    var reading = dir==="->" ? (LEX[w]?LEX[w].g:w) : (LEX[w]?("read backward: "+LEX[w].inv):w);
+    hits.forEach(function(t){ say("ok","→ "+shortRef(t.from)+" "+w+" "+shortRef(t.to)+"   ("+reading+")"); });
+    return;
+  }
+
+  throw new Error('i don\'t know that sentence. try:  thread a/b/1 --contains--> a/c/2');
+}
+
+function parseRef(r){ var p=(r||"").split("/"); if(p.length!==3) throw new Error('a ref is book/deck/id — got "'+r+'"'); return {book:p[0],deck:p[1],id:p[2]}; }
+function shortRef(r){ var p=r.split("/"); return p[0]+"/"+p[1]+"/"+(p[2].length>8?p[2].slice(0,6)+"…":p[2]); }
+
+// ── highlight a traversal ──
+var hi={ref:null, set:{}, until:0};
+function highlight(ref, hits, dir){
+  hi.ref=ref; hi.set={}; hits.forEach(function(t){ hi.set[t.id]=1; hi.set[t.from]=1; hi.set[t.to]=1; }); hi.until=performance.now?0:0; hiTimer=180;
+}
+var hiTimer=0;
+
+// ── layout: a gentle loom (repel + thread-spring + center) ──
+function step(){
+  var keys=Object.keys(cards), i, j;
+  for(i=0;i<keys.length;i++){ var a=cards[keys[i]]; a.vx*=0.82; a.vy*=0.82;
+    // center gravity
+    a.vx+=(W/2-a.x)*0.0009; a.vy+=(H/2-a.y)*0.0009;
+    for(j=i+1;j<keys.length;j++){ var b=cards[keys[j]];
+      var dx=a.x-b.x, dy=a.y-b.y, d2=dx*dx+dy*dy+0.01, d=Math.sqrt(d2);
+      if(d<170){ var f=(170-d)/d*0.06; a.vx+=dx*f; a.vy+=dy*f; b.vx-=dx*f; b.vy-=dy*f; }
+    }
+  }
+  for(i=0;i<threads.length;i++){ var t=threads[i], A=cards[t.from], B=cards[t.to]; if(!A||!B) continue;
+    var dx=B.x-A.x, dy=B.y-A.y, d=Math.sqrt(dx*dx+dy*dy)||1, want=132, f=(d-want)/d*0.012;
+    A.vx+=dx*f; A.vy+=dy*f; B.vx-=dx*f; B.vy-=dy*f;
+  }
+  for(i=0;i<keys.length;i++){ var c=cards[keys[i]]; if(c===dragging) continue;
+    c.x+=c.vx; c.y+=c.vy;
+    c.x=Math.max(60,Math.min(W-60,c.x)); c.y=Math.max(44,Math.min(H-44,c.y));
+    if(c.glow>0) c.glow-=0.012;
+  }
+  for(i=0;i<threads.length;i++){ if(threads[i].glow>0) threads[i].glow-=0.01; }
+  if(hiTimer>0) hiTimer--;
+}
+
+// ── render ──
+function size(){ var r=$("#stagewrap").getBoundingClientRect(); W=r.width; H=r.height; cv.width=W*DPR; cv.height=H*DPR; cv.style.width=W+"px"; cv.style.height=H+"px"; ctx.setTransform(DPR,0,0,DPR,0,0); }
+function draw(ts){
+  step();
+  ctx.clearRect(0,0,W,H);
+  // threads
+  for(var i=0;i<threads.length;i++){ var t=threads[i], A=cards[t.from], B=cards[t.to]; if(!A||!B) continue;
+    var mx=(A.x+B.x)/2, my=(A.y+B.y)/2 - 18;
+    var lit=hiTimer>0 && hi.set[t.id];
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.quadraticCurveTo(mx,my,B.x,B.y);
+    ctx.lineWidth=lit?2.4:1.3;
+    ctx.strokeStyle=lit?"rgba(240,200,150,0.95)":("rgba(212,163,115,"+(0.28+0.5*Math.max(0,t.glow)).toFixed(2)+")");
+    ctx.stroke();
+    // arrowhead near B
+    var ang=Math.atan2(B.y-my,B.x-mx), ax=B.x-Math.cos(ang)*26, ay=B.y-Math.sin(ang)*26;
+    ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax-Math.cos(ang-0.4)*7, ay-Math.sin(ang-0.4)*7); ctx.moveTo(ax,ay); ctx.lineTo(ax-Math.cos(ang+0.4)*7, ay-Math.sin(ang+0.4)*7); ctx.strokeStyle=ctx.strokeStyle; ctx.stroke();
+    // the WORD on the thread — the whole point
+    ctx.font="11px "+"ui-monospace,Menlo,monospace"; var tw=ctx.measureText(t.word).width;
+    ctx.fillStyle="rgba(10,10,10,0.85)"; ctx.fillRect(mx-tw/2-5, my-8, tw+10, 15);
+    ctx.fillStyle=lit?"#f0c896":"#d4a373"; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.fillText(t.word, mx-tw/2, my);
+  }
+  // cards
+  var keys=Object.keys(cards);
+  for(i=0;i<keys.length;i++){ var c=cards[keys[i]], col=bookColor(c.book);
+    var label=c.deck+"/"+(c.id.length>8?c.id.slice(0,6)+"…":c.id);
+    ctx.font="12px ui-monospace,Menlo,monospace";
+    var w=Math.max(ctx.measureText(label).width, ctx.measureText(c.book).width)+22, h=34;
+    var glow=Math.max(0,c.glow), litc=hiTimer>0&&hi.set[c.ref];
+    if(glow>0||litc){ ctx.shadowColor=col; ctx.shadowBlur=(litc?26:16*glow); }
+    roundRect(c.x-w/2, c.y-h/2, w, h, 8);
+    ctx.fillStyle="#16130f"; ctx.fill(); ctx.shadowBlur=0;
+    ctx.lineWidth=litc?2:1.2; ctx.strokeStyle=litc?"#f0c896":col; ctx.stroke();
+    // provenance sigil (how)
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(c.x-w/2+9, c.y-h/2+9, 2.4, 0, 6.28); ctx.fill();
+    ctx.textAlign="center"; ctx.textBaseline="alphabetic";
+    ctx.fillStyle="#6b6b6b"; ctx.font="9px ui-monospace,Menlo,monospace"; ctx.fillText(c.book, c.x, c.y-3);
+    ctx.fillStyle="#e8e8e8"; ctx.font="12px ui-monospace,Menlo,monospace"; ctx.fillText(label, c.x, c.y+12);
+  }
+  requestAnimationFrame(draw);
+}
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+// ── interaction: drag cards, click to inspect ──
+var dragging=null, dragMoved=false, downPt=null;
+function cardAt(x,y){ var keys=Object.keys(cards); for(var i=keys.length-1;i>=0;i--){ var c=cards[keys[i]]; if(Math.abs(x-c.x)<52 && Math.abs(y-c.y)<20) return c; } return null; }
+function threadAt(x,y){ for(var i=0;i<threads.length;i++){ var t=threads[i],A=cards[t.from],B=cards[t.to]; if(!A||!B)continue; var mx=(A.x+B.x)/2,my=(A.y+B.y)/2-18; if(Math.abs(x-mx)<34&&Math.abs(y-my)<12) return t; } return null; }
+cv.addEventListener("mousedown",function(e){ var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top; dragging=cardAt(x,y); dragMoved=false; downPt={x:x,y:y}; if(dragging) cv.classList.add("drag"); });
+addEventListener("mousemove",function(e){ if(!dragging) return; var r=cv.getBoundingClientRect(); dragging.x=e.clientX-r.left; dragging.y=e.clientY-r.top; dragging.vx=dragging.vy=0; dragMoved=true; });
+addEventListener("mouseup",function(e){ cv.classList.remove("drag"); if(dragging&&!dragMoved){} dragging=null; });
+cv.addEventListener("click",function(e){ var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+  if(dragMoved){ dragMoved=false; return; }
+  var c=cardAt(x,y); if(c){ inspectCard(c,x,y); return; }
+  var t=threadAt(x,y); if(t){ inspectThread(t,x,y); return; }
+  $("#pop").style.display="none";
+});
+function inspectCard(c,x,y){ var p=$("#pop");
+  p.innerHTML='<div class="ref">'+c.ref+'</div>'+
+    '<div class="row"><span class="k">at</span> '+c.at+' <span class="k">by</span> '+c.by+'</div>'+
+    '<div class="row"><span class="k">how</span> '+c.how+(c.src?' <span class="k">src</span> '+c.src:'')+'</div>'+
+    '<div class="row" style="color:#666;margin-top:5px">a card is one row, addressable by ref.</div>';
+  showPop(x,y);
+}
+function inspectThread(t,x,y){ var p=$("#pop"), g=LEX[t.word];
+  p.innerHTML='<div class="ref">'+shortRef(t.from)+' —'+t.word+'→ '+shortRef(t.to)+'</div>'+
+    '<div class="row" style="color:#999">'+(g?g.g:'')+'</div>'+
+    (g?'<div class="row"><span class="k">inverse</span> '+g.inv+'</div>':'')+
+    '<div class="row"><span class="k">at</span> '+t.at+' <span class="k">by</span> '+t.by+' <span class="k">how</span> '+t.how+(t.src?' <span class="k">src</span> '+t.src:'')+'</div>'+
+    '<div class="sever" data-t="'+t.id+'">✕ sever this thread (how witnessed)</div>';
+  showPop(x,y);
+  var sv=p.querySelector(".sever"); if(sv) sv.onclick=function(){ threads=threads.filter(function(x){return x.id!==t.id;}); say("no","✂ severed:  "+shortRef(t.from)+" —"+t.word+"→ "+shortRef(t.to)+"   (how witnessed — the old stays readable in the log)"); p.style.display="none"; refreshCount(); };
+}
+function showPop(x,y){ var p=$("#pop"); p.style.display="block"; p.style.left=Math.min(x+12,W-292)+"px"; p.style.top=Math.min(y+12,H-120)+"px"; }
+
+// ── the panels ──
+(function fillLex(){
+  var el=$("#lexicon");
+  Object.keys(LEX).forEach(function(w){ var b=document.createElement("button"); b.className="word";
+    b.innerHTML='<span class="w">'+w+'</span> <span class="inv">· '+LEX[w].inv+'</span><span class="g">'+LEX[w].g+'</span>';
+    b.onclick=function(){ var i=$("#input"); i.value='thread book/deck/1 --'+w+'--> book/deck/2  how witnessed'; i.focus(); };
+    el.appendChild(b); });
+  $("#banned").innerHTML="banned by name: "+BANNED.map(function(b){return '<code>'+b+'</code>';}).join(" · ")+" — anonymous relations are not sentences.";
+})();
+
+// ── the trade-in story (watch a world weave itself) ──
+var STORY=[
+  'card people/agents/yu how declared',
+  'thread tradein/submissions/01977c --submitted_by--> people/agents/yu  how witnessed',
+  'thread tradein/submissions/01977c --contains--> tradein/items/0197a1  how witnessed',
+  'thread tradein/submissions/01977c --contains--> tradein/items/0197b2  how witnessed',
+  'thread tradein/items/0197a1 --priced_from--> pricing/quotes/01984c  how computed src tradein/items/0197a1',
+  'thread pricing/quotes/01984c --witnesses--> tradein/items/0197a1  how witnessed',
+  'thread pricing/quotes/02001 --supersedes--> pricing/quotes/01984c  how declared'
+];
+$("#story").onclick=function(){ var i=0; (function nxt(){ if(i>=STORY.length){ say("ok","● the story is woven. click any card or thread to read how it came to be true. now follow a word:  tradein/submissions/01977c -> contains"); return; } speak(STORY[i++]); setTimeout(nxt, 520); })(); };
+$("#clear").onclick=function(){ cards={}; threads=[]; hi.set={}; $("#pop").style.display="none"; hideEmpty(); refreshCount(); say("no","· the loom is cleared."); };
+
+// ── input ──
+var input=$("#input");
+input.addEventListener("keydown",function(e){ if(e.key==="Enter"){ var v=input.value; input.value=""; speak(v); } });
+
+// ── boot ──
+size(); addEventListener("resize",size); refreshCount();
+say("ok","● welcome to the loom. speak, and reality listens. every thread must carry a word.");
+requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
