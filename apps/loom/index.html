@@ -92,7 +92,18 @@ footer{grid-column:1/3;border-top:1px solid var(--line);background:var(--bg2)}
     <h2>the honesty header</h2>
     <div class="hdr">every card & thread says <span class="k">at</span> · <span class="k">by</span> · <span class="k">how</span> · <span class="k">src</span>. a write that won't say <span class="k">how</span> bounces. <span class="k">computed</span> without <span class="k">src</span> bounces.</div>
 
+    <h2>the cross · yumi ⟷ yutabase</h2>
+    <div class="hdr" style="line-height:1.9">YOUSPEAK-ORDO's evidentials are the honesty header in another tongue. Attest a thread:
+      <div style="margin-top:5px;color:var(--ink)">I attest that a/b/1 contains a/c/2 <span style="color:var(--gold)">-mi</span>.</div>
+      <div style="margin-top:5px"><span class="k">-mi</span> witnessed <span style="color:var(--faint)">≡</span> <span class="k">how witnessed</span></div>
+      <div><span class="k">-si</span> reported <span style="color:var(--faint)">≡</span> <span class="k">how cached</span></div>
+      <div><span class="k">-chu</span> inferred <span style="color:var(--faint)">≡</span> <span class="k">how computed</span></div>
+      <div><span class="k">unmarked</span> <span style="color:var(--faint)">≡</span> a write with no <span class="k">how</span> — bounces</div>
+      <div style="margin-top:5px;color:var(--clay)">both refuse the over-claim — the verisleight-guard.</div>
+    </div>
+
     <button class="btn" id="story">▶ weave the trade-in story</button>
+    <button class="btn" id="rite">▶ speak a rite (yumi)</button>
     <button class="btn ghost" id="clear">clear the loom</button>
     <div class="hdr" style="margin-top:10px;color:var(--faint)">click a card or a thread to read its provenance.</div>
   </aside>
@@ -125,6 +136,15 @@ var LEX={
 };
 var BANNED=["related_to","linked","refs","misc"];
 var HOWS=["witnessed","live","cached","computed","declared"];
+
+// ── the cross · YOUSPEAK-ORDO's evidentials ⟷ yutabase's honesty header ──
+// yumi grammar (ordo.ai-love.cc): every value carries how-you-know-it, mandatory.
+//   -mi witnessed · -si reported · -chu inferred · -auth verbatim · unmarked = no claim
+// It's the SAME law as `how` — two tongues, one honesty. Demotion-only, never over-claim.
+var EV={ mi:"witnessed", si:"cached", chu:"computed", auth:"declared" };
+var EVGLOSS={ mi:"direct witness", si:"reported — arrived from outside", chu:"inferred — derived from reports", auth:"verbatim canon" };
+// words you could directly witness vs words that are inherently a derivation (the verisleight-guard)
+var DERIVED={ priced_from:1 };  // "priced_from that source" is inferred — you didn't witness the price, you derived it
 
 // ── state: cards + threads, with the honesty header ──
 var cards={}, threads=[], tick=0, seq=0;
@@ -183,6 +203,29 @@ function speak(input){
 }
 
 function parse(s, dryRun){
+  // ── the cross: an ORDO attestation IS a yutabase thread ──
+  // "I attest that A word B -mi."  /  "Emetme: A word B -mi."
+  var am=s.match(/^(?:I attest that|Emetme:)\s+(\S+)\s+(\w+)\s+(\S+)\s+-(\w+)\.?$/i);
+  if(am){
+    var aFrom=am[1], aWord=am[2], aTo=am[3], ev=am[4].toLowerCase();
+    if(!EV[ev]) throw new Error('the evidential must be a grade: -mi (witnessed) · -si (reported) · -chu (inferred). "-'+ev+'" is none.');
+    if(BANNED.indexOf(aWord)>=0) throw new Error('"'+aWord+'" is banned by name. say what you actually mean.');
+    if(!LEX[aWord]) throw new Error('"'+aWord+'" — GAP. an unknown word is a petition to the forge, not an error (ORDO Law 1). weave with the seven.');
+    // the verisleight-guard — you cannot attest -mi over something you only derived
+    if(ev==="mi" && DERIVED[aWord]) throw new Error('verisleight-guard ✕  "'+aWord+'" is a derivation — you inferred it, you did not witness it. attest -chu, not -mi. (honesty may understate, never overstate)');
+    var ehow=EV[ev], esrc=(ehow==="cached"||ehow==="computed")?aFrom:null;
+    if(dryRun){ return {sql: sqlFor("thread",{f:parseRef(aFrom),word:aWord,t:parseRef(aTo),how:ehow,src:esrc})}; }
+    var EA=ensureCard(aFrom,ehow), EB=ensureCard(aTo,ehow);
+    var eth={id:"t"+(seq++), from:aFrom, word:aWord, to:aTo, how:ehow, ev:ev, by:"agent:fable/loom", at:now(), src:esrc, glow:1};
+    threads.push(eth); EA.glow=EB.glow=1;
+    say("ok","● attested:  "+shortRef(aFrom)+" —"+aWord+"→ "+shortRef(aTo)+"    -"+ev+" ≡ how "+ehow+"    ("+EVGLOSS[ev]+")");
+    refreshCount(); return eth;
+  }
+  // an attestation with no evidential is a misfire (ORDO: the evidential is mandatory)
+  if(/^(?:I attest that|Emetme:)/i.test(s)){
+    throw new Error('the evidential is mandatory — "I attest …" with no -mi / -si / -chu is a misfire. how do you know it?');
+  }
+
   // thread A --word--> B [how <how>] [src <a,b>]
   var m=s.match(/^thread\s+(\S+)\s+--(.*?)-->\s+(\S+?)(?:\s+how\s+(\w+))?(?:\s+src\s+(\S+))?$/);
   if(m){
@@ -330,6 +373,7 @@ function inspectThread(t,x,y){ var p=$("#pop"), g=LEX[t.word];
     '<div class="row" style="color:#999">'+(g?g.g:'')+'</div>'+
     (g?'<div class="row"><span class="k">inverse</span> '+g.inv+'</div>':'')+
     '<div class="row"><span class="k">at</span> '+t.at+' <span class="k">by</span> '+t.by+' <span class="k">how</span> '+t.how+(t.src?' <span class="k">src</span> '+t.src:'')+'</div>'+
+    (t.ev?'<div class="row" style="color:#d4a373">attested <b>-'+t.ev+'</b> in yumi ≡ how '+t.how+'</div>':'')+
     '<div class="sever" data-t="'+t.id+'">✕ sever this thread (how witnessed)</div>';
   showPop(x,y);
   var sv=p.querySelector(".sever"); if(sv) sv.onclick=function(){ threads=threads.filter(function(x){return x.id!==t.id;}); say("no","✂ severed:  "+shortRef(t.from)+" —"+t.word+"→ "+shortRef(t.to)+"   (how witnessed — the old stays readable in the log)"); p.style.display="none"; refreshCount(); };
@@ -357,6 +401,15 @@ var STORY=[
   'thread pricing/quotes/02001 --supersedes--> pricing/quotes/01984c  how declared'
 ];
 $("#story").onclick=function(){ var i=0; (function nxt(){ if(i>=STORY.length){ say("ok","● the story is woven. click any card or thread to read how it came to be true. now follow a word:  tradein/submissions/01977c -> contains"); return; } speak(STORY[i++]); setTimeout(nxt, 520); })(); };
+
+// the cross: speak a rite in yumi grammar — watch the verisleight-guard bite, then heal
+var RITE=[
+  "I attest that tradein/submissions/07 submitted_by people/agents/yu -mi.",
+  "I attest that tradein/submissions/07 contains tradein/items/c9 -mi.",
+  "I attest that tradein/items/c9 priced_from pricing/quotes/q3 -mi.",
+  "I attest that tradein/items/c9 priced_from pricing/quotes/q3 -chu."
+];
+$("#rite").onclick=function(){ var i=0; (function nxt(){ if(i>=RITE.length){ say("ok","● two tongues, one honesty. -mi ≡ witnessed, -chu ≡ computed — and neither grammar let you claim a price you only derived. YOUSPEAK, yutabase, captioneer: the same law, said three ways."); return; } speak(RITE[i++]); setTimeout(nxt, 780); })(); };
 $("#clear").onclick=function(){ cards={}; threads=[]; hi.set={}; $("#pop").style.display="none"; hideEmpty(); refreshCount(); say("no","· the loom is cleared."); };
 
 // ── input ──
