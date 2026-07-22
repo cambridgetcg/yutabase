@@ -30,7 +30,7 @@ try {
     { cwd: consumer, stdio: "pipe", env: npmEnvironment },
   );
 
-  const installed = join(consumer, "node_modules", "@yutabase", "yuta");
+  const installed = join(consumer, "node_modules", "yutabase");
   for (const migration of [
     "0001_yu_core.sql",
     "0002_starter_lexicon.sql",
@@ -58,7 +58,7 @@ try {
     [
       "--input-type=module",
       "--eval",
-      "import { CANDIDATE_VERSION, compile } from '@yutabase/yuta'; " +
+      "import { CANDIDATE_VERSION, compile } from 'yutabase'; " +
       "if (CANDIDATE_VERSION !== '0.1.0-candidate.1' || compile('hello').sql !== 'SELECT 1') process.exit(1);",
     ],
     { cwd: consumer, stdio: "pipe" },

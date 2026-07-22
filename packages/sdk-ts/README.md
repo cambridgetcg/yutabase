@@ -1,4 +1,4 @@
-# `@yutabase/yuta`
+# `yutabase`
 
 Node.js SDK and CLI for the YUTABASE PostgreSQL semantic-profile candidate.
 It provides full-UUID ref parsing, UUIDv7 generation, the frozen core
@@ -18,13 +18,13 @@ compatibility check at observation time, not tamper resistance against a
 database owner or superuser.
 
 ```sh
-npm install @yutabase/yuta@next
+npm install yutabase@next
 yuta init --conn postgresql://localhost/example
 yuta hello --conn postgresql://localhost/example
 ```
 
 ```ts
-import { Yuta } from "@yutabase/yuta";
+import { Yuta } from "yutabase";
 
 const yuta = new Yuta({ connectionString: process.env.DATABASE_URL });
 const result = await yuta.query(

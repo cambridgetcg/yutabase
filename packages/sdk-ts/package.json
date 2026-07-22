@@ -1,5 +1,5 @@
 {
-  "name": "@yutabase/yuta",
+  "name": "yutabase",
   "version": "0.1.0-candidate.1",
   "description": "YUTABASE client — ref parser, UUIDv7, YOUSPEAK compiler, thin wrapper over postgres.js",
   "license": "MIT",

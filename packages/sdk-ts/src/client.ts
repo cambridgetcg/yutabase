@@ -1,4 +1,4 @@
-// client.ts — @yutabase/yuta: thin wrapper over postgres.js
+// client.ts — yutabase: thin wrapper over postgres.js
 //
 // Doctrine: SPEC.md §7 — "A thin wrapper over postgres.js (~500 lines):
 // ref parser, UUIDv7, the YOUSPEAK compiler, and a sql tagged-template

@@ -1,4 +1,4 @@
-// index.ts — @yutabase/yuta public API
+// index.ts — yutabase public API
 //
 // Doctrine: SPEC.md §7 — "A thin wrapper over postgres.js"
 

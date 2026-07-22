@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@yutabase/yuta",
+      "name": "yutabase",
       "dependencies": {
         "postgres": "^3.4.7",
       },
