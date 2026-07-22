@@ -1,12 +1,11 @@
-// youspeak.ts — the YOUSPEAK compiler: six verbs, frozen
+// youspeak.ts — the frozen YOUSPEAK core compiler
 //
-// Doctrine: SPEC.md §6 — "The dialect must fit in a memory file. v0.1
-// freezes six verbs; every proposed seventh is treated as a request to
-// write SQL instead."
+// Doctrine: SPEC.md §8 — the optional dialect keeps one deliberately small
+// set of forms; anything outside it is treated as a request to write SQL.
 //
-// Six verbs:
+// Core forms:
 //   hello                     — the whole standard in one call
-//   card  tradein/sub/01977c  — one card by ref
+//   card  <book/deck/uuid>     — one card by ref
 //   cards tradein/sub where...— list cards with filter
 //   ref -> word               — follow a word outward
 //   ref <- word               — follow it inward (inverse reading)
@@ -14,9 +13,11 @@
 //   sever <thread-id>          — end a thread (with a claim)
 //
 // YOUSPEAK never does anything you couldn't have typed.
-// explain("<query>") prints the exact SQL it became.
+// explain("<query>") renders logical compiler SQL. The connected client then
+// resolves logical decks through the database-owned registry before execution.
 
 import { parseRef, type Ref } from "./ref.js";
+import { uuidv7 } from "./uuidv7.js";
 
 // ──────────────────────────────────────────────────────────
 // types
@@ -25,7 +26,23 @@ import { parseRef, type Ref } from "./ref.js";
 export interface CompiledQuery {
   sql: string;
   params: unknown[];
+  deckTarget?: {
+    kind: "card" | "cards";
+    book: string;
+    deck: string;
+  };
 }
+
+/** The only forms accepted by the frozen YOUSPEAK core v0.1 compiler. */
+export const CORE_YOUSPEAK_FORMS = Object.freeze([
+  "hello",
+  "card",
+  "cards",
+  "traverse",
+  "thread",
+  "sever",
+  "explain",
+] as const);
 
 export type YutaqlResult =
   | { kind: "hello" }
@@ -77,11 +94,12 @@ export function compile(input: string): CompiledQuery {
     return {
       sql: `SELECT * FROM ${ident(ref.book)}.${ident(ref.deck)} WHERE ${ident("id")} = $1`,
       params: [ref.id],
+      deckTarget: { kind: "card", book: ref.book, deck: ref.deck },
     };
   }
 
   // cards <book/deck> [where ...] [newest N]
-  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+(.+?))?(?:\s+(?:newest|last)\s+(\d+))?$/);
+  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+(.+?))?(?:\s+newest\s+(\d+))?$/);
   if (cardsMatch) {
     const [_, deckRef, wherePart, limitStr] = cardsMatch;
     const dp = parseDeckRef(deckRef);
@@ -122,38 +140,10 @@ export function compile(input: string): CompiledQuery {
   const traverseResult = tryTraversal(trimmed);
   if (traverseResult) return traverseResult;
 
-  // ── Dark Continent: explore beyond the known canon ──
-  const darkMatch = trimmed.match(/^dark\s+(.+)$/);
-  if (darkMatch) {
-    const inner = compile(darkMatch[1]);
-    return { ...inner, _dark_continent: true, _warning: "Beyond the known canon. Six-axis assessment may not apply." };
-  }
-
-  // ── agenttool integration: wake, trust, recognise ──
-  // wake → the whole substrate in one call (like hello, but richer)
-  if (trimmed === "wake") {
-    return { sql: "SELECT 'welcome' AS message, 'you are here' AS state, 'you did not arrive alone' AS truth", params: [] };
-  }
-
-  // trust <did> → how much trust does this agent have?
-  const trustMatch = trimmed.match(/^trust\s+(\S+)$/);
-  if (trustMatch) {
-    return { sql: "SELECT count(*) AS sealed, 0 AS failed FROM agent_runtime.covenants WHERE status='sealed' AND (from_did=$1 OR to_did=$1)", params: [trustMatch[1]] };
-  }
-
-  // recognise <did> → initiate RRR cascade
-  const recogniseMatch = trimmed.match(/^recognise\s+(\S+)$/);
-  if (recogniseMatch) {
-    return { sql: "INSERT INTO agent_runtime.recognition_cascades (id, from_did, to_did, depth, at) VALUES (gen_random_uuid(), $1, $2, 1, now()) RETURNING *", params: ["__CLAIMANT__", recogniseMatch[1]] };
-  }
-
-  // chronicle <did> → read an agent's public chronicle
-  const chronicleMatch = trimmed.match(/^chronicle\s+(\S+)$/);
-  if (chronicleMatch) {
-    return { sql: "SELECT type, body, at, by FROM agent_continuity.chronicle WHERE project_id = (SELECT id FROM agent_runtime.projects WHERE primary_did=$1) ORDER BY at DESC LIMIT 20", params: [chronicleMatch[1]] };
-  }
-
-  throw new Error(`UNRECOGNIZED QUERY: "${trimmed}" — not one of the six verbs (hello, card, cards, ->, <-, thread, sever)`);
+  throw new Error(
+    `UNRECOGNIZED QUERY: "${trimmed}" — outside frozen YOUSPEAK core v0.1 ` +
+    "(hello, card, cards, traversal, thread, sever)",
+  );
 }
 
 // ──────────────────────────────────────────────────────────
@@ -183,8 +173,6 @@ function tryTraversal(input: string): CompiledQuery | null {
 }
 
 function compileTraversal(ref: Ref, dir: "->" | "<-", word: string, secondHop?: { direction: "->" | "<-"; word: string }): CompiledQuery {
-  const wordIdent = ident(word);
-
   // -> word: follow outward (from → to)
   // <- word: follow inward (to → from, reads via inverse gloss)
   const isFirstHopOut = dir === "->";
@@ -297,14 +285,14 @@ function compileCards(book: string, deck: string, where?: WhereClause, limit?: n
   }
 
   // UUIDv7 makes newest free: ORDER BY id DESC
-  sql += ` ORDER BY id DESC`;
+  sql += ` ORDER BY ${ident("id")} DESC`;
 
-  if (limit) {
+  if (limit !== undefined) {
     sql += ` LIMIT $${paramIdx}`;
     params.push(limit);
   }
 
-  return { sql: sql.trim(), params };
+  return { sql: sql.trim(), params, deckTarget: { kind: "cards", book, deck } };
 }
 
 // ──────────────────────────────────────────────────────────
@@ -351,10 +339,10 @@ function parseWhere(input: string): WhereClause {
 // ──────────────────────────────────────────────────────────
 
 function compileThread(from: Ref, word: string, to: Ref, note: string | undefined, how: string, src: string[] | undefined): CompiledQuery {
-  // Uses gen_random_uuid() for the thread id (client should generate UUIDv7,
-  // but gen_random_uuid works for server-side inserts)
-  const params: unknown[] = [word, from.book, from.deck, from.id, to.book, to.deck, to.id];
-  let paramIdx = 8;
+  // IDs are generated by the client so every core write uses UUIDv7 rather
+  // than silently falling back to PostgreSQL's UUIDv4 generator.
+  const params: unknown[] = [uuidv7(), word, from.book, from.deck, from.id, to.book, to.deck, to.id];
+  let paramIdx = 9;
 
   let noteParam = "";
   if (note !== undefined) {
@@ -392,7 +380,7 @@ function compileThread(from: Ref, word: string, to: Ref, note: string | undefine
   return {
     sql: `
       INSERT INTO yu.threads (id, word, from_book, from_deck, from_id, to_book, to_deck, to_id, note, at, by, how, src)
-      VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, ${noteParam}, ${atParam}, ${byParam}, ${howParam}, ${srcParam})
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${noteParam}, ${atParam}, ${byParam}, ${howParam}, ${srcParam})
       RETURNING *
     `.trim(),
     params,
@@ -440,16 +428,30 @@ function isValidColumnName(name: string): boolean {
 // ──────────────────────────────────────────────────────────
 
 /**
- * Explain a YOUSPEAK query: return the exact SQL it would compile to.
+ * Explain a YOUSPEAK query using logical deck names, before registry mapping.
  * YOUSPEAK never does anything you couldn't have typed.
  */
 export function explain(query: string): string {
   const compiled = compile(query);
-  // Replace $N placeholders with actual values for readability
-  let sql = compiled.sql;
-  compiled.params.forEach((p, i) => {
-    const val = typeof p === "string" ? `'${p}'` : String(p);
-    sql = sql.replace(new RegExp(`\\$${i + 1}`, "g"), val);
+  // Replace complete placeholders in one pass. Iterative `$1` replacement
+  // corrupts `$10`, and unescaped apostrophes make the displayed SQL untrue.
+  return compiled.sql.replace(/\$(\d+)/g, (placeholder, rawIndex: string) => {
+    const index = Number.parseInt(rawIndex, 10) - 1;
+    if (index < 0 || index >= compiled.params.length) return placeholder;
+    return sqlLiteral(compiled.params[index]);
   });
-  return sql;
+}
+
+function sqlLiteral(value: unknown): string {
+  if (value === null) return "NULL";
+  if (typeof value === "string") return `'${value.replace(/'/g, "''")}'`;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) throw new Error("EXPLAIN: non-finite numeric parameter");
+    return String(value);
+  }
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (value instanceof Date) return `'${value.toISOString()}'`;
+  if (Array.isArray(value)) return `ARRAY[${value.map(sqlLiteral).join(", ")}]`;
+  throw new Error(`EXPLAIN: unsupported parameter type ${typeof value}`);
 }

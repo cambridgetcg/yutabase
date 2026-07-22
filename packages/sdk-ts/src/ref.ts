@@ -13,8 +13,8 @@ export interface Ref {
 
 /**
  * Parse a ref string into its components.
- * Accepts "book/deck/id" or "book/deck/uuid-prefix" (short refs are
- * expanded by the database query, not here — this parser is strict).
+ * Accepts exactly "book/deck/full-uuid". Prefix lookup is not part of the
+ * frozen core because the compiler uses exact UUID equality.
  *
  * @throws on malformed ref
  */
@@ -27,28 +27,28 @@ export function parseRef(ref: string): Ref {
   if (!book || !deck || !id) {
     throw new Error(`BAD REF: "${ref}" — book, deck, and id are all required`);
   }
-  // Validate UUID format loosely (8-4-4-4-12 or hex)
+  validateIdentifier(book, "book");
+  validateIdentifier(deck, "deck");
   if (!isValidUuid(id)) {
-    throw new Error(`BAD REF: "${ref}" — id is not a valid UUID`);
+    throw new Error(`BAD REF: "${ref}" — id is not a full UUID`);
   }
   return { book, deck, id };
 }
 
 /** Format a Ref back to its string form. */
 export function formatRef(ref: Ref): string {
-  return `${ref.book}/${ref.deck}/${ref.id}`;
+  const validated = parseRef(`${ref.book}/${ref.deck}/${ref.id}`);
+  return `${validated.book}/${validated.deck}/${validated.id}`;
 }
 
 /** Build a ref from components. */
 export function makeRef(book: string, deck: string, id: string): Ref {
-  return { book, deck, id };
+  return parseRef(`${book}/${deck}/${id}`);
 }
 
 function isValidUuid(s: string): boolean {
-  // Accept full UUID or partial (for lookups)
   const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const shortRe = /^[0-9a-f]{8,}$/i;
-  return uuidRe.test(s) || shortRe.test(s);
+  return uuidRe.test(s);
 }
 
 /**
@@ -61,5 +61,14 @@ export function parseDeckPattern(pattern: string): { book: string; deck: string 
   if (parts.length !== 2) {
     throw new Error(`BAD DECK PATTERN: "${pattern}" — expected book/deck (2 segments)`);
   }
-  return { book: parts[0], deck: parts[1] };
+  const [book, deck] = parts;
+  if (book !== "*") validateIdentifier(book, "book pattern");
+  if (deck !== "*") validateIdentifier(deck, "deck pattern");
+  return { book, deck };
+}
+
+function validateIdentifier(value: string, label: string): void {
+  if (!/^[a-z_][a-z0-9_]*$/.test(value)) {
+    throw new Error(`BAD REF: ${label} "${value}" is not lower_snake`);
+  }
 }

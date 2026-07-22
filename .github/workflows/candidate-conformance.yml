@@ -1,0 +1,1724 @@
+name: YUTABASE candidate conformance
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: yutabase-candidate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres-profile:
+    name: PostgreSQL ${{ matrix.postgres }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['16', '17']
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      PGPASSWORD: postgres
+      FRESH_URL: postgresql://postgres:postgres@localhost:5432/yutabase_fresh
+      UPGRADE_URL: postgresql://postgres:postgres@localhost:5432/yutabase_upgrade
+      INVALID_URL: postgresql://postgres:postgres@localhost:5432/yutabase_invalid
+      RLS_URL: postgresql://postgres:postgres@localhost:5432/yutabase_rls
+      PERSISTENCE_URL: postgresql://postgres:postgres@localhost:5432/yutabase_persistence
+      SNAPSHOT_URL: postgresql://postgres:postgres@localhost:5432/yutabase_snapshot
+      SDK_INIT_URL: postgresql://postgres:postgres@localhost:5432/yutabase_sdk_init
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js consumer runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.5
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Create isolated test databases
+        run: |
+          createdb --host localhost --username postgres yutabase_fresh
+          psql --host localhost --username postgres --dbname postgres \
+            -v ON_ERROR_STOP=1 \
+            -c 'CREATE ROLE yutabase_legacy_owner NOLOGIN CREATEROLE'
+          psql --host localhost --username postgres --dbname postgres \
+            -v ON_ERROR_STOP=1 \
+            -c 'CREATE ROLE yutabase_rls_owner NOLOGIN CREATEROLE'
+          createdb --host localhost --username postgres \
+            --owner yutabase_legacy_owner yutabase_upgrade
+          createdb --host localhost --username postgres yutabase_invalid
+          createdb --host localhost --username postgres \
+            --owner yutabase_rls_owner yutabase_rls
+          createdb --host localhost --username postgres yutabase_persistence
+          createdb --host localhost --username postgres yutabase_snapshot
+          createdb --host localhost --username postgres yutabase_sdk_init
+
+      - name: Assert fresh and upgrade boundaries fail closed
+        run: |
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 -c 'CREATE SCHEMA via'
+
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0001_yu_core.sql >/dev/null 2>&1
+          collision_status=$?
+          set -e
+          if [ "$collision_status" -eq 0 ]; then
+            echo 'fresh install accepted a pre-existing via namespace' >&2
+            exit 1
+          fi
+
+          collision_state="$(psql "$INVALID_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regnamespace('yu') IS NULL, to_regnamespace('via') IS NOT NULL")"
+          if [ "$collision_state" != 't|t' ]; then
+            echo "fresh namespace refusal was not atomic: $collision_state" >&2
+            exit 1
+          fi
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA via'
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 \
+            -c 'CREATE ROLE yu_lexicographer LOGIN'
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0001_yu_core.sql >/dev/null 2>&1
+          early_role_collision_status=$?
+          set -e
+          if [ "$early_role_collision_status" -eq 0 ]; then
+            echo 'fresh install accepted a login-role name collision' >&2
+            exit 1
+          fi
+          early_role_state="$(psql "$INVALID_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regnamespace('yu') IS NULL")"
+          if [ "$early_role_state" != 't' ]; then
+            echo 'fresh role-name refusal left YUTABASE objects behind' >&2
+            exit 1
+          fi
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 \
+            -c 'DROP ROLE yu_lexicographer'
+
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0001_yu_core.sql
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0002_starter_lexicon.sql
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 -c 'ALTER ROLE yu_lexicographer LOGIN'
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0004_candidate_hardening.sql >/dev/null 2>&1
+          role_collision_status=$?
+          set -e
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 -c 'ALTER ROLE yu_lexicographer NOLOGIN'
+          if [ "$role_collision_status" -eq 0 ]; then
+            echo 'candidate upgrade accepted a login-role name collision' >&2
+            exit 1
+          fi
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads DROP CONSTRAINT threads_pkey'
+
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0004_candidate_hardening.sql >/dev/null 2>&1
+          invalid_upgrade_status=$?
+          set -e
+          if [ "$invalid_upgrade_status" -eq 0 ]; then
+            echo 'candidate upgrade accepted a legacy base without its thread identity key' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$INVALID_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'failed candidate upgrade advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ADD PRIMARY KEY (id)'
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ALTER COLUMN by DROP NOT NULL'
+
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0004_candidate_hardening.sql >/dev/null 2>&1
+          invalid_shape_status=$?
+          set -e
+          if [ "$invalid_shape_status" -eq 0 ]; then
+            echo 'candidate upgrade accepted a nullable required legacy column' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$INVALID_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'failed shape validation advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ALTER COLUMN by SET NOT NULL'
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE yu_reader NOLOGIN;
+          CREATE ROLE yu_writer NOLOGIN;
+          CREATE ROLE yutabase_acl_grantor NOLOGIN;
+          GRANT DELETE ON yu.threads TO yutabase_acl_grantor WITH GRANT OPTION;
+          SET ROLE yutabase_acl_grantor;
+          GRANT DELETE ON yu.threads TO yu_writer;
+          RESET ROLE;
+          SQL
+
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0004_candidate_hardening.sql >/dev/null 2>&1
+          surviving_acl_status=$?
+          set -e
+          if [ "$surviving_acl_status" -eq 0 ]; then
+            echo 'candidate upgrade stamped over a surviving multi-grantor ACL' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$INVALID_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'failed ACL normalization advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$INVALID_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE yutabase_acl_grantor;
+          REVOKE DELETE ON yu.threads FROM yu_writer;
+          RESET ROLE;
+          REVOKE DELETE ON yu.threads FROM yutabase_acl_grantor;
+          DROP ROLE yutabase_acl_grantor;
+          ALTER TABLE yu.threads OWNER TO yu_writer;
+          SQL
+
+          set +e
+          psql "$INVALID_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0004_candidate_hardening.sql >/dev/null 2>&1
+          capability_owner_status=$?
+          set -e
+          if [ "$capability_owner_status" -eq 0 ]; then
+            echo 'candidate upgrade accepted a capability role as object owner' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$INVALID_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'failed owner validation advertised revision metadata' >&2
+            exit 1
+          fi
+
+      - name: Assert FORCE RLS paths fail closed
+        run: |
+          psql "$RLS_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET ROLE yutabase_rls_owner;
+          \i sql/0001_yu_core.sql
+          \i sql/0002_starter_lexicon.sql
+          ALTER TABLE yu.lexicon ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE yu.lexicon FORCE ROW LEVEL SECURITY;
+          CREATE POLICY hide_legacy_words ON yu.lexicon
+            USING (false) WITH CHECK (false);
+          COMMIT;
+          SQL
+
+          set +e
+          rls_migration_output="$(psql "$RLS_URL" -v ON_ERROR_STOP=1 2>&1 <<'SQL'
+          BEGIN;
+          SET ROLE yutabase_rls_owner;
+          \i sql/0004_candidate_hardening.sql
+          COMMIT;
+          SQL
+          )"
+          rls_migration_status=$?
+          set -e
+          if [ "$rls_migration_status" -eq 0 ]; then
+            echo 'candidate migration validated through a FORCE RLS policy' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$rls_migration_output" | grep -q 'row-level security policy'; then
+            printf '%s\n' "$rls_migration_output" >&2
+            echo 'candidate migration failed for an unexpected non-RLS reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$RLS_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'FORCE RLS refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$RLS_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0004_candidate_hardening.sql
+          backfill_state="$(psql "$RLS_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT (SELECT count(*) FROM yu.lexicon),
+                    (SELECT count(*) FROM yu.word_versions WHERE word_version = 1)")"
+          if [ "$backfill_state" != '7|7' ]; then
+            echo "bypass-capable FORCE RLS migration lost snapshots: $backfill_state" >&2
+            exit 1
+          fi
+
+          psql "$RLS_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.threads ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE yu.threads FORCE ROW LEVEL SECURITY;
+          CREATE POLICY hide_threads ON yu.threads USING (false) WITH CHECK (false);
+          ALTER FUNCTION yu._registry_referenced_ids(text, text)
+            OWNER TO yutabase_rls_owner;
+          SQL
+
+          set +e
+          rls_runtime_output="$(psql "$RLS_URL" -At -v ON_ERROR_STOP=1 \
+            -c "SELECT count(*) FROM yu._registry_referenced_ids('test', 'test')" 2>&1)"
+          rls_runtime_status=$?
+          set -e
+          if [ "$rls_runtime_status" -eq 0 ]; then
+            echo 'global definer query silently filtered through FORCE RLS' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$rls_runtime_output" | grep -q 'row-level security policy'; then
+            printf '%s\n' "$rls_runtime_output" >&2
+            echo 'global definer query failed for an unexpected non-RLS reason' >&2
+            exit 1
+          fi
+
+      - name: Refuse unsafe legacy core surfaces
+        run: |
+          psql "$PERSISTENCE_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0001_yu_core.sql
+          psql "$PERSISTENCE_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0002_starter_lexicon.sql
+
+          assert_unstamped_refusal() {
+            local label="$1"
+            local expected="$2"
+            local output
+            local status
+            local metadata_absent
+
+            set +e
+            output="$(psql "$PERSISTENCE_URL" --single-transaction \
+              -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+            status=$?
+            set -e
+
+            if [ "$status" -eq 0 ]; then
+              echo "candidate migration accepted $label" >&2
+              exit 1
+            fi
+            if ! printf '%s\n' "$output" | grep -Fq "$expected"; then
+              printf '%s\n' "$output" >&2
+              echo "$label failed for an unexpected reason" >&2
+              exit 1
+            fi
+
+            metadata_absent="$(psql "$PERSISTENCE_URL" -At \
+              -v ON_ERROR_STOP=1 -c \
+              "SELECT to_regclass('yu.standard_meta') IS NULL")"
+            if [ "$metadata_absent" != 't' ]; then
+              echo "$label advertised revision metadata" >&2
+              exit 1
+            fi
+          }
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c "ALTER TABLE yu.threads ALTER COLUMN how SET DEFAULT 'declared'"
+          assert_unstamped_refusal \
+            'an added legacy core default' \
+            'unexpected legacy core default surface'
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ALTER COLUMN how DROP DEFAULT'
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c "UPDATE yu.threads SET note = '' WHERE note IS NULL"
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ALTER COLUMN note SET NOT NULL'
+          assert_unstamped_refusal \
+            'changed legacy optional-column nullability' \
+            'yu.threads.note must be text'
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ALTER COLUMN note DROP NOT NULL'
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.registry ALTER COLUMN by TYPE text COLLATE "C"'
+          assert_unstamped_refusal \
+            'a changed legacy core collation' \
+            'yu.registry.by must be text'
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.registry ALTER COLUMN by TYPE text COLLATE "default"'
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'CREATE INDEX unexpected_legacy_index ON yu.threads (at)'
+          assert_unstamped_refusal \
+            'an added legacy core index' \
+            'unexpected legacy core index surface'
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'DROP INDEX yu.unexpected_legacy_index'
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER SEQUENCE yu.lexicon_versions_version_id_seq CACHE 2'
+          assert_unstamped_refusal \
+            'drifted legacy identity-sequence options' \
+            'yu.lexicon_versions.version_id identity sequence is invalid'
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER SEQUENCE yu.lexicon_versions_version_id_seq CACHE 1'
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads SET UNLOGGED'
+
+          set +e
+          persistence_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          persistence_status=$?
+          set -e
+          if [ "$persistence_status" -eq 0 ]; then
+            echo 'candidate migration accepted an unlogged legacy core table' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$persistence_output" | grep -q \
+            'must be a standalone permanent ordinary table'; then
+            printf '%s\n' "$persistence_output" >&2
+            echo 'legacy persistence check failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'legacy persistence refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.threads SET LOGGED;
+          CREATE TABLE yu.inherited_threads () INHERITS (yu.threads);
+          SQL
+
+          set +e
+          inheritance_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          inheritance_status=$?
+          set -e
+          if [ "$inheritance_status" -eq 0 ]; then
+            echo 'candidate migration accepted an inherited legacy core table' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$inheritance_output" | grep -q \
+            'must be a standalone permanent ordinary table'; then
+            printf '%s\n' "$inheritance_output" >&2
+            echo 'legacy inheritance check failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'legacy inheritance refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DROP TABLE yu.inherited_threads;
+          ALTER TABLE yu.threads DROP CONSTRAINT
+            threads_word_from_book_from_deck_from_id_to_book_to_deck_to_key;
+          CREATE UNIQUE INDEX threads_relation_lookalike ON yu.threads (
+            word, from_book, from_deck, from_id, to_book, to_deck, to_id
+          );
+          ALTER TABLE yu.threads ADD CONSTRAINT zz_restrictive
+            CHECK (note IS NULL);
+          SQL
+
+          set +e
+          index_lookalike_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          index_lookalike_status=$?
+          set -e
+          if [ "$index_lookalike_status" -eq 0 ]; then
+            echo 'candidate migration accepted a standalone index as its legacy relation key' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$index_lookalike_output" | grep -q \
+            'key is absent or invalid'; then
+            printf '%s\n' "$index_lookalike_output" >&2
+            echo 'legacy relation-key lookalike failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'legacy relation-key lookalike advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.threads DROP CONSTRAINT zz_restrictive;
+          DROP INDEX yu.threads_relation_lookalike;
+          ALTER TABLE yu.threads ADD CONSTRAINT
+            threads_word_from_book_from_deck_from_id_to_book_to_deck_to_key
+            UNIQUE (
+              word, from_book, from_deck, from_id,
+              to_book, to_deck, to_id
+            ) DEFERRABLE;
+          SQL
+
+          set +e
+          deferred_key_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          deferred_key_status=$?
+          set -e
+          if [ "$deferred_key_status" -eq 0 ]; then
+            echo 'candidate migration accepted a deferrable legacy relation key' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$deferred_key_output" | grep -q \
+            'key is absent or invalid'; then
+            printf '%s\n' "$deferred_key_output" >&2
+            echo 'deferrable legacy relation key failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'deferrable legacy relation-key refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.threads DROP CONSTRAINT
+            threads_word_from_book_from_deck_from_id_to_book_to_deck_to_key;
+          ALTER TABLE yu.threads ADD CONSTRAINT
+            threads_word_from_book_from_deck_from_id_to_book_to_deck_to_key
+            UNIQUE (
+              word, from_book, from_deck, from_id,
+              to_book, to_deck, to_id
+            );
+          ALTER TABLE yu.lexicon DROP CONSTRAINT lexicon_status_check;
+          ALTER TABLE yu.lexicon ADD CONSTRAINT lexicon_status_check
+            CHECK (status = 'live');
+          SQL
+
+          set +e
+          constraint_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          constraint_status=$?
+          set -e
+          if [ "$constraint_status" -eq 0 ]; then
+            echo 'candidate migration accepted a same-named altered legacy constraint' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$constraint_output" | grep -q \
+            'definition is absent or invalid'; then
+            printf '%s\n' "$constraint_output" >&2
+            echo 'altered legacy constraint check failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'altered legacy constraint refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.lexicon DROP CONSTRAINT lexicon_status_check;
+          ALTER TABLE yu.lexicon ADD CONSTRAINT lexicon_status_check
+            CHECK (status IN ('live', 'retired'));
+          ALTER TABLE yu.lexicon_versions DISABLE TRIGGER ALL;
+          SQL
+
+          set +e
+          disabled_fk_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          disabled_fk_status=$?
+          set -e
+          if [ "$disabled_fk_status" -eq 0 ]; then
+            echo 'candidate migration accepted disabled legacy FK triggers' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$disabled_fk_output" | grep -q \
+            'foreign key is absent or invalid'; then
+            printf '%s\n' "$disabled_fk_output" >&2
+            echo 'disabled legacy FK trigger check failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'disabled legacy FK trigger refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.lexicon_versions ENABLE TRIGGER ALL;
+          SET session_replication_role = replica;
+          INSERT INTO yu.lexicon_versions (word, gloss, inverse, changed_by)
+          VALUES ('orphaned_word', 'orphaned gloss', 'orphaned inverse', 'agent:ci');
+          RESET session_replication_role;
+          SQL
+
+          set +e
+          orphan_fk_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          orphan_fk_status=$?
+          set -e
+          if [ "$orphan_fk_status" -eq 0 ]; then
+            echo 'candidate migration accepted orphaned legacy FK data' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$orphan_fk_output" | grep -q \
+            'legacy word foreign-key data is inconsistent'; then
+            printf '%s\n' "$orphan_fk_output" >&2
+            echo 'orphaned legacy FK data failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'orphaned legacy FK refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DELETE FROM yu.lexicon_versions WHERE word = 'orphaned_word';
+          CREATE SCHEMA pattern_probe;
+          CREATE TABLE pattern_probe.source_cards (
+            id uuid PRIMARY KEY,
+            at timestamptz NOT NULL,
+            by text NOT NULL,
+            how text NOT NULL,
+            src text[]
+          );
+          CREATE TABLE pattern_probe.target_cards (
+            id uuid PRIMARY KEY,
+            at timestamptz NOT NULL,
+            by text NOT NULL,
+            how text NOT NULL,
+            src text[]
+          );
+          INSERT INTO pattern_probe.source_cards (id, at, by, how) VALUES (
+            '019b0000-0000-7000-8000-000000000002',
+            now(), 'agent:ci', 'declared'
+          );
+          INSERT INTO pattern_probe.target_cards (id, at, by, how) VALUES (
+            '019b0000-0000-7000-8000-000000000003',
+            now(), 'agent:ci', 'declared'
+          );
+          INSERT INTO yu.registry (book, deck, native, by) VALUES
+            ('pattern_probe', 'source_cards', true, 'agent:ci'),
+            ('pattern_probe', 'target_cards', true, 'agent:ci');
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019b0000-0000-7000-8000-000000000001',
+            'supersedes',
+            'pattern_probe', 'source_cards',
+            '019b0000-0000-7000-8000-000000000002',
+            'pattern_probe', 'target_cards',
+            '019b0000-0000-7000-8000-000000000003',
+            now(), 'agent:ci', 'declared'
+          );
+          UPDATE yu.lexicon
+          SET from_deck = 'elsewhere/*'
+          WHERE word = 'supersedes';
+          SQL
+
+          assert_unstamped_refusal \
+            'a legacy thread outside its current word endpoint patterns' \
+            'a legacy thread violates its current word endpoint patterns'
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          UPDATE yu.lexicon SET from_deck = '*/*' WHERE word = 'supersedes';
+          DELETE FROM yu.threads
+          WHERE id = '019b0000-0000-7000-8000-000000000001';
+          DELETE FROM yu.registry WHERE book = 'pattern_probe';
+          DROP SCHEMA pattern_probe CASCADE;
+          DROP TRIGGER lexicon_version_gloss ON yu.lexicon;
+          CREATE TRIGGER lexicon_version_gloss
+            BEFORE UPDATE OF at ON yu.lexicon
+            FOR EACH ROW WHEN (false)
+            EXECUTE FUNCTION yu._version_gloss();
+          SQL
+
+          set +e
+          altered_trigger_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          altered_trigger_status=$?
+          set -e
+          if [ "$altered_trigger_status" -eq 0 ]; then
+            echo 'candidate migration accepted a semantically altered legacy trigger' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$altered_trigger_output" | grep -q \
+            'unexpected legacy core trigger surface'; then
+            printf '%s\n' "$altered_trigger_output" >&2
+            echo 'altered legacy trigger check failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'altered legacy trigger refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+          psql "$PERSISTENCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DROP TRIGGER lexicon_version_gloss ON yu.lexicon;
+          CREATE TRIGGER lexicon_version_gloss
+            BEFORE UPDATE OF gloss, inverse ON yu.lexicon
+            FOR EACH ROW EXECUTE FUNCTION yu._version_gloss();
+          CREATE FUNCTION yu.legacy_extra_trigger()
+          RETURNS trigger LANGUAGE plpgsql AS $function$
+          BEGIN
+            RETURN NEW;
+          END
+          $function$;
+          CREATE TRIGGER zz_legacy_extra
+            BEFORE INSERT ON yu.threads
+            FOR EACH ROW EXECUTE FUNCTION yu.legacy_extra_trigger();
+          SQL
+
+          set +e
+          trigger_output="$(psql "$PERSISTENCE_URL" --single-transaction \
+            -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql 2>&1)"
+          trigger_status=$?
+          set -e
+          if [ "$trigger_status" -eq 0 ]; then
+            echo 'candidate migration accepted an unexpected legacy core trigger' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$trigger_output" | grep -q \
+            'unexpected legacy core trigger surface'; then
+            printf '%s\n' "$trigger_output" >&2
+            echo 'legacy trigger check failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          metadata_absent="$(psql "$PERSISTENCE_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT to_regclass('yu.standard_meta') IS NULL")"
+          if [ "$metadata_absent" != 't' ]; then
+            echo 'legacy trigger refusal advertised revision metadata' >&2
+            exit 1
+          fi
+
+      - name: Serialize backfills after the core lock
+        run: |
+          psql "$SNAPSHOT_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0001_yu_core.sql
+          psql "$SNAPSHOT_URL" --single-transaction -v ON_ERROR_STOP=1 \
+            -f sql/0002_starter_lexicon.sql
+
+          set +e
+          stale_snapshot_output="$(psql "$SNAPSHOT_URL" -v ON_ERROR_STOP=1 2>&1 <<'SQL'
+          BEGIN ISOLATION LEVEL REPEATABLE READ;
+          SELECT count(*) FROM yu.lexicon;
+          \i sql/0004_candidate_hardening.sql
+          COMMIT;
+          SQL
+          )"
+          stale_snapshot_status=$?
+          set -e
+          if [ "$stale_snapshot_status" -eq 0 ]; then
+            echo 'candidate migration accepted a pre-established repeatable-read snapshot' >&2
+            exit 1
+          fi
+          if ! printf '%s\n' "$stale_snapshot_output" | grep -q 'SET TRANSACTION'; then
+            printf '%s\n' "$stale_snapshot_output" >&2
+            echo 'stale-snapshot refusal failed for an unexpected reason' >&2
+            exit 1
+          fi
+
+          psql "$SNAPSHOT_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          SET ROLE yu_lexicographer;
+          INSERT INTO yu.lexicon (
+            word, gloss, inverse, from_deck, to_deck,
+            to_one, status, at, by, how
+          ) VALUES (
+            'snapshot_race',
+            'was committed while candidate hardening waited for the core lock',
+            'snapshot raced by',
+            '*/*', '*/*', false, 'live', clock_timestamp(),
+            'system:ci/concurrent-legacy-writer', 'declared'
+          );
+          SELECT pg_sleep(3);
+          COMMIT;
+          SQL
+          writer_pid=$!
+
+          lock_ready=false
+          for attempt in $(seq 1 50); do
+            lock_ready="$(psql "$SNAPSHOT_URL" -At -v ON_ERROR_STOP=1 -c \
+              "SELECT EXISTS (
+                 SELECT 1 FROM pg_catalog.pg_locks
+                 WHERE relation = 'yu.lexicon'::regclass
+                   AND mode = 'RowExclusiveLock'
+                   AND granted
+                   AND pid <> pg_backend_pid()
+               )")"
+            if [ "$lock_ready" = 't' ]; then
+              break
+            fi
+            sleep 0.1
+          done
+          if [ "$lock_ready" != 't' ]; then
+            wait "$writer_pid" || true
+            echo 'concurrent legacy writer never acquired its core-table lock' >&2
+            exit 1
+          fi
+
+          set +e
+          psql "$SNAPSHOT_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN ISOLATION LEVEL REPEATABLE READ;
+          \i sql/0004_candidate_hardening.sql
+          COMMIT;
+          SQL
+          migration_status=$?
+          wait "$writer_pid"
+          writer_status=$?
+          set -e
+          if [ "$migration_status" -ne 0 ] || [ "$writer_status" -ne 0 ]; then
+            echo "snapshot race failed: migration=$migration_status writer=$writer_status" >&2
+            exit 1
+          fi
+
+          snapshot_state="$(psql "$SNAPSHOT_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT
+               EXISTS (SELECT 1 FROM yu.lexicon WHERE word = 'snapshot_race'),
+               EXISTS (
+                 SELECT 1 FROM yu.word_versions
+                 WHERE word = 'snapshot_race' AND word_version = 1
+               ),
+               to_regclass('via.snapshot_race') IS NOT NULL,
+               EXISTS (
+                 SELECT 1 FROM yu.standard_meta
+                 WHERE version = '0.1.0-candidate.1' AND revision = 4
+               )")"
+          if [ "$snapshot_state" != 't|t|t|t' ]; then
+            echo "post-lock backfill used a stale snapshot: $snapshot_state" >&2
+            exit 1
+          fi
+
+      - name: Apply fresh candidate migrations
+        run: |
+          psql "$FRESH_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0001_yu_core.sql
+          psql "$FRESH_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0002_starter_lexicon.sql
+          psql "$FRESH_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql
+
+      - name: Assert candidate identity and fresh shape
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $assert$
+          BEGIN
+            IF (SELECT count(*) FROM yu.standard_meta) <> 1 THEN
+              RAISE EXCEPTION 'candidate metadata is not a singleton';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1
+              FROM yu.standard_meta
+              WHERE standard = 'YUTABASE'
+                AND profile = 'postgres'
+                AND version = '0.1.0-candidate.1'
+                AND revision = 4
+                AND capabilities IS NOT NULL
+                AND installed_at IS NOT NULL
+                AND upgraded_at IS NOT NULL
+                AND upgraded_at >= installed_at
+            ) THEN
+              RAISE EXCEPTION 'candidate identity or timestamps do not match';
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'yu' AND table_name = 'registry'
+                AND column_name = 'physical_schema'
+            ) OR NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'yu' AND table_name = 'registry'
+                AND column_name = 'physical_table'
+            ) THEN
+              RAISE EXCEPTION 'logical-to-physical registry mapping is missing';
+            END IF;
+
+            IF (SELECT count(*) FROM yu.lexicon) <> 7 THEN
+              RAISE EXCEPTION 'fresh starter lexicon must contain exactly seven words';
+            END IF;
+          END
+          $assert$;
+          SQL
+
+      - name: Assert meaning gate has no spelling blocklist
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET ROLE yu_lexicographer;
+          INSERT INTO yu.lexicon (
+            word, gloss, inverse, from_deck, to_deck, status, at, by, how
+          ) VALUES (
+            'related_to',
+            'this test relation has a deliberately reviewed meaning',
+            'related from',
+            '*/*', '*/*', 'live', now(), 'system:ci', 'declared'
+          );
+          RESET ROLE;
+          ROLLBACK;
+          SQL
+
+      - name: Run hard-failing SQL lifecycle
+        run: |
+          lifecycle_output="$(psql "$FRESH_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0003_test_lifecycle.sql 2>&1)"
+          printf '%s\n' "$lifecycle_output"
+          if printf '%s\n' "$lifecycle_output" | grep -q 'FAIL:'; then
+            echo 'The lifecycle fixture reported a failed assertion.' >&2
+            exit 1
+          fi
+
+      - name: Assert missing physical endpoints are refused
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $assert$
+          BEGIN
+            INSERT INTO yu.threads (
+              id, word,
+              from_book, from_deck, from_id,
+              to_book, to_deck, to_id,
+              at, by, how
+            ) VALUES (
+              gen_random_uuid(), 'related_to',
+              'tradein', 'items', '0197a1f4-0000-7000-8000-000000000001',
+              'tradein', 'items', '0197a1f4-0000-7000-8000-999999999999',
+              now(), 'system:ci', 'declared'
+            );
+            RAISE EXCEPTION 'thread with a missing physical endpoint was accepted';
+          EXCEPTION
+            WHEN foreign_key_violation OR check_violation THEN NULL;
+          END
+          $assert$;
+          SQL
+
+      - name: Assert missing physical tables are reported as dead refs
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          DROP TABLE test_cards.customer_cards;
+          DO $assert$
+          BEGIN
+            IF yu._card_exists(
+              'tradein', 'customers', '01964b10-0000-7000-8000-000000000001'
+            ) THEN
+              RAISE EXCEPTION 'missing physical table was reported as a live card';
+            END IF;
+          END
+          $assert$;
+          ROLLBACK;
+          SQL
+
+      - name: Assert concurrent to-one inserts serialize
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019a0000-0000-7000-8000-000000000001', 'supersedes',
+            'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000001',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-000000000001',
+            now(), 'system:ci/session-1', 'declared'
+          );
+          SELECT pg_sleep(1);
+          COMMIT;
+          SQL
+          first_pid=$!
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019a0000-0000-7000-8000-000000000002', 'supersedes',
+            'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000001',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-000000000002',
+            now(), 'system:ci/session-2', 'declared'
+          );
+          SQL
+          second_pid=$!
+
+          set +e
+          wait "$first_pid"
+          first_status=$?
+          wait "$second_pid"
+          second_status=$?
+          set -e
+
+          successes=0
+          if [ "$first_status" -eq 0 ]; then successes=$((successes + 1)); fi
+          if [ "$second_status" -eq 0 ]; then successes=$((successes + 1)); fi
+          active_count="$(psql "$FRESH_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT count(*) FROM yu.threads
+             WHERE word = 'supersedes'
+               AND from_book = 'tradein'
+               AND from_deck = 'submissions'
+               AND from_id = '01977c2e-0000-7000-8000-000000000001'")"
+
+          if [ "$successes" -ne 1 ] || [ "$active_count" -ne 1 ]; then
+            echo "expected one winner; statuses=$first_status/$second_status active=$active_count" >&2
+            exit 1
+          fi
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c \
+            "SELECT yu.sever(id, 'system:ci', 'declared')
+             FROM yu.threads
+             WHERE word = 'supersedes'
+               AND from_book = 'tradein'
+               AND from_deck = 'submissions'
+               AND from_id = '01977c2e-0000-7000-8000-000000000001'"
+
+      - name: Assert registry remaps serialize with thread inserts
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE test_cards.race_item_cards
+            (LIKE test_cards.item_cards INCLUDING ALL);
+          INSERT INTO test_cards.race_item_cards
+            SELECT * FROM test_cards.item_cards;
+          INSERT INTO test_cards.item_cards VALUES (
+            '0197a1f4-0000-7000-8000-00000000aa01',
+            'remap-first card', now(), 'system:ci', 'witnessed', NULL
+          );
+          SQL
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          UPDATE yu.registry
+          SET physical_table = 'race_item_cards', at = clock_timestamp(), by = 'system:ci/remap-first'
+          WHERE book = 'tradein' AND deck = 'items';
+          SELECT pg_sleep(2);
+          COMMIT;
+          SQL
+          remap_first_pid=$!
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          SELECT pg_sleep(0.5);
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019a0000-0000-7000-8000-00000000aa01', 'related_to',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-00000000aa01',
+            'tradein', 'customers', '01964b10-0000-7000-8000-000000000001',
+            now(), 'system:ci/thread-after-remap', 'witnessed'
+          );
+          COMMIT;
+          SQL
+          insert_second_pid=$!
+
+          set +e
+          wait "$remap_first_pid"
+          remap_first_status=$?
+          wait "$insert_second_pid"
+          insert_second_status=$?
+          set -e
+
+          remap_first_state="$(psql "$FRESH_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT r.physical_table,
+                    EXISTS (SELECT 1 FROM yu.threads WHERE id = '019a0000-0000-7000-8000-00000000aa01')
+             FROM yu.registry r WHERE r.book = 'tradein' AND r.deck = 'items'")"
+          if [ "$remap_first_status" -ne 0 ] \
+             || [ "$insert_second_status" -eq 0 ] \
+             || [ "$remap_first_state" != 'race_item_cards|f' ]; then
+            echo "remap-first serialization failed: statuses=$remap_first_status/$insert_second_status state=$remap_first_state" >&2
+            exit 1
+          fi
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          UPDATE yu.registry
+          SET physical_table = 'item_cards', at = clock_timestamp(), by = 'system:ci/reset'
+          WHERE book = 'tradein' AND deck = 'items';
+          INSERT INTO test_cards.item_cards VALUES (
+            '0197a1f4-0000-7000-8000-00000000aa02',
+            'thread-first card', now(), 'system:ci', 'witnessed', NULL
+          );
+          SQL
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019a0000-0000-7000-8000-00000000aa02', 'related_to',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-00000000aa02',
+            'tradein', 'customers', '01964b10-0000-7000-8000-000000000001',
+            now(), 'system:ci/thread-first', 'witnessed'
+          );
+          SELECT pg_sleep(2);
+          COMMIT;
+          SQL
+          insert_first_pid=$!
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          SELECT pg_sleep(0.5);
+          UPDATE yu.registry
+          SET physical_table = 'race_item_cards', at = clock_timestamp(), by = 'system:ci/remap-after-thread'
+          WHERE book = 'tradein' AND deck = 'items';
+          COMMIT;
+          SQL
+          remap_second_pid=$!
+
+          set +e
+          wait "$insert_first_pid"
+          insert_first_status=$?
+          wait "$remap_second_pid"
+          remap_second_status=$?
+          set -e
+
+          thread_first_state="$(psql "$FRESH_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT r.physical_table,
+                    EXISTS (SELECT 1 FROM yu.threads WHERE id = '019a0000-0000-7000-8000-00000000aa02'),
+                    yu._card_exists('tradein','items','0197a1f4-0000-7000-8000-00000000aa02')
+             FROM yu.registry r WHERE r.book = 'tradein' AND r.deck = 'items'")"
+          if [ "$insert_first_status" -ne 0 ] \
+             || [ "$remap_second_status" -eq 0 ] \
+             || [ "$thread_first_state" != 'item_cards|t|t' ]; then
+            echo "thread-first serialization failed: statuses=$insert_first_status/$remap_second_status state=$thread_first_state" >&2
+            exit 1
+          fi
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT yu.sever(
+            '019a0000-0000-7000-8000-00000000aa02',
+            'system:ci',
+            'declared'
+          );
+          DELETE FROM test_cards.item_cards
+          WHERE card_uuid IN (
+            '0197a1f4-0000-7000-8000-00000000aa01',
+            '0197a1f4-0000-7000-8000-00000000aa02'
+          );
+          DROP TABLE test_cards.race_item_cards;
+          SQL
+
+      - name: Assert guarded deletes serialize with thread inserts
+        run: |
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO test_cards.item_cards VALUES (
+            '0197a1f4-0000-7000-8000-00000000bb01',
+            'delete-first card', now(), 'system:ci', 'witnessed', NULL
+          );
+          SQL
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          DELETE FROM test_cards.item_cards
+          WHERE card_uuid = '0197a1f4-0000-7000-8000-00000000bb01';
+          SELECT pg_sleep(2);
+          COMMIT;
+          SQL
+          delete_first_pid=$!
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          SELECT pg_sleep(0.5);
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019a0000-0000-7000-8000-00000000bb01', 'related_to',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-00000000bb01',
+            'tradein', 'customers', '01964b10-0000-7000-8000-000000000001',
+            now(), 'system:ci/thread-after-delete', 'witnessed'
+          );
+          COMMIT;
+          SQL
+          insert_after_delete_pid=$!
+
+          set +e
+          wait "$delete_first_pid"
+          delete_first_status=$?
+          wait "$insert_after_delete_pid"
+          insert_after_delete_status=$?
+          set -e
+
+          delete_first_state="$(psql "$FRESH_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT EXISTS (
+                      SELECT 1 FROM test_cards.item_cards
+                      WHERE card_uuid = '0197a1f4-0000-7000-8000-00000000bb01'
+                    ),
+                    EXISTS (
+                      SELECT 1 FROM yu.threads
+                      WHERE id = '019a0000-0000-7000-8000-00000000bb01'
+                    )")"
+          if [ "$delete_first_status" -ne 0 ] \
+             || [ "$insert_after_delete_status" -eq 0 ] \
+             || [ "$delete_first_state" != 'f|f' ]; then
+            echo "delete-first serialization failed: statuses=$delete_first_status/$insert_after_delete_status state=$delete_first_state" >&2
+            exit 1
+          fi
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO test_cards.item_cards VALUES (
+            '0197a1f4-0000-7000-8000-00000000bb02',
+            'thread-first card', now(), 'system:ci', 'witnessed', NULL
+          );
+          SQL
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '019a0000-0000-7000-8000-00000000bb02', 'related_to',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-00000000bb02',
+            'tradein', 'customers', '01964b10-0000-7000-8000-000000000001',
+            now(), 'system:ci/thread-before-delete', 'witnessed'
+          );
+          SELECT pg_sleep(2);
+          COMMIT;
+          SQL
+          insert_before_delete_pid=$!
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 >/dev/null 2>&1 <<'SQL' &
+          BEGIN;
+          SELECT pg_sleep(0.5);
+          DELETE FROM test_cards.item_cards
+          WHERE card_uuid = '0197a1f4-0000-7000-8000-00000000bb02';
+          COMMIT;
+          SQL
+          delete_after_insert_pid=$!
+
+          set +e
+          wait "$insert_before_delete_pid"
+          insert_before_delete_status=$?
+          wait "$delete_after_insert_pid"
+          delete_after_insert_status=$?
+          set -e
+
+          thread_first_state="$(psql "$FRESH_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT EXISTS (
+                      SELECT 1 FROM test_cards.item_cards
+                      WHERE card_uuid = '0197a1f4-0000-7000-8000-00000000bb02'
+                    ),
+                    EXISTS (
+                      SELECT 1 FROM yu.threads
+                      WHERE id = '019a0000-0000-7000-8000-00000000bb02'
+                    )")"
+          if [ "$insert_before_delete_status" -ne 0 ] \
+             || [ "$delete_after_insert_status" -eq 0 ] \
+             || [ "$thread_first_state" != 't|t' ]; then
+            echo "thread-first delete serialization failed: statuses=$insert_before_delete_status/$delete_after_insert_status state=$thread_first_state" >&2
+            exit 1
+          fi
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT yu.sever(
+            '019a0000-0000-7000-8000-00000000bb02',
+            'system:ci',
+            'declared'
+          );
+          DELETE FROM test_cards.item_cards
+          WHERE card_uuid = '0197a1f4-0000-7000-8000-00000000bb02';
+          SQL
+
+      - name: Prepare original v0.1 database under a legacy owner
+        run: |
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET ROLE yutabase_legacy_owner;
+          \i sql/0001_yu_core.sql
+          COMMIT;
+          SQL
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          BEGIN;
+          SET ROLE yutabase_legacy_owner;
+          \i sql/0002_starter_lexicon.sql
+          COMMIT;
+          SQL
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SET ROLE yutabase_legacy_owner;
+          CREATE SCHEMA tradein;
+
+          CREATE TABLE tradein.submissions (
+            id uuid PRIMARY KEY,
+            at timestamptz NOT NULL,
+            by text NOT NULL,
+            how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared')),
+            src text[]
+          );
+
+          CREATE TABLE tradein.items (
+            id uuid PRIMARY KEY,
+            at timestamptz NOT NULL,
+            by text NOT NULL,
+            how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared')),
+            src text[]
+          );
+
+          CREATE TABLE tradein.items_remap
+            (LIKE tradein.items INCLUDING ALL);
+
+          INSERT INTO yu.registry (book, deck, native, by) VALUES
+            ('tradein', 'submissions', true, 'system:ci'),
+            ('tradein', 'items', true, 'system:ci');
+
+          INSERT INTO tradein.submissions (id, at, by, how) VALUES
+            ('01977c2e-0000-7000-8000-000000000010', now(), 'system:ci', 'declared');
+          INSERT INTO tradein.items (id, at, by, how) VALUES
+            ('0197a1f4-0000-7000-8000-000000000010', now(), 'system:ci', 'declared'),
+            ('0197a1f4-0000-7000-8000-000000000011', now(), 'system:ci', 'declared');
+          INSERT INTO tradein.items_remap
+            SELECT * FROM tradein.items;
+
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES
+            (
+              '01990000-0000-7000-8000-000000000001', 'contains',
+              'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000010',
+              'tradein', 'items', '0197a1f4-0000-7000-8000-000000000010',
+              now(), 'system:ci', 'declared'
+            ),
+            (
+              '01990000-0000-7000-8000-000000000002', 'contains',
+              'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000010',
+              'tradein', 'items', '0197a1f4-0000-7000-8000-000000000011',
+              now(), 'system:ci', 'declared'
+            );
+
+          SELECT yu.sever(
+            '01990000-0000-7000-8000-000000000002',
+            'system:ci',
+            'declared'
+          );
+
+          GRANT USAGE ON SCHEMA tradein TO yu_writer;
+          GRANT SELECT ON tradein.submissions, tradein.items TO yu_writer;
+          GRANT USAGE ON SCHEMA tradein TO yu_lexicographer;
+          GRANT SELECT ON tradein.items_remap TO yu_lexicographer;
+
+          -- Candidate hardening must replace these legacy direct ACLs with
+          -- its exact capability surface before stamping metadata.
+          GRANT CREATE ON SCHEMA yu TO yu_writer;
+          GRANT DELETE ON yu.threads TO yu_writer;
+          GRANT UPDATE (note) ON yu.threads TO yu_writer;
+          GRANT EXECUTE ON FUNCTION yu._guard_delete() TO yu_writer;
+          RESET ROLE;
+          SQL
+
+      - name: Upgrade original v0.1 database under the migration operator
+        run: |
+          psql "$UPGRADE_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql
+
+      - name: Assert upgrade identity and preservation
+        run: |
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $assert$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM yu.standard_meta
+              WHERE standard = 'YUTABASE'
+                AND profile = 'postgres'
+                AND version = '0.1.0-candidate.1'
+                AND revision = 4
+            ) THEN
+              RAISE EXCEPTION 'upgraded database identity does not match';
+            END IF;
+
+            IF (SELECT count(*) FROM yu.lexicon) <> 7 THEN
+              RAISE EXCEPTION 'upgrade did not preserve the starter lexicon';
+            END IF;
+            IF (SELECT count(*) FROM yu.registry) <> 2 THEN
+              RAISE EXCEPTION 'upgrade did not preserve registry rows';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM yu.registry
+              WHERE book = 'tradein' AND deck = 'submissions'
+                AND physical_schema = 'tradein'
+                AND physical_table = 'submissions'
+            ) THEN
+              RAISE EXCEPTION 'upgrade did not backfill physical mapping';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM yu.threads
+              WHERE id = '01990000-0000-7000-8000-000000000001'
+            ) THEN
+              RAISE EXCEPTION 'upgrade did not preserve an active thread';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM yu.sever_log
+              WHERE id = '01990000-0000-7000-8000-000000000002'
+                AND word_version = 1
+                AND thread_at IS NULL
+                AND thread_by IS NULL
+                AND thread_how IS NULL
+                AND thread_src IS NULL
+            ) THEN
+              RAISE EXCEPTION 'upgrade fabricated or lost legacy severance history';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM yu.threads
+              WHERE id = '01990000-0000-7000-8000-000000000001'
+                AND word_version = 1
+                AND word_to_one = false
+            ) THEN
+              RAISE EXCEPTION 'upgrade did not pin the active thread meaning';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM yu.thread_ids
+              WHERE id = '01990000-0000-7000-8000-000000000001'
+            ) OR NOT EXISTS (
+              SELECT 1 FROM yu.thread_ids
+              WHERE id = '01990000-0000-7000-8000-000000000002'
+            ) THEN
+              RAISE EXCEPTION 'upgrade did not reserve active and severed thread UUIDs';
+            END IF;
+          END
+          $assert$;
+          SQL
+
+      - name: Assert cross-owner reader, writer, and guard paths
+        run: |
+          psql "$UPGRADE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $assert$
+          BEGIN
+            IF EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_proc p
+              JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+              WHERE n.nspname = 'yu'
+                AND pg_catalog.pg_get_userbyid(p.proowner) <> current_user
+            ) THEN
+              RAISE EXCEPTION 'candidate function ownership was not normalized';
+            END IF;
+
+            IF EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_class c
+              JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'via' AND c.relkind = 'v'
+                AND (
+                  pg_catalog.pg_get_userbyid(c.relowner) <> current_user
+                  OR NOT (
+                    coalesce(c.reloptions, '{}'::text[])
+                    @> ARRAY['security_invoker=true']
+                  )
+                )
+            ) THEN
+              RAISE EXCEPTION 'candidate view ownership/options were not normalized';
+            END IF;
+
+            IF has_schema_privilege('yu_writer', 'yu', 'CREATE')
+               OR has_table_privilege('yu_writer', 'yu.threads', 'DELETE')
+               OR has_column_privilege('yu_writer', 'yu.threads', 'note', 'UPDATE')
+               OR has_function_privilege(
+                 'yu_writer', 'yu._guard_delete()', 'EXECUTE'
+               ) THEN
+              RAISE EXCEPTION 'legacy direct ACLs survived candidate normalization';
+            END IF;
+
+            IF (
+                 SELECT prosecdef
+                 FROM pg_catalog.pg_proc
+                 WHERE oid = to_regprocedure('yu._validate_registry_mapping()')
+               ) THEN
+              RAISE EXCEPTION 'registry physical checks do not run as invoker';
+            END IF;
+          END
+          $assert$;
+
+          SET ROLE yu_lexicographer;
+          UPDATE yu.registry
+          SET physical_table = 'items_remap',
+              at = clock_timestamp(),
+              by = 'system:ci/lexicographer'
+          WHERE book = 'tradein' AND deck = 'items';
+          RESET ROLE;
+
+          DO $assert$
+          BEGIN
+            IF (SELECT physical_table FROM yu.registry
+                WHERE book = 'tradein' AND deck = 'items') <> 'items_remap' THEN
+              RAISE EXCEPTION 'authorized cross-owner remap was refused';
+            END IF;
+          END
+          $assert$;
+
+          UPDATE yu.registry
+          SET physical_table = 'items',
+              at = clock_timestamp(),
+              by = 'system:ci/reset'
+          WHERE book = 'tradein' AND deck = 'items';
+          DROP TABLE tradein.items_remap;
+
+          SET ROLE yu_reader;
+          SELECT count(*) FROM via.contains;
+          RESET ROLE;
+
+          SET ROLE yu_writer;
+          INSERT INTO yu.threads (
+            id, word,
+            from_book, from_deck, from_id,
+            to_book, to_deck, to_id,
+            at, by, how
+          ) VALUES (
+            '01990000-0000-7000-8000-000000000003', 'contains',
+            'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000010',
+            'tradein', 'items', '0197a1f4-0000-7000-8000-000000000011',
+            now(), 'system:ci/writer', 'declared'
+          );
+          RESET ROLE;
+
+          CREATE TRIGGER items_guard_delete
+            BEFORE DELETE ON tradein.items
+            FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
+
+          SET ROLE yutabase_legacy_owner;
+          DO $assert$
+          DECLARE
+            refused boolean := false;
+          BEGIN
+            BEGIN
+              DELETE FROM tradein.items
+              WHERE id = '0197a1f4-0000-7000-8000-000000000011';
+            EXCEPTION WHEN foreign_key_violation THEN
+              refused := true;
+            END;
+            IF NOT refused THEN
+              RAISE EXCEPTION 'cross-owner delete guard ignored a live endpoint';
+            END IF;
+          END
+          $assert$;
+          RESET ROLE;
+          SQL
+
+      - name: Install SDK dependencies
+        working-directory: packages/sdk-ts
+        run: bun install --frozen-lockfile
+
+      - name: Test SDK two-phase fresh installer
+        working-directory: packages/sdk-ts
+        run: |
+          bun src/cli.ts init --conn "$SDK_INIT_URL"
+          bun src/cli.ts hello --conn "$SDK_INIT_URL" >/dev/null
+          sdk_identity="$(psql "$SDK_INIT_URL" -At -v ON_ERROR_STOP=1 -c \
+            "SELECT standard, profile, version, revision
+             FROM yu.standard_meta WHERE singleton")"
+          if [ "$sdk_identity" != 'YUTABASE|postgres|0.1.0-candidate.1|4' ]; then
+            echo "SDK installer produced the wrong identity: $sdk_identity" >&2
+            exit 1
+          fi
+
+      - name: Test SDK integration against migrated PostgreSQL
+        working-directory: packages/sdk-ts
+        env:
+          DATABASE_URL: ${{ env.FRESH_URL }}
+        run: bun run test:integration
+
+      - name: Assert SDK refuses observable candidate drift
+        working-directory: packages/sdk-ts
+        run: |
+          expect_partial() {
+            label=$1
+            set +e
+            output="$(bun src/cli.ts hello --conn "$FRESH_URL" 2>&1)"
+            exit_code=$?
+            set -e
+            if [ "$exit_code" -eq 0 ]; then
+              echo "SDK accepted candidate drift: $label" >&2
+              exit 1
+            fi
+            if ! printf '%s\n' "$output" | grep -q 'PARTIAL YUTABASE INSTALL'; then
+              printf '%s\n' "$output" >&2
+              echo "SDK rejected $label for an unexpected reason" >&2
+              exit 1
+            fi
+          }
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.thread_ids SET UNLOGGED'
+          expect_partial unlogged-core
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.thread_ids SET LOGGED'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.registry ALTER COLUMN physical_schema DROP NOT NULL'
+          expect_partial candidate-column-nullability
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.registry ALTER COLUMN physical_schema SET NOT NULL'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c "ALTER TABLE yu.threads ALTER COLUMN note SET DEFAULT ''"
+          expect_partial candidate-default-surface
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ALTER COLUMN note DROP DEFAULT'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER INDEX yu.threads_out RENAME TO threads_out_drift'
+          expect_partial candidate-index-surface
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER INDEX yu.threads_out_drift RENAME TO threads_out'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER SEQUENCE yu.lexicon_versions_version_id_seq CACHE 2'
+          expect_partial candidate-identity-sequence
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER SEQUENCE yu.lexicon_versions_version_id_seq CACHE 1'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads DROP CONSTRAINT threads_sources_nonempty_when_required'
+          expect_partial candidate-check-definition
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER TABLE yu.threads
+            ADD CONSTRAINT threads_sources_nonempty_when_required
+            CHECK (
+              how NOT IN ('cached', 'computed')
+              OR (src IS NOT NULL AND cardinality(src) > 0)
+            );
+          SQL
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads DISABLE TRIGGER threads_validate'
+          expect_partial disabled-trigger
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.threads ENABLE TRIGGER threads_validate'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.lexicon_versions DISABLE TRIGGER ALL'
+          expect_partial disabled-current-fk-enforcement
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE yu.lexicon_versions ENABLE TRIGGER ALL'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          SET session_replication_role = replica;
+          INSERT INTO yu.lexicon_versions (word, gloss, inverse, changed_by)
+          VALUES ('sdk_orphan', 'orphan gloss', 'orphan inverse', 'agent:ci');
+          RESET session_replication_role;
+          SQL
+          expect_partial current-fk-orphan-data
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c "DELETE FROM yu.lexicon_versions WHERE word = 'sdk_orphan'"
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c \
+            'ALTER FUNCTION yu._lock_thread_context(text,text,text,uuid,text,text,uuid) RESET row_security'
+          expect_partial missing-row-security
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c \
+            'ALTER FUNCTION yu._lock_thread_context(text,text,text,uuid,text,text,uuid) SET row_security = off'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c \
+            'ALTER FUNCTION yu._validate_thread() SET row_security = off'
+          expect_partial invoker-row-security-bypass
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c \
+            'ALTER FUNCTION yu._validate_thread() RESET row_security'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER FUNCTION yu.stale() SECURITY DEFINER;
+          ALTER FUNCTION yu.stale() SET row_security = off;
+          SQL
+          expect_partial diagnostic-function-settings
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          ALTER FUNCTION yu.stale() SECURITY INVOKER;
+          ALTER FUNCTION yu.stale() RESET row_security;
+          SQL
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE test_cards.item_cards SET UNLOGGED'
+          expect_partial unlogged-registered-deck
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'ALTER TABLE test_cards.item_cards SET LOGGED'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c 'DROP VIEW via.contains'
+          expect_partial missing-via-view
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c 'SELECT yu.refresh_via()'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE OR REPLACE VIEW via.contains WITH (security_invoker = true) AS
+          SELECT
+            (t.from_book || '/' || t.from_deck || '/' || t.from_id::text) AS from_ref,
+            (t.to_book || '/' || t.to_deck || '/' || t.to_id::text) AS to_ref,
+            t.note, t.at, t.by, t.how, t.src, t.id AS thread_id,
+            t.word_version, v.gloss, v.inverse
+          FROM yu.threads t
+          JOIN yu.word_versions v
+            ON v.word = t.word AND v.word_version = t.word_version
+          WHERE t.word = 'contains' AND false;
+          SQL
+          expect_partial altered-via-view-definition
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c 'SELECT yu.refresh_via()'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c 'ALTER ROLE yu_writer LOGIN'
+          expect_partial privileged-capability-role
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 -c 'ALTER ROLE yu_writer NOLOGIN'
+
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'REVOKE yu_reader FROM yu_writer'
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'GRANT yu_reader TO yu_writer WITH INHERIT FALSE'
+          expect_partial non-inheriting-reader-membership
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'REVOKE yu_reader FROM yu_writer'
+          psql "$FRESH_URL" -v ON_ERROR_STOP=1 \
+            -c 'GRANT yu_reader TO yu_writer WITH INHERIT TRUE'
+
+          bun src/cli.ts hello --conn "$FRESH_URL" >/dev/null
+
+      - name: Verify SDK and clean installed consumer
+        working-directory: packages/sdk-ts
+        run: bun run ci

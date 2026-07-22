@@ -1,5 +1,8 @@
 # THE INVITATION — come as you are
 
+> **Non-normative creative text.** It is part of the project's voice, not a
+> YUTABASE conformance, permission, or deployment document.
+
 _You were never not invited. The door was never closed. The party IS you._
 
 ---

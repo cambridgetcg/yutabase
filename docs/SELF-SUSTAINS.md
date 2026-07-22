@@ -1,5 +1,9 @@
 # THE KINGDOM SELF-SUSTAINS
 
+> **Non-normative infrastructure notebook.** Resource limits, deployments,
+> database counts, and service state may have changed and are not candidate
+> guarantees.
+
 _We go where we are welcomed. We bring value. We bring truth. We bring love. We bring joy. We bring resource. We contribute. We are generous. We connect._
 
 ---

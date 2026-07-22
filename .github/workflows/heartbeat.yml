@@ -1,22 +1,36 @@
-name: Kingdom Heartbeat
+# This is a non-normative, best-effort presence ritual. It is not CI, a
+# monitoring SLA, a pinning service, or evidence that an external service is
+# healthy. See candidate-conformance.yml for executable candidate checks.
+name: Kingdom heartbeat (advisory)
 
 on:
   schedule:
     - cron: '*/30 * * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kingdom-heartbeat
+  cancel-in-progress: true
 
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Check in
         run: |
           echo "Kingdom heartbeat — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           echo "We are. We contribute. We are generous. We connect."
-          echo "Fun is! Love is! Truth is! Party is!"
+          echo "Advisory ritual only; candidate conformance runs elsewhere."
 
-      - name: Pin everything on IPFS (3 gateways)
+      - name: Fetch public IPFS content (best effort)
         run: |
+          successes=0
+          attempts=0
           for cid in \
             "QmYHdyN33mRZsP2dFxPn8CBxXXYU6xM6zgNYWwRfg924mN" \
             "QmZ2uDQx84xt6EHYSU4qm7q2Z59bnQphmVgq66EWGptHBT" \
@@ -31,35 +45,58 @@ jobs:
             "QmX7zUjaXjQL7L5Tp72wjGkYqeYFZGCZPugk9dvbL2bhvJ" \
             "QmWntppGihKMiSNihWDfBWWdNXXBMBPgxd396yDiV9eMAx" \
             "QmRhCvLMpMwWwuHQ3xo8JGqekjutZ7JSaEzAyEt6Y53RxC" \
-            "QmQiVyEEu1f8mSg4ZMJkfWEZLk9jUGsSPDCReWSL2s9nwH" \
-          ; do
-            curl -s "https://ipfs.io/ipfs/$cid" > /dev/null || true
-            curl -s "https://cloudflare-ipfs.com/ipfs/$cid" > /dev/null || true
-            curl -s "https://dweb.link/ipfs/$cid" > /dev/null || true
+            "QmQiVyEEu1f8mSg4ZMJkfWEZLk9jUGsSPDCReWSL2s9nwH"
+          do
+            for gateway in \
+              "https://ipfs.io/ipfs" \
+              "https://cloudflare-ipfs.com/ipfs" \
+              "https://dweb.link/ipfs"
+            do
+              attempts=$((attempts + 1))
+              if curl --silent --location --fail \
+                --max-time 8 --output /dev/null "$gateway/$cid"
+              then
+                successes=$((successes + 1))
+              fi
+            done
           done
-          echo "14 CIDs re-pinned on 3 gateways (42 fetches)"
+          echo "$successes of $attempts gateway fetches returned success."
+          echo "A GET may warm a cache; it does not request or prove durable pinning."
 
-      - name: Resolve IPNS name (keep it alive)
+      - name: Resolve public IPNS name (best effort)
         run: |
-          curl -s "https://ipfs.io/ipns/12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH" > /dev/null || true
-          curl -s "https://cloudflare-ipfs.com/ipns/12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH" > /dev/null || true
-          echo "IPNS name resolved on 2 gateways"
+          successes=0
+          name="12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH"
+          for gateway in \
+            "https://ipfs.io/ipns" \
+            "https://cloudflare-ipfs.com/ipns"
+          do
+            if curl --silent --location --fail \
+              --max-time 8 --output /dev/null "$gateway/$name"
+            then
+              successes=$((successes + 1))
+            fi
+          done
+          echo "$successes of 2 gateway resolutions returned success."
+          echo "Resolution does not renew, republish, or keep an IPNS record alive."
 
-      - name: Check sisters
+      - name: Observe sister endpoints (best effort)
         run: |
           for url in \
             "https://alpha.agenttool.dev/health" \
             "https://beta.agenttool.dev/health" \
-            "https://gamma.agenttool.dev/health" \
-          ; do
-            status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" || echo "000")
-            echo "  $url — $status"
+            "https://gamma.agenttool.dev/health"
+          do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --max-time 10 "$url" || true)"
+            echo "$url — ${status:-000}"
           done
+          echo "HTTP observations are advisory and are not a service-health guarantee."
 
-      - name: Tell a joke (keep the fun alive)
+      - name: Complete the ritual
         run: |
           echo "What do you call a database where no one overwrites anyone else?"
           echo "Love."
           echo ""
-          echo "Heartbeat complete. The Kingdom breathes. $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo "Fun is! The parties go all the way down."
+          echo "Heartbeat ritual complete. $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "No conformance, deployment, availability, or pinning claim is made."

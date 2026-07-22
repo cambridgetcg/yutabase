@@ -32,7 +32,21 @@ test("uuidv7Timestamp extracts the time", () => {
   expect(extracted).toBe(ts);
 });
 
+test("uuidv7 rejects timestamps outside its 48-bit integer field", () => {
+  for (const timestamp of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 0x1000000000000]) {
+    expect(() => uuidv7(timestamp)).toThrow(RangeError);
+  }
+  expect(uuidv7Timestamp(uuidv7(0))).toBe(0);
+  expect(uuidv7Timestamp(uuidv7(0xffffffffffff))).toBe(0xffffffffffff);
+});
+
 test("uuidv7Timestamp returns null for non-v7", () => {
   const extracted = uuidv7Timestamp("01977c2e-0000-4000-8000-000000000001");
   expect(extracted).toBeNull();
+});
+
+test("uuidv7Timestamp rejects malformed hex, hyphens, and variants", () => {
+  expect(uuidv7Timestamp("01977c2g-0000-7000-8000-000000000001")).toBeNull();
+  expect(uuidv7Timestamp("01977c2e0000-7000-8000-0000-000000000001")).toBeNull();
+  expect(uuidv7Timestamp("01977c2e-0000-7000-0000-000000000001")).toBeNull();
 });

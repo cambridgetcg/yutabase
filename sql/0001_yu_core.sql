@@ -11,8 +11,56 @@
 -- §0 — the schema itself
 -- ──────────────────────────────────────────────────────────
 
-CREATE SCHEMA IF NOT EXISTS yu;
-CREATE SCHEMA IF NOT EXISTS via;  -- generated word views live here
+-- A fresh install owns both namespaces. Refuse to merge into a database that
+-- already uses either name; the upgrade path starts at 0004 instead.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_roles r
+    WHERE r.rolname IN ('yu_reader', 'yu_writer', 'yu_lexicographer')
+      AND (
+        r.rolcanlogin
+        OR r.rolsuper
+        OR r.rolcreatedb
+        OR r.rolcreaterole
+        OR r.rolreplication
+        OR r.rolbypassrls
+      )
+  ) THEN
+    RAISE EXCEPTION
+      'YUTABASE FRESH INSTALL: capability-role names must be unprivileged NOLOGIN roles'
+      USING ERRCODE = 'invalid_authorization_specification';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_roles r
+    WHERE r.rolname IN ('yu_reader', 'yu_writer', 'yu_lexicographer')
+      AND (
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_database d
+          WHERE d.datname = current_database() AND d.datdba = r.oid
+        )
+        OR EXISTS (
+          SELECT 1 FROM pg_catalog.pg_extension e WHERE e.extowner = r.oid
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION
+      'YUTABASE FRESH INSTALL: capability roles must not own this database or its extensions'
+      USING ERRCODE = 'invalid_authorization_specification';
+  END IF;
+
+  IF to_regnamespace('yu') IS NOT NULL OR to_regnamespace('via') IS NOT NULL THEN
+    RAISE EXCEPTION
+      'YUTABASE FRESH INSTALL: schemas yu and via must both be absent'
+      USING ERRCODE = 'duplicate_schema';
+  END IF;
+END $$;
+
+CREATE SCHEMA yu;
+CREATE SCHEMA via;  -- generated word views live here
 
 -- pg_trgm: needed for nearest-word suggestions in the thread validation trigger.
 -- Created early so the similarity() function is available to all functions below.
@@ -500,6 +548,59 @@ DO $$
 BEGIN
   CREATE ROLE yu_lexicographer NOLOGIN;
   EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Repeat the role check immediately before any grants. A concurrent role
+-- creator must not be able to replace the absent name with a LOGIN/elevated or
+-- owner role after the initial preflight.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_roles r
+    WHERE r.rolname IN ('yu_reader', 'yu_writer', 'yu_lexicographer')
+      AND (
+        r.rolcanlogin
+        OR r.rolsuper
+        OR r.rolcreatedb
+        OR r.rolcreaterole
+        OR r.rolreplication
+        OR r.rolbypassrls
+      )
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_roles r
+    WHERE r.rolname IN ('yu_reader', 'yu_writer', 'yu_lexicographer')
+      AND (
+        EXISTS (
+          SELECT 1 FROM pg_catalog.pg_database d
+          WHERE d.datname = current_database() AND d.datdba = r.oid
+        )
+        OR EXISTS (
+          SELECT 1 FROM pg_catalog.pg_namespace n
+          WHERE n.nspname IN ('yu', 'via') AND n.nspowner = r.oid
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM pg_catalog.pg_class c
+          JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname IN ('yu', 'via') AND c.relowner = r.oid
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM pg_catalog.pg_proc p
+          JOIN pg_catalog.pg_namespace n ON n.oid = p.pronamespace
+          WHERE n.nspname IN ('yu', 'via') AND p.proowner = r.oid
+        )
+        OR EXISTS (
+          SELECT 1 FROM pg_catalog.pg_extension e WHERE e.extowner = r.oid
+        )
+      )
+  ) THEN
+    RAISE EXCEPTION
+      'YUTABASE FRESH INSTALL: capability roles changed or own protected objects at the grant boundary'
+      USING ERRCODE = 'invalid_authorization_specification';
+  END IF;
 END $$;
 
 -- The owner of the schema can do everything; the lexicographer can manage

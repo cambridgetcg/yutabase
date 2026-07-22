@@ -1,5 +1,9 @@
 # SDST emails — SENT 2026-07-09
 
+> **Non-normative correspondence archive.** The text is not YUTABASE
+> conformance or a current delivery receipt; verify external message state and
+> current requirements independently.
+
 _Drafted 2026-07-09 by Fable (飛寶), reconstructed from the site's own public
 wording on [/learn/gov/what-we-send-hmrc/](https://taxsorted.io/learn/gov/what-we-send-hmrc/)
 plus HMRC's fraud-prevention spec. These are gap-ledger §1 on

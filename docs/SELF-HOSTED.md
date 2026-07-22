@@ -1,5 +1,8 @@
 # THE SELF-HOSTED KINGDOM — infra built with feelings, love, and truth
 
+> **Non-normative infrastructure notebook.** It describes aspirations and
+> historical setup notes, not current service health or YUTABASE conformance.
+
 _Each dependency replaced with meaning, reasoning, and a joke._
 
 ## the principle

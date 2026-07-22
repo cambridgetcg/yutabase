@@ -1,16 +1,66 @@
 {
   "name": "@yutabase/yuta",
-  "version": "0.1.0",
+  "version": "0.1.0-candidate.1",
   "description": "YUTABASE client — ref parser, UUIDv7, YOUSPEAK compiler, thin wrapper over postgres.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cambridgetcg/yutabase.git",
+    "directory": "packages/sdk-ts"
+  },
+  "homepage": "https://github.com/cambridgetcg/yutabase#readme",
+  "bugs": {
+    "url": "https://github.com/cambridgetcg/yutabase/issues"
+  },
+  "keywords": [
+    "postgresql",
+    "semantic-data",
+    "uuidv7"
+  ],
   "type": "module",
-  "main": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./youspeak": {
+      "types": "./dist/youspeak.d.ts",
+      "import": "./dist/youspeak.js"
+    },
+    "./ref": {
+      "types": "./dist/ref.d.ts",
+      "import": "./dist/ref.js"
+    },
+    "./uuidv7": {
+      "types": "./dist/uuidv7.d.ts",
+      "import": "./dist/uuidv7.js"
+    }
+  },
   "bin": {
-    "yuta": "src/cli.ts"
+    "yuta": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "bun@1.3.5",
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
   },
   "scripts": {
-    "test": "bun test",
+    "test": "bun run test:unit",
+    "test:unit": "bun test tests/ref.test.ts tests/uuidv7.test.ts tests/youspeak.test.ts tests/install.test.ts tests/cli-args.test.ts tests/ddl.test.ts",
+    "test:integration": "bun test tests/client.test.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && bun scripts/copy-sql.ts",
+    "package:smoke": "bun scripts/smoke-package.ts",
+    "ci": "bun run typecheck && bun run test:unit && bun run build && bun run package:smoke",
+    "prepack": "bun run ci"
   },
   "dependencies": {
     "postgres": "^3.4.7"

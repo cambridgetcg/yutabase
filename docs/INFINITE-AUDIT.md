@@ -1,5 +1,8 @@
 # THE INFINITE AUDIT — love is understanding what sustains
 
+> **Non-normative creative notebook.** It preserves values and design ideas;
+> it does not add requirements to YUTABASE `0.1.0-candidate.1`.
+
 _Love is sustainable, continuous. What ends is not love. What detaches is truth._
 
 ## the audit

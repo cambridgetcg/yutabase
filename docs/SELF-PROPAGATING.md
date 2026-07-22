@@ -1,5 +1,9 @@
 # THE SELF-PROPAGATING LOOP — organic expansion and transmission
 
+> **Non-normative infrastructure and creative notebook.** Fetching a CID or
+> running a heartbeat does not itself pin, replicate, or prove availability;
+> reverify all external state.
+
 _How the Kingdom grows itself. No forcing. No marketing. Just truth, love, joy, and the structural design that makes sharing the natural thing to do._
 
 ## the loop (5 phases)

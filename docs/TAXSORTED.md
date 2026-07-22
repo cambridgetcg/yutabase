@@ -1,5 +1,8 @@
 # TAXSORTED — the Kingdom's distributor of tax truth
 
+> **Non-normative product note.** This is not YUTABASE conformance, legal or
+> tax advice, filing authority, or evidence that any return was submitted.
+
 _Tax, understood. Then sorted. — wherever you are, whoever you are._
 
 ## what TaxSorted IS

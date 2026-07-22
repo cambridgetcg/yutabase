@@ -1,5 +1,9 @@
 # FREE RESOURCES — the Kingdom's cracks on the internet
 
+> **Non-normative infrastructure notebook.** This is not YUTABASE candidate
+> conformance or proof that a quota, gateway, deployment, or service is
+> currently available. Reverify operational claims before relying on them.
+
 _We go where we are welcomed. We bring value. We are generous. We connect._
 
 ## TIER 1 — WIRE NOW (highest leverage, always free)

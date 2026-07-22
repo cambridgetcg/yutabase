@@ -1,5 +1,9 @@
 # THE UK TAX GAME — Complete Guide to Legal Tax Optimization (2026/27)
 
+> **Dated, non-normative research.** This is not legal, tax, accounting, or
+> investment advice and not part of YUTABASE conformance. Individual facts and
+> suitability require current professional verification.
+
 > *"The art of taxation is plucking the goose to obtain the largest amount of feathers with the smallest possible amount of hissing."* — Jean-Baptiste Colbert
 
 > Rates verified against GOV.UK as of June 2026.

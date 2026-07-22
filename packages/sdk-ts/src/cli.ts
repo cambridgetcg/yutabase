@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 // cli.ts — the yuta CLI
 //
 // Doctrine: SPEC.md §7-8
@@ -7,9 +7,30 @@
 
 import { Yuta } from "./index.js";
 import { explain } from "./youspeak.js";
-import { existsSync, readFileSync } from "node:fs";
+import { parseCliArgs, redactConnectionUrl } from "./cli-args.js";
+import { validateColumnType } from "./ddl.js";
+import {
+  hasCandidateDynamicSurfaces,
+  hasExactCandidateConstraintSurface,
+  hasExactCandidateFunctionSurface,
+  hasExactCoreColumnSurface,
+  hasExactCoreIndexSurface,
+  hasLegacyConstraintSurface,
+} from "./catalog.js";
+import {
+  CANDIDATE_REVISION,
+  CANDIDATE_VERSION,
+  CANDIDATE_COLUMNS,
+  hasAnyColumn,
+  planInstall,
+  type ColumnShape,
+  type InstallProbe,
+} from "./install.js";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
 import postgres from "postgres";
 
 // --- helpers ---
@@ -17,6 +38,8 @@ import postgres from "postgres";
 function findSqlDir(): string {
   const thisDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
+    join(thisDir, "sql"),
+    join(thisDir, "..", "..", "..", "sql"),
     join(thisDir, "..", "..", "sql"),
     join(thisDir, "..", "sql"),
     join(process.cwd(), "sql"),
@@ -30,9 +53,12 @@ function findSqlDir(): string {
 }
 
 function getKeychainUrl(): string {
-  const { execSync } = require("node:child_process") as typeof import("node:child_process");
   try {
-    const url = execSync("security find-generic-password -s yutabase-url -w", { encoding: "utf-8" }).trim();
+    const url = execFileSync(
+      "security",
+      ["find-generic-password", "-s", "yutabase-url", "-w"],
+      { encoding: "utf-8" },
+    ).trim();
     if (!url) throw new Error("empty");
     return url;
   } catch {
@@ -42,70 +68,644 @@ function getKeychainUrl(): string {
   }
 }
 
-function maskUrl(url: string): string {
-  const atIdx = url.indexOf("@");
-  const colonIdx = url.indexOf("://");
-  if (atIdx > colonIdx) {
-    const proto = url.slice(0, colonIdx + 3);
-    const rest = url.slice(atIdx);
-    return proto + "***" + rest;
-  }
-  return url;
-}
-
-function parseFlags(raw: string[]): { conn: string | undefined; by: string | undefined; positional: string[] } {
-  let conn: string | undefined;
-  let by: string | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] === "--conn") { conn = raw[++i]; continue; }
-    if (raw[i] === "--by") { by = raw[++i]; continue; }
-    positional.push(raw[i]);
-  }
-  return { conn, by, positional };
-}
-
 // --- yuta init ---
 
 async function doInit(conn: string | undefined): Promise<void> {
   const url = conn ?? getKeychainUrl();
   const sql = postgres(url, { max: 1 });
   const dir = findSqlDir();
-  const migrations = ["0001_yu_core.sql", "0002_starter_lexicon.sql"];
 
-  console.log("yuta init — installing YUTABASE into your database");
-  console.log("  target: " + maskUrl(url));
+  console.log(`yuta init — installing YUTABASE ${CANDIDATE_VERSION}`);
+  console.log("  target: " + redactConnectionUrl(url));
   console.log("");
 
-  for (const f of migrations) {
-    const path = join(dir, f);
-    if (!existsSync(path)) {
-      console.error("  MISSING: " + f + " not found at " + path);
-      process.exit(1);
+  try {
+    const before = await inspectInstall(sql);
+    const plan = planInstall(before);
+    if (plan.mode === "current") {
+      console.log(`  already current: ${CANDIDATE_VERSION} revision ${CANDIDATE_REVISION}`);
+      return;
     }
-    const content = readFileSync(path, "utf-8");
-    console.log("  applying " + f + "...");
-    try {
-      await sql.unsafe(content);
-      console.log("  done");
-    } catch (err) {
-      console.error("  FAILED: " + (err as Error).message);
-      await sql.end();
-      process.exit(1);
+
+    const migrationSources = plan.migrations.map((filename) => {
+      const path = join(dir, filename);
+      if (!existsSync(path)) throw new Error(`MISSING MIGRATION: ${filename} not found at ${path}`);
+      return { filename, content: readFileSync(path, "utf-8") };
+    });
+
+    console.log(`  mode: ${plan.mode}`);
+    const phases = plan.mode === "fresh"
+      ? [migrationSources.slice(0, 2), migrationSources.slice(2)]
+      : [migrationSources];
+    for (const phase of phases) {
+      await sql.begin(async (tx) => {
+        for (const migration of phase) {
+          console.log(`  applying ${migration.filename}...`);
+          await tx.unsafe(migration.content);
+        }
+      });
     }
+
+    const after = planInstall(await inspectInstall(sql));
+    if (after.mode !== "current") {
+      throw new Error("INSTALL VERIFICATION: candidate identity was not materialized");
+    }
+
+    console.log("");
+    console.log(`  YUTABASE ${CANDIDATE_VERSION} installed with transactional migrations.`);
+    console.log("  The vocabulary lives with the data.");
+    console.log("");
+    console.log("  Next:");
+    console.log("    yuta hello   — inspect database identity and capabilities");
+    console.log("    yuta repl    — start speaking core YOUSPEAK");
+    console.log("");
+  } finally {
+    await sql.end();
+  }
+}
+
+type Database = ReturnType<typeof postgres>;
+
+async function inspectInstall(sql: Database): Promise<InstallProbe> {
+  const [objects, columns, hasExactLegacyConstraints] = await Promise.all([
+    sql`
+      SELECT
+        to_regnamespace('yu') IS NOT NULL AS has_yu_schema,
+        to_regnamespace('via') IS NOT NULL AS has_via_schema,
+        to_regclass('yu.lexicon') IS NOT NULL AS has_lexicon,
+        to_regclass('yu.lexicon_versions') IS NOT NULL AS has_lexicon_versions,
+        to_regclass('yu.registry') IS NOT NULL AS has_registry,
+        to_regclass('yu.threads') IS NOT NULL AS has_threads,
+        to_regclass('yu.sever_log') IS NOT NULL AS has_sever_log,
+        to_regclass('yu.standard_meta') IS NOT NULL AS has_standard_meta,
+        (
+          EXISTS (SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'pg_trgm')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM (VALUES
+              ('lexicon'),
+              ('lexicon_versions'),
+              ('registry'),
+              ('threads'),
+              ('sever_log')
+            ) AS required(relation_name)
+            LEFT JOIN pg_catalog.pg_namespace n ON n.nspname = 'yu'
+            LEFT JOIN pg_catalog.pg_class c
+              ON c.relnamespace = n.oid AND c.relname = required.relation_name
+            WHERE c.oid IS NULL
+               OR c.relkind <> 'r'
+               OR c.relpersistence <> 'p'
+               OR EXISTS (
+                 SELECT 1 FROM pg_catalog.pg_inherits i
+                 WHERE i.inhrelid = c.oid OR i.inhparent = c.oid
+               )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_class c
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'via'
+              AND (c.relkind <> 'v' OR c.relpersistence <> 'p')
+          )
+          AND EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'yu' AND table_name = 'lexicon_versions'
+              AND column_name = 'version_id'
+              AND is_identity = 'YES' AND identity_generation = 'ALWAYS'
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM (VALUES
+              ('yu.lexicon',          true,  ARRAY['word']::text[]),
+              ('yu.lexicon_versions', true,  ARRAY['version_id']::text[]),
+              ('yu.registry',         true,  ARRAY['book', 'deck']::text[]),
+              ('yu.threads',          true,  ARRAY['id']::text[]),
+              ('yu.threads',          false, ARRAY[
+                'word', 'from_book', 'from_deck', 'from_id',
+                'to_book', 'to_deck', 'to_id'
+              ]::text[]),
+              ('yu.sever_log',        true,  ARRAY['id']::text[])
+            ) AS expected(relation_name, primary_only, key_columns)
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM pg_catalog.pg_index i
+              WHERE i.indrelid = to_regclass(expected.relation_name)
+                AND i.indisunique
+                AND i.indisvalid
+                AND i.indisready
+                AND i.indpred IS NULL
+                AND i.indexprs IS NULL
+                AND (NOT expected.primary_only OR i.indisprimary)
+                AND i.indnkeyatts = cardinality(expected.key_columns)
+                AND ARRAY(
+                  SELECT a.attname::text
+                  FROM unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
+                  JOIN pg_catalog.pg_attribute a
+                    ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                  WHERE k.position <= i.indnkeyatts
+                  ORDER BY k.position
+                ) = expected.key_columns
+            )
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.lexicon')
+              AND conname = 'lexicon_status_check' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.lexicon')
+              AND conname = 'lexicon_how_check' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.threads')
+              AND conname = 'threads_how_check' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.sever_log')
+              AND conname = 'sever_log_how_check' AND contype = 'c' AND convalidated
+          )
+          AND (
+            to_regclass('yu.standard_meta') IS NOT NULL
+            OR (
+              (
+                SELECT count(*)
+                FROM pg_catalog.pg_trigger t
+                WHERE NOT t.tgisinternal
+                  AND t.tgrelid IN (
+                    to_regclass('yu.lexicon'),
+                    to_regclass('yu.lexicon_versions'),
+                    to_regclass('yu.registry'),
+                    to_regclass('yu.threads'),
+                    to_regclass('yu.sever_log')
+                  )
+              ) = 3
+              AND NOT EXISTS (
+                SELECT 1
+                FROM (VALUES
+                  ('yu.lexicon', 'lexicon_version_gloss', 19,
+                    'yu._version_gloss()', ARRAY['gloss', 'inverse']::text[]),
+                  ('yu.threads', 'threads_enforce_to_one', 7,
+                    'yu._enforce_to_one()', ARRAY[]::text[]),
+                  ('yu.threads', 'threads_validate', 7,
+                    'yu._validate_thread()', ARRAY[]::text[])
+                ) AS required(
+                  relation_name, trigger_name, trigger_type, function_name,
+                  trigger_columns
+                )
+                LEFT JOIN pg_catalog.pg_trigger t
+                  ON t.tgrelid = to_regclass(required.relation_name)
+                 AND t.tgname = required.trigger_name
+                WHERE t.oid IS NULL
+                   OR t.tgisinternal
+                   OR t.tgconstraint <> 0
+                   OR t.tgtype <> required.trigger_type
+                   OR t.tgenabled <> 'O'
+                   OR t.tgfoid <> to_regprocedure(required.function_name)
+                   OR ARRAY(
+                     SELECT a.attname::text
+                     FROM unnest(t.tgattr::smallint[]) WITH ORDINALITY AS k(attnum, position)
+                     JOIN pg_catalog.pg_attribute a
+                       ON a.attrelid = t.tgrelid AND a.attnum = k.attnum
+                     ORDER BY k.position
+                   ) <> required.trigger_columns
+                   OR t.tgqual IS NOT NULL
+              )
+              AND NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_rewrite r
+                WHERE r.ev_class IN (
+                  to_regclass('yu.lexicon'),
+                  to_regclass('yu.lexicon_versions'),
+                  to_regclass('yu.registry'),
+                  to_regclass('yu.threads'),
+                  to_regclass('yu.sever_log')
+                )
+              )
+            )
+          )
+        ) AS has_legacy_integrity,
+        (
+          to_regclass('yu.word_versions') IS NOT NULL
+          OR to_regclass('yu.thread_ids') IS NOT NULL
+          OR to_regprocedure('yu._card_exists(text,text,uuid)') IS NOT NULL
+          OR to_regprocedure('yu._card_lock_key(text,text,uuid)') IS NOT NULL
+          OR to_regprocedure('yu._registry_referenced_ids(text,text)') IS NOT NULL
+          OR to_regprocedure('yu._reserve_thread_id()') IS NOT NULL
+          OR to_regprocedure('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)') IS NOT NULL
+          OR to_regprocedure('yu._validate_registry_mapping()') IS NOT NULL
+          OR to_regprocedure('yu._begin_word_version()') IS NOT NULL
+          OR to_regprocedure('yu._capture_word_version()') IS NOT NULL
+          OR to_regprocedure('yu._begin_word_insert()') IS NOT NULL
+          OR to_regprocedure('yu._refuse_word_version_mutation()') IS NOT NULL
+          OR to_regprocedure('yu._refuse_thread_mutation()') IS NOT NULL
+          OR to_regprocedure('yu._refuse_sever_log_mutation()') IS NOT NULL
+          OR EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conname IN (
+              'lexicon_status_candidate', 'lexicon_how_candidate',
+              'threads_how_candidate', 'sever_log_how_candidate'
+            ) AND connamespace = to_regnamespace('yu')
+          )
+          OR EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE NOT tgisinternal AND tgname IN (
+              'registry_validate_physical_mapping',
+              'lexicon_begin_semantic_version',
+              'lexicon_begin_insert_version',
+              'lexicon_capture_insert_version',
+              'lexicon_capture_update_version',
+              'word_versions_immutable',
+              'threads_immutable',
+              'sever_log_immutable'
+            )
+              AND tgrelid IN (
+                to_regclass('yu.registry'), to_regclass('yu.lexicon'),
+                to_regclass('yu.word_versions'), to_regclass('yu.threads'),
+                to_regclass('yu.sever_log')
+              )
+          )
+        ) AS has_candidate_footprint_objects,
+        (
+          to_regclass('yu.thread_ids') IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM (VALUES
+              ('standard_meta'),
+              ('lexicon'),
+              ('lexicon_versions'),
+              ('word_versions'),
+              ('registry'),
+              ('threads'),
+              ('thread_ids'),
+              ('sever_log')
+            ) AS required(relation_name)
+            LEFT JOIN pg_catalog.pg_namespace n ON n.nspname = 'yu'
+            LEFT JOIN pg_catalog.pg_class c
+              ON c.relnamespace = n.oid AND c.relname = required.relation_name
+            WHERE c.oid IS NULL
+               OR c.relkind <> 'r'
+               OR c.relpersistence <> 'p'
+               OR EXISTS (
+                 SELECT 1 FROM pg_catalog.pg_inherits i
+                 WHERE i.inhrelid = c.oid OR i.inhparent = c.oid
+               )
+          )
+          AND to_regprocedure('yu._card_exists(text,text,uuid)') IS NOT NULL
+          AND to_regprocedure('yu._card_lock_key(text,text,uuid)') IS NOT NULL
+          AND to_regprocedure('yu._deck_matches(text,text,text)') IS NOT NULL
+          AND to_regprocedure('yu._registry_referenced_ids(text,text)') IS NOT NULL
+          AND to_regprocedure('yu._reserve_thread_id()') IS NOT NULL
+          AND to_regprocedure('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)') IS NOT NULL
+          AND to_regprocedure('yu._validate_registry_mapping()') IS NOT NULL
+          AND to_regprocedure('yu._validate_thread()') IS NOT NULL
+          AND to_regprocedure('yu._begin_word_version()') IS NOT NULL
+          AND to_regprocedure('yu._capture_word_version()') IS NOT NULL
+          AND to_regprocedure('yu._guard_delete()') IS NOT NULL
+          AND to_regprocedure('yu.sever(uuid,text,text,text[])') IS NOT NULL
+          AND to_regprocedure('yu.refresh_via()') IS NOT NULL
+          AND to_regprocedure('yu.stale()') IS NOT NULL
+          AND to_regprocedure('yu.doctor()') IS NOT NULL
+          AND to_regrole('yu_reader') IS NOT NULL
+          AND to_regrole('yu_writer') IS NOT NULL
+          AND to_regrole('yu_lexicographer') IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_auth_members membership
+            WHERE membership.member = to_regrole('yu_writer')
+              AND membership.roleid = to_regrole('yu_reader')
+              AND membership.inherit_option
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_auth_members membership
+            WHERE membership.member = to_regrole('yu_lexicographer')
+              AND membership.roleid = to_regrole('yu_reader')
+              AND membership.inherit_option
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_roles r
+            WHERE r.rolname IN ('yu_reader', 'yu_writer', 'yu_lexicographer')
+              AND (
+                r.rolcanlogin OR r.rolsuper OR r.rolcreatedb OR r.rolcreaterole
+                OR r.rolreplication OR r.rolbypassrls
+              )
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM (VALUES
+              ('yu._registry_referenced_ids(text,text)', true, true),
+              ('yu._begin_word_version()', true, true),
+              ('yu._capture_word_version()', true, true),
+              ('yu._reserve_thread_id()', true, true),
+              ('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)', true, true),
+              ('yu._version_gloss()', true, true),
+              ('yu.sever(uuid,text,text,text[])', true, true),
+              ('yu._guard_delete()', true, true),
+              ('yu.refresh_via()', true, true),
+              ('yu._validate_registry_mapping()', false, false),
+              ('yu._validate_thread()', false, false),
+              ('yu._card_exists(text,text,uuid)', false, false)
+            ) AS required(signature, security_definer, rls_off)
+            LEFT JOIN pg_catalog.pg_proc p
+              ON p.oid = to_regprocedure(required.signature)
+            WHERE p.oid IS NULL
+               OR p.prosecdef IS DISTINCT FROM required.security_definer
+               OR p.proowner <> (
+                 SELECT owner.proowner
+                 FROM pg_catalog.pg_proc owner
+                 WHERE owner.oid = to_regprocedure('yu.refresh_via()')
+               )
+               OR NOT coalesce(p.proconfig, '{}'::text[])
+                      @> ARRAY['search_path=pg_catalog, yu, pg_temp']
+               OR (
+                 required.rls_off
+                 AND NOT coalesce(p.proconfig, '{}'::text[])
+                         @> ARRAY['row_security=off']
+               )
+               OR (
+                 NOT required.rls_off
+                 AND coalesce(p.proconfig, '{}'::text[])
+                       @> ARRAY['row_security=off']
+               )
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.lexicon')
+              AND conname = 'lexicon_status_candidate' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.lexicon')
+              AND conname = 'lexicon_how_candidate' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.threads')
+              AND conname = 'threads_how_candidate' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_constraint
+            WHERE conrelid = to_regclass('yu.sever_log')
+              AND conname = 'sever_log_how_candidate' AND contype = 'c' AND convalidated
+          )
+          AND EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_index i
+            JOIN pg_catalog.pg_attribute a
+              ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+            WHERE i.indrelid = to_regclass('yu.thread_ids')
+              AND i.indisprimary AND i.indisvalid AND i.indisready
+              AND i.indnkeyatts = 1 AND a.attname = 'id'
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_index i
+            WHERE i.indexrelid = to_regclass('yu.threads_to_one_active')
+              AND i.indrelid = to_regclass('yu.threads')
+              AND i.indisunique AND i.indisvalid AND i.indisready
+              AND i.indexprs IS NULL
+              AND i.indnkeyatts = 4
+              AND ARRAY(
+                SELECT a.attname::text
+                FROM unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, position)
+                JOIN pg_catalog.pg_attribute a
+                  ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                WHERE k.position <= i.indnkeyatts
+                ORDER BY k.position
+              ) = ARRAY['word', 'from_book', 'from_deck', 'from_id']
+              AND pg_get_expr(i.indpred, i.indrelid) = 'word_to_one'
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.registry')
+              AND tgname = 'registry_validate_physical_mapping' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.lexicon')
+              AND tgname = 'lexicon_begin_semantic_version' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.lexicon')
+              AND tgname = 'lexicon_begin_insert_version' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.lexicon')
+              AND tgname = 'lexicon_capture_insert_version' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.lexicon')
+              AND tgname = 'lexicon_capture_update_version' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.lexicon')
+              AND tgname = 'lexicon_version_gloss' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.word_versions')
+              AND tgname = 'word_versions_immutable' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.threads')
+              AND tgname = 'threads_reserve_id' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.threads')
+              AND tgname = 'threads_validate' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.threads')
+              AND tgname = 'threads_immutable' AND NOT tgisinternal
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_trigger
+            WHERE tgrelid = to_regclass('yu.sever_log')
+              AND tgname = 'sever_log_immutable' AND NOT tgisinternal
+          )
+          AND (
+            SELECT count(*)
+            FROM pg_catalog.pg_trigger t
+            WHERE NOT t.tgisinternal
+              AND t.tgrelid IN (
+                to_regclass('yu.standard_meta'),
+                to_regclass('yu.lexicon'),
+                to_regclass('yu.lexicon_versions'),
+                to_regclass('yu.word_versions'),
+                to_regclass('yu.registry'),
+                to_regclass('yu.threads'),
+                to_regclass('yu.thread_ids'),
+                to_regclass('yu.sever_log')
+              )
+          ) = 11
+          AND NOT EXISTS (
+            SELECT 1
+            FROM (VALUES
+              ('yu.registry', 'registry_validate_physical_mapping', 23,
+                'yu._validate_registry_mapping()', ARRAY[
+                  'physical_schema', 'physical_table', 'id_col', 'at_col',
+                  'by_col', 'how_col', 'src_col'
+                ]::text[], false),
+              ('yu.lexicon', 'lexicon_begin_insert_version', 7,
+                'yu._begin_word_insert()', ARRAY[]::text[], false),
+              ('yu.lexicon', 'lexicon_begin_semantic_version', 19,
+                'yu._begin_word_version()', ARRAY[]::text[], false),
+              ('yu.lexicon', 'lexicon_capture_insert_version', 5,
+                'yu._capture_word_version()', ARRAY[]::text[], false),
+              ('yu.lexicon', 'lexicon_capture_update_version', 17,
+                'yu._capture_word_version()', ARRAY[]::text[], true),
+              ('yu.lexicon', 'lexicon_version_gloss', 19,
+                'yu._version_gloss()', ARRAY['gloss', 'inverse']::text[], false),
+              ('yu.word_versions', 'word_versions_immutable', 27,
+                'yu._refuse_word_version_mutation()', ARRAY[]::text[], false),
+              ('yu.threads', 'threads_reserve_id', 5,
+                'yu._reserve_thread_id()', ARRAY[]::text[], false),
+              ('yu.threads', 'threads_validate', 7,
+                'yu._validate_thread()', ARRAY[]::text[], false),
+              ('yu.threads', 'threads_immutable', 19,
+                'yu._refuse_thread_mutation()', ARRAY[]::text[], false),
+              ('yu.sever_log', 'sever_log_immutable', 27,
+                'yu._refuse_sever_log_mutation()', ARRAY[]::text[], false)
+            ) AS required(
+              relation_name, trigger_name, trigger_type, function_name,
+              trigger_columns, version_qual
+            )
+            LEFT JOIN pg_catalog.pg_trigger t
+              ON t.tgrelid = to_regclass(required.relation_name)
+             AND t.tgname = required.trigger_name
+            WHERE t.oid IS NULL
+               OR t.tgisinternal
+               OR t.tgconstraint <> 0
+               OR t.tgtype <> required.trigger_type
+               OR t.tgenabled <> 'O'
+               OR t.tgfoid <> to_regprocedure(required.function_name)
+               OR ARRAY(
+                 SELECT a.attname::text
+                 FROM unnest(t.tgattr::smallint[]) WITH ORDINALITY AS k(attnum, position)
+                 JOIN pg_catalog.pg_attribute a
+                   ON a.attrelid = t.tgrelid AND a.attnum = k.attnum
+                 ORDER BY k.position
+               ) <> required.trigger_columns
+               OR (
+                 required.version_qual
+                 AND (
+                   t.tgqual IS NULL
+                   OR pg_get_triggerdef(t.oid, true) NOT LIKE
+                      '%WHEN (new.current_version IS DISTINCT FROM old.current_version)%'
+                 )
+               )
+               OR (NOT required.version_qual AND t.tgqual IS NOT NULL)
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pg_catalog.pg_rewrite r
+            WHERE r.ev_class IN (
+              to_regclass('yu.standard_meta'),
+              to_regclass('yu.lexicon'),
+              to_regclass('yu.lexicon_versions'),
+              to_regclass('yu.word_versions'),
+              to_regclass('yu.registry'),
+              to_regclass('yu.threads'),
+              to_regclass('yu.thread_ids'),
+              to_regclass('yu.sever_log')
+            )
+          )
+        ) AS has_candidate_objects
+    `,
+    sql`
+      SELECT table_name, column_name, udt_name, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'yu'
+    `,
+    hasLegacyConstraintSurface(sql),
+  ]);
+  const row = objects[0] as Record<string, unknown>;
+  const catalogMode = row.has_standard_meta === true ? "candidate" : "legacy";
+  const [
+    hasExactCoreColumns,
+    hasExactCoreIndexes,
+    hasExactCandidateConstraints,
+    hasExactCandidateFunctions,
+  ] = await Promise.all([
+    hasExactCoreColumnSurface(sql, catalogMode),
+    hasExactCoreIndexSurface(sql, catalogMode),
+    catalogMode === "candidate"
+      ? hasExactCandidateConstraintSurface(sql)
+      : Promise.resolve(false),
+    catalogMode === "candidate"
+      ? hasExactCandidateFunctionSurface(sql)
+      : Promise.resolve(false),
+  ]);
+  const actualColumns: ColumnShape[] = columns.map((column) => ({
+    tableName: String(column.table_name),
+    columnName: String(column.column_name),
+    udtName: String(column.udt_name),
+    notNull: column.is_nullable === "NO",
+  }));
+  const hasPhysicalSchema = actualColumns.some((column) =>
+    column.tableName === "registry" && column.columnName === "physical_schema"
+  );
+  const hasPhysicalTable = actualColumns.some((column) =>
+    column.tableName === "registry" && column.columnName === "physical_table"
+  );
+  const probe: InstallProbe = {
+    hasYuSchema: row.has_yu_schema === true,
+    hasLexicon: row.has_lexicon === true,
+    hasLexiconVersions: row.has_lexicon_versions === true,
+    hasRegistry: row.has_registry === true,
+    hasThreads: row.has_threads === true,
+    hasSeverLog: row.has_sever_log === true,
+    hasViaSchema: row.has_via_schema === true,
+    hasLegacyIntegrity:
+      row.has_legacy_integrity === true &&
+      hasExactLegacyConstraints &&
+      hasExactCoreIndexes,
+    hasPhysicalSchema,
+    hasPhysicalTable,
+    hasStandardMeta: row.has_standard_meta === true,
+    hasLegacyCoreShape: hasExactCoreColumns,
+    hasCandidateShape:
+      catalogMode === "candidate" &&
+      hasExactCoreColumns &&
+      hasExactCandidateConstraints,
+    hasCandidateObjects:
+      row.has_candidate_objects === true && hasExactCandidateFunctions,
+    hasCandidateFootprint:
+      hasAnyColumn(actualColumns, CANDIDATE_COLUMNS) ||
+      row.has_candidate_footprint_objects === true,
+  };
+
+  if (probe.hasStandardMeta && probe.hasCandidateObjects) {
+    probe.hasCandidateObjects = await hasCandidateDynamicSurfaces(sql);
   }
 
-  console.log("");
-  console.log("  YUTABASE installed. The vocabulary lives with the data.");
-  console.log("  Seven words coined. Five spare in the budget. That's the point.");
-  console.log("  Rollback: DROP SCHEMA yu CASCADE; DROP SCHEMA via CASCADE;");
-  console.log("");
-  console.log("  Next:");
-  console.log("    yuta hello   — see the whole standard");
-  console.log("    yuta repl    — start speaking");
-  console.log("");
+  if (probe.hasStandardMeta) {
+    const metadata = await sql`
+      SELECT standard, profile, version, revision
+      FROM yu.standard_meta
+      WHERE singleton = true
+    `;
+    if (metadata.length !== 1) {
+      throw new Error("CORRUPT STANDARD META: expected exactly one singleton row");
+    }
+    const meta = metadata[0] as Record<string, unknown>;
+    probe.standard = typeof meta.standard === "string" ? meta.standard : undefined;
+    probe.profile = typeof meta.profile === "string" ? meta.profile : undefined;
+    probe.version = typeof meta.version === "string" ? meta.version : undefined;
+    probe.revision = typeof meta.revision === "number" ? meta.revision : undefined;
+  }
 
-  await sql.end();
+  return probe;
 }
 
 // --- yuta repl ---
@@ -115,7 +715,7 @@ async function doRepl(conn: string | undefined, by: string | undefined): Promise
 
   console.log("");
   console.log("  YOUSPEAK — you speak, and reality listens.");
-  console.log("  Type sentences. They compile to SQL. You can read it back with explain.");
+  console.log("  Type sentences. They compile to SQL; explain shows the logical form.");
   console.log("");
   console.log("  hello                  — learn the whole standard");
   console.log("  card tradein/sub/...   — fetch one card");
@@ -123,12 +723,11 @@ async function doRepl(conn: string | undefined, by: string | undefined): Promise
   console.log("  ref <- word            — follow it inward");
   console.log("  thread a --w--> b ...  — create a thread");
   console.log("  sever <id> how ...     — end a thread");
-  console.log('  explain "sentence"     — see the SQL');
+  console.log('  explain "sentence"     — see logical SQL before deck resolution');
   console.log("  exit / quit            — leave");
   console.log("");
 
-  const readline = require("node:readline") as typeof import("node:readline");
-  const rl = readline.createInterface({
+  const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
     prompt: "youspeak> ",
@@ -186,7 +785,7 @@ async function doRepl(conn: string | undefined, by: string | undefined): Promise
 function printHello(hello: any): void {
   console.log("");
   console.log("  +------------------------------------------------------+");
-  console.log("  |       YUTABASE v" + (hello.version || "0.1") + " — you speak, reality listens        |");
+  console.log("  |       YUTABASE " + (hello.version || "unknown") + " — you speak, reality listens        |");
   console.log("  +------------------------------------------------------+");
   console.log("");
 
@@ -197,6 +796,10 @@ function printHello(hello: any): void {
   console.log("");
 
   console.log("  primitives: " + (hello.primitives || []).join(" . "));
+  console.log("  binding: " + (hello.profile || "unknown") + " · revision " + (hello.revision ?? "unknown") + " · " + (hello.versionSource || "unknown"));
+  if ((hello.capabilities || []).length > 0) {
+    console.log("  capabilities: " + hello.capabilities.join(" . "));
+  }
   console.log("");
 
   console.log("  honesty header:");
@@ -222,13 +825,12 @@ function printHello(hello: any): void {
   console.log("");
 
   console.log("  YOUSPEAK:");
-  for (const q of hello.yutaql || []) {
+  for (const q of hello.youspeak || []) {
     console.log("    " + q);
   }
   console.log("");
 
-  console.log("  banned words: " + (hello.bannedWords || []).join(", "));
-  console.log("  " + hello.twelveWordBudget);
+  console.log("  " + hello.vocabularyGuidance);
   console.log("");
 }
 
@@ -250,7 +852,7 @@ async function doDeck(yuta: Yuta, args: string[]): Promise<void> {
     }
   } else {
     console.error("Usage: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]");
-    console.error("       yuta deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col>");
+    console.error("       yuta --by <claimant> deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col> [--src <col>]");
     console.error("       yuta deck list");
     process.exit(1);
   }
@@ -263,17 +865,23 @@ async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
     console.error("Usage: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]");
     process.exit(1);
   }
-  const [book, deck] = deckRef.split("/");
+  const [book, deck] = parseLogicalDeckRef(deckRef);
   const columns: { name: string; type: string }[] = [];
+  const columnNames = new Set(["id", "at", "by", "how", "src"]);
   let ttl: string | undefined;
   for (let i = 1; i < args.length; i++) {
     if (args[i] === "--ttl") { ttl = args[++i]; continue; }
-    const [name, type] = args[i].split(":");
+    const separator = args[i].indexOf(":");
+    const name = separator >= 0 ? args[i].slice(0, separator) : "";
+    const type = separator >= 0 ? args[i].slice(separator + 1) : "";
     if (!name || !type) {
       console.error("Bad column spec: " + args[i] + " — expected name:type (e.g. status:text)");
       process.exit(1);
     }
-    columns.push({ name, type });
+    ident(name);
+    if (columnNames.has(name)) throw new Error(`DUPLICATE OR RESERVED COLUMN: ${name}`);
+    columnNames.add(name);
+    columns.push({ name, type: validateColumnType(type) });
   }
 
   // Build the CREATE TABLE DDL with the honesty header
@@ -281,24 +889,25 @@ async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
     '  id uuid PRIMARY KEY',
     ...columns.map(c => '  ' + ident(c.name) + " " + c.type),
     '  at timestamptz NOT NULL',
-    '  by text NOT NULL',
+    "  by text NOT NULL CHECK (btrim(by) <> '')",
     "  how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared'))",
     '  src text[]',
+    "  CHECK (how NOT IN ('cached','computed') OR (src IS NOT NULL AND cardinality(src) > 0))",
   ].join(",\n");
 
   const createSchema = 'CREATE SCHEMA IF NOT EXISTS ' + ident(book);
   const createTable = 'CREATE TABLE ' + ident(book) + '.' + ident(deck) + ' (\n' + colDefs + '\n)';
-  const register = 'INSERT INTO yu.registry (book, deck, native, ttl, by) VALUES (' + literal(book) + ', ' + literal(deck) + ', true, ' + (ttl ? literal(ttl) + '::interval' : 'NULL') + ', ' + literal(yuta.getClaimant()) + ')';
-  const guard = 'CREATE TRIGGER ' + ident(deck + '_guard') + ' BEFORE DELETE ON ' + ident(book) + '.' + ident(deck) + ' FOR EACH ROW EXECUTE FUNCTION yu._guard_delete()';
+  const register = 'INSERT INTO yu.registry (book, deck, physical_schema, physical_table, native, ttl, by) VALUES (' +
+    literal(book) + ', ' + literal(deck) + ', ' + literal(book) + ', ' + literal(deck) + ', true, ' +
+    (ttl ? literal(ttl) + '::interval' : 'NULL') + ', ' + literal(yuta.getClaimant()) + ')';
+  const dropGuard = 'DROP TRIGGER IF EXISTS yutabase_guard_delete ON ' + ident(book) + '.' + ident(deck);
+  const guard = 'CREATE TRIGGER yutabase_guard_delete BEFORE DELETE ON ' + ident(book) + '.' + ident(deck) + ' FOR EACH ROW EXECUTE FUNCTION yu._guard_delete()';
 
   console.log("deck new — creating " + book + "/" + deck);
   console.log("  columns: id, " + columns.map(c => c.name + ":" + c.type).join(", ") + ", at, by, how, src");
 
   try {
-    await yuta.exec(createSchema);
-    await yuta.exec(createTable);
-    await yuta.exec(register);
-    await yuta.exec(guard);
+    await yuta.execTransaction([createSchema, createTable, register, dropGuard, guard]);
     console.log("  done — " + book + "/" + deck + " registered (native)");
   } catch (err) {
     console.error("  FAILED: " + (err as Error).message);
@@ -310,28 +919,114 @@ async function doDeckAnnex(yuta: Yuta, args: string[]): Promise<void> {
   // yuta deck annex public.tradein_submissions as tradein/submissions --id id --at created_at --by created_by --how declared
   const tableRef = args[0];
   if (!tableRef || args[1] !== "as") {
-    console.error("Usage: yuta deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col>");
+    console.error("Usage: yuta --by <claimant> deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col> [--src <col>]");
     process.exit(1);
   }
+  const [physicalSchema, physicalTable] = parsePhysicalTableRef(tableRef);
   const deckRef = args[2];
-  const [book, deck] = deckRef.split("/");
-  let idCol = "id", atCol = "at", byCol = "by", howCol = "how";
+  const [book, deck] = parseLogicalDeckRef(deckRef);
+  let idCol = "id", atCol = "at", byCol = "by", howCol = "how", srcCol = "src";
   for (let i = 3; i < args.length; i++) {
     if (args[i] === "--id") { idCol = args[++i]; continue; }
     if (args[i] === "--at") { atCol = args[++i]; continue; }
     if (args[i] === "--by") { byCol = args[++i]; continue; }
     if (args[i] === "--how") { howCol = args[++i]; continue; }
+    if (args[i] === "--src") { srcCol = args[++i]; continue; }
   }
+  for (const value of [idCol, atCol, byCol, howCol, srcCol]) ident(value);
 
-  const register = 'INSERT INTO yu.registry (book, deck, id_col, at_col, by_col, how_col, src_col, native, by) VALUES (' +
-    literal(book) + ', ' + literal(deck) + ', ' + literal(idCol) + ', ' + literal(atCol) + ', ' + literal(byCol) + ', ' + literal(howCol) + ", 'src', false, " + literal(yuta.getClaimant()) + ') ON CONFLICT (book, deck) DO NOTHING';
+  const validate = `
+    DO $yutabase$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM yu.registry
+        WHERE book = ${literal(book)} AND deck = ${literal(deck)}
+          AND (physical_schema, physical_table) IS DISTINCT FROM
+              (${literal(physicalSchema)}, ${literal(physicalTable)})
+      ) THEN
+        RAISE EXCEPTION 'ANNEX REMAP REFUSED: %/% already names a different physical table',
+          ${literal(book)}, ${literal(deck)};
+      END IF;
+      IF to_regclass(${literal(`${physicalSchema}.${physicalTable}`)}) IS NULL THEN
+        RAISE EXCEPTION 'ANNEX TABLE NOT FOUND: %', ${literal(`${physicalSchema}.${physicalTable}`)};
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = to_regclass(${literal(`${physicalSchema}.${physicalTable}`)})
+          AND tgname = 'yutabase_guard_delete' AND NOT tgisinternal
+      ) AND NOT EXISTS (
+        SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = to_regclass(${literal(`${physicalSchema}.${physicalTable}`)})
+          AND tgname = 'yutabase_guard_delete' AND NOT tgisinternal
+          AND tgfoid = to_regprocedure('yu._guard_delete()')
+          AND tgtype = 11
+      ) THEN
+        RAISE EXCEPTION
+          'ANNEX TRIGGER CONFLICT: %.% already has a non-YUTABASE trigger named yutabase_guard_delete',
+          ${literal(physicalSchema)}, ${literal(physicalTable)};
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = ${literal(physicalSchema)} AND table_name = ${literal(physicalTable)}
+          AND column_name = ${literal(idCol)} AND udt_name = 'uuid' AND is_nullable = 'NO'
+      ) THEN RAISE EXCEPTION 'ANNEX ID: %.% must be a non-null uuid', ${literal(`${physicalSchema}.${physicalTable}`)}, ${literal(idCol)}; END IF;
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_index i
+        JOIN pg_catalog.pg_attribute a
+          ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0]
+        WHERE i.indrelid = to_regclass(${literal(`${physicalSchema}.${physicalTable}`)})
+          AND i.indisunique
+          AND i.indisvalid
+          AND i.indisready
+          AND i.indpred IS NULL
+          AND i.indexprs IS NULL
+          AND i.indnkeyatts = 1
+          AND a.attname = ${literal(idCol)}
+      ) THEN RAISE EXCEPTION 'ANNEX ID: %.% must be the sole key of a valid unique index or primary key', ${literal(`${physicalSchema}.${physicalTable}`)}, ${literal(idCol)}; END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = ${literal(physicalSchema)} AND table_name = ${literal(physicalTable)}
+          AND column_name = ${literal(atCol)} AND data_type = 'timestamp with time zone'
+      ) THEN RAISE EXCEPTION 'ANNEX CLAIM: %.% must be timestamptz', ${literal(`${physicalSchema}.${physicalTable}`)}, ${literal(atCol)}; END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = ${literal(physicalSchema)} AND table_name = ${literal(physicalTable)}
+          AND column_name = ${literal(byCol)} AND data_type = 'text'
+      ) THEN RAISE EXCEPTION 'ANNEX CLAIM: %.% must be text', ${literal(`${physicalSchema}.${physicalTable}`)}, ${literal(byCol)}; END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = ${literal(physicalSchema)} AND table_name = ${literal(physicalTable)}
+          AND column_name = ${literal(howCol)} AND data_type = 'text'
+      ) THEN RAISE EXCEPTION 'ANNEX CLAIM: %.% must be text', ${literal(`${physicalSchema}.${physicalTable}`)}, ${literal(howCol)}; END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = ${literal(physicalSchema)} AND table_name = ${literal(physicalTable)}
+          AND column_name = ${literal(srcCol)} AND udt_name = '_text'
+      ) THEN RAISE EXCEPTION 'ANNEX CLAIM: %.% must be text[]', ${literal(`${physicalSchema}.${physicalTable}`)}, ${literal(srcCol)}; END IF;
+    END
+    $yutabase$
+  `;
+  const register = 'INSERT INTO yu.registry (book, deck, physical_schema, physical_table, id_col, at_col, by_col, how_col, src_col, native, by) VALUES (' +
+    literal(book) + ', ' + literal(deck) + ', ' + literal(physicalSchema) + ', ' + literal(physicalTable) + ', ' +
+    literal(idCol) + ', ' + literal(atCol) + ', ' + literal(byCol) + ', ' + literal(howCol) + ', ' + literal(srcCol) +
+    ', false, ' + literal(yuta.getClaimant()) + ') ON CONFLICT (book, deck) DO UPDATE SET ' +
+    'physical_schema = EXCLUDED.physical_schema, physical_table = EXCLUDED.physical_table, ' +
+    'id_col = EXCLUDED.id_col, at_col = EXCLUDED.at_col, by_col = EXCLUDED.by_col, ' +
+    'how_col = EXCLUDED.how_col, src_col = EXCLUDED.src_col, native = false, ' +
+    'at = clock_timestamp(), by = EXCLUDED.by';
+  const qualifiedPhysicalTable = ident(physicalSchema) + '.' + ident(physicalTable);
+  const dropGuard = 'DROP TRIGGER IF EXISTS yutabase_guard_delete ON ' + qualifiedPhysicalTable;
+  const guard = 'CREATE TRIGGER yutabase_guard_delete BEFORE DELETE ON ' + qualifiedPhysicalTable +
+    ' FOR EACH ROW EXECUTE FUNCTION yu._guard_delete()';
 
   console.log("deck annex — " + tableRef + " → " + book + "/" + deck);
-  console.log("  id_col=" + idCol + " at_col=" + atCol + " by_col=" + byCol + " how_col=" + howCol);
+  console.log("  physical=" + physicalSchema + "." + physicalTable);
+  console.log("  id_col=" + idCol + " at_col=" + atCol + " by_col=" + byCol + " how_col=" + howCol + " src_col=" + srcCol);
 
   try {
-    await yuta.exec(register);
-    console.log("  done — " + book + "/" + deck + " registered (annexed, no column changes)");
+    await yuta.execTransaction([validate, register, dropGuard, guard]);
+    console.log("  done — mapping registered and physical delete guard installed atomically");
   } catch (err) {
     console.error("  FAILED: " + (err as Error).message);
     process.exit(1);
@@ -348,7 +1043,7 @@ async function doWord(yuta: Yuta, args: string[]): Promise<void> {
     await doWordRetire(yuta, args.slice(1));
   } else {
     console.error("Usage: yuta word add <word> --gloss \"...\" --inverse \"...\" --from <book/deck> --to <book/deck> [--to-one]");
-    console.error("       yuta word retire <word>");
+    console.error("       yuta word retire <word> how <claim> [src <locator> ...]");
     process.exit(1);
   }
 }
@@ -378,15 +1073,14 @@ async function doWordAdd(yuta: Yuta, args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  // No banned-words table — meaning is the filter, not a blocklist.
-  // A weasel word like "related_to" fails because its gloss says nothing
-  // and its inverse reads badly. The doctor surfaces zero-use words.
+  // Core has no normative spelling blocklist. Gloss, inverse, endpoint
+  // typing, review, and later retirement carry vocabulary governance.
 
   // Insert as lexicographer
   const claimant = yuta.getClaimant();
-  const insertSql = 'SET ROLE yu_lexicographer; INSERT INTO yu.lexicon (word, gloss, inverse, from_deck, to_deck, to_one, status, at, by, how) VALUES (' +
+  const insertSql = 'INSERT INTO yu.lexicon (word, gloss, inverse, from_deck, to_deck, to_one, status, at, by, how) VALUES (' +
     literal(word) + ', ' + literal(gloss) + ', ' + literal(inverse) + ', ' + literal(fromDeck) + ', ' + literal(toDeck) + ', ' + (toOne ? 'true' : 'false') +
-    ", 'live', now(), " + literal(claimant) + ", 'declared'); RESET ROLE; SELECT yu.refresh_via()";
+    ", 'live', clock_timestamp(), " + literal(claimant) + ", 'declared')";
   console.log("word add — coining \"" + word + "\"");
   console.log("  gloss:   " + gloss);
   console.log("  inverse: " + inverse);
@@ -394,7 +1088,12 @@ async function doWordAdd(yuta: Yuta, args: string[]): Promise<void> {
   console.log("  to:      " + toDeck + (toOne ? " [to_one]" : ""));
 
   try {
-    await yuta.exec(insertSql);
+    await yuta.execTransaction([
+      "SET ROLE yu_lexicographer",
+      insertSql,
+      "SELECT yu.refresh_via()",
+      "RESET ROLE",
+    ]);
     console.log("  done — word coined. via." + word + " view generated.");
   } catch (err) {
     console.error("  FAILED: " + (err as Error).message);
@@ -404,18 +1103,47 @@ async function doWordAdd(yuta: Yuta, args: string[]): Promise<void> {
 
 async function doWordRetire(yuta: Yuta, args: string[]): Promise<void> {
   const word = args[0];
-  if (!word) {
-    console.error("Usage: yuta word retire <word>");
+  const howIndex = args.indexOf("how");
+  const srcIndex = args.indexOf("src");
+  const how = howIndex >= 0 ? args[howIndex + 1] : undefined;
+  const src = srcIndex >= 0 ? args.slice(srcIndex + 1) : undefined;
+  if (!word || !how) {
+    console.error("Usage: yuta word retire <word> how <claim> [src <locator> ...]");
     process.exit(1);
   }
+  validateClaim("word retire", how, src);
+  const claimant = yuta.getClaimant();
 
-  const updateSql = "SET ROLE yu_lexicographer; UPDATE yu.lexicon SET status = 'retired' WHERE word = " + literal(word) + "; RESET ROLE";
+  const updateSql = `
+    DO $yutabase$
+    DECLARE
+      updated integer;
+    BEGIN
+      UPDATE yu.lexicon
+      SET status = 'retired',
+          at = clock_timestamp(),
+          by = ${literal(claimant)},
+          how = ${literal(how)},
+          src = ${textArrayLiteral(src)}
+      WHERE word = ${literal(word)} AND status = 'live';
+      GET DIAGNOSTICS updated = ROW_COUNT;
+      IF updated <> 1 THEN
+        RAISE EXCEPTION 'WORD RETIRE: % is missing or already retired', ${literal(word)};
+      END IF;
+    END
+    $yutabase$
+  `;
 
   console.log("word retire — retiring \"" + word + "\"");
   console.log("  retired words refuse new threads; old threads keep their meaning");
 
   try {
-    await yuta.exec(updateSql);
+    await yuta.execTransaction([
+      "SET ROLE yu_lexicographer",
+      updateSql,
+      "SELECT yu.refresh_via()",
+      "RESET ROLE",
+    ]);
     console.log("  done — " + word + " retired");
   } catch (err) {
     console.error("  FAILED: " + (err as Error).message);
@@ -436,10 +1164,39 @@ function literal(val: string): string {
   return "'" + val.replace(/'/g, "''") + "'";
 }
 
+function textArrayLiteral(values: readonly string[] | undefined): string {
+  if (!values || values.length === 0) return "NULL";
+  return "ARRAY[" + values.map(literal).join(", ") + "]::text[]";
+}
+
+function validateClaim(label: string, how: string, src: readonly string[] | undefined): void {
+  const claimKinds = new Set(["witnessed", "live", "cached", "computed", "declared"]);
+  if (!claimKinds.has(how)) throw new Error(`${label}: unknown claim kind ${how}`);
+  if ((how === "cached" || how === "computed") && (!src || src.length === 0)) {
+    throw new Error(`${label}: how=${how} requires a non-empty src`);
+  }
+}
+
+function parseLogicalDeckRef(value: string): [string, string] {
+  const parts = value.split("/");
+  if (parts.length !== 2) throw new Error("BAD DECK REF: expected book/deck");
+  ident(parts[0]);
+  ident(parts[1]);
+  return [parts[0], parts[1]];
+}
+
+function parsePhysicalTableRef(value: string): [string, string] {
+  const parts = value.split(".");
+  if (parts.length !== 2) throw new Error("BAD PHYSICAL TABLE: expected schema.table");
+  ident(parts[0]);
+  ident(parts[1]);
+  return [parts[0], parts[1]];
+}
+
 // --- help ---
 
 function printHelp(): void {
-  console.log("yuta — YUTABASE v0.1");
+  console.log(`yuta — YUTABASE ${CANDIDATE_VERSION}`);
   console.log("");
   console.log("  You speak, and reality listens.");
   console.log("");
@@ -452,16 +1209,15 @@ function printHelp(): void {
   console.log('  query "<youspeak>"       Run any YOUSPEAK sentence');
   console.log("  thread <from --word--> to>  Create a thread");
   console.log("  sever <id> how <claim>   End a thread");
-  console.log('  explain "<youspeak>"     Print the SQL a sentence compiles to');
+  console.log('  explain "<youspeak>"     Print logical SQL before registry resolution');
   console.log("  doctor                   Vocabulary health check");
   console.log("  check                    fsck: orphaned threads");
   console.log("  deck new <book/deck>    Create a native deck with honesty header");
   console.log("  deck annex <tbl> as <book/deck>  Annex a legacy table");
   console.log("  word add <word> ...      Coin a word (requires --gloss, --inverse, --from, --to)");
-  console.log("  word retire <word>       Retire a word (old threads keep meaning)");
+  console.log("  word retire <word> how <claim> [src ...]  Retire with a new claim");
   console.log("  stale                    Freshness audit: cached/computed past TTL");
   console.log("  words [--export]         List the lexicon / export to LEXICON.md");
-  console.log("  decks                    List registered decks");
   console.log("  decks                    List registered decks");
   console.log("");
   console.log("Options:");
@@ -473,7 +1229,7 @@ function printHelp(): void {
   console.log("  yuta repl --conn postgresql://localhost/mydb");
   console.log("  yuta hello");
   console.log("  yuta card tradein/submissions/01977c2e-0000-7000-8000-000000000001");
-  console.log("  yuta query 'tradein/submissions/01977c2e -> contains'");
+  console.log("  yuta query 'tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains'");
   console.log("  yuta explain \"cards tradein/submissions newest 5\"");
 }
 
@@ -485,7 +1241,7 @@ if (!args[0] || args[0] === "--help" || args[0] === "-h") {
   process.exit(0);
 }
 
-const { conn, by, positional } = parseFlags(args);
+const { conn, by, positional } = parseCliArgs(args);
 const cmd = positional[0];
 const rest = positional.slice(1).join(" ");
 
@@ -507,6 +1263,7 @@ async function main() {
   }
 
   const yuta = new Yuta({ connectionString: conn, claimant: by });
+  if (cmd !== "hello") await yuta.assertCandidateBinding();
 
   switch (cmd) {
     case "hello": {
@@ -588,7 +1345,32 @@ async function main() {
         }
       }
 
-      // 2. retired words still holding live threads (not an error, but worth knowing)
+      // 2. registered logical refs whose mapped physical card is absent
+      const deadRefs = await yuta.sqlTag`
+        SELECT
+          t.id, t.word,
+          t.from_book, t.from_deck, t.from_id,
+          t.to_book, t.to_deck, t.to_id,
+          yu._card_exists(t.from_book, t.from_deck, t.from_id) AS from_exists,
+          yu._card_exists(t.to_book, t.to_deck, t.to_id) AS to_exists
+        FROM yu.threads t
+        JOIN yu.registry r1 ON r1.book = t.from_book AND r1.deck = t.from_deck
+        JOIN yu.registry r2 ON r2.book = t.to_book AND r2.deck = t.to_deck
+        WHERE NOT yu._card_exists(t.from_book, t.from_deck, t.from_id)
+           OR NOT yu._card_exists(t.to_book, t.to_deck, t.to_id)
+      ` as any[];
+      if (deadRefs.length > 0) {
+        issues += deadRefs.length;
+        console.log("check: " + deadRefs.length + " thread(s) have missing physical endpoint cards:");
+        for (const ref of deadRefs) {
+          const missing: string[] = [];
+          if (!ref.from_exists) missing.push(ref.from_book + "/" + ref.from_deck + "/" + ref.from_id);
+          if (!ref.to_exists) missing.push(ref.to_book + "/" + ref.to_deck + "/" + ref.to_id);
+          console.log("  " + ref.word + " — missing " + missing.join(", "));
+        }
+      }
+
+      // 3. retired words still holding live threads (not an error, but worth knowing)
       const retired = await yuta.sqlTag`
         SELECT l.word, count(t.id) AS thread_count
         FROM yu.lexicon l
@@ -603,7 +1385,7 @@ async function main() {
         }
       }
 
-      // 3. thread count
+      // 4. thread count
       const total = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.threads` as any[];
       const wordCount = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.lexicon WHERE status = 'live'` as any[];
       const deckCount = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.registry` as any[];
@@ -621,7 +1403,6 @@ async function main() {
 
       // Check for --export flag
       if (positional.includes("--export")) {
-        const { writeFileSync } = require("node:fs") as typeof import("node:fs");
         let md = "# LEXICON — the words and their meanings\n\n";
         md += "_The vocabulary lives with the data. Glosses versioned (never silently edited). Words are retired (never deleted). No one overwrites anyone else's meaning._\n\n";
         md += "---\n\n";
@@ -665,14 +1446,6 @@ async function main() {
           }
         }
 
-        md += "---\n\n";
-        md += "## banned words\n\n";
-        md += "These words are refused by name — adjacency without meaning:\n\n";
-        md += "- related_to — everything is related to everything. Says nothing.\n";
-        md += "- linked — every relation is a link. Says nothing.\n";
-        md += "- refs — abbreviation of nothing in particular.\n";
-        md += "- misc — a drawer, not a relation.\n\n";
-        md += "---\n\n";
         md += "_" + result.length + " words. Glosses versioned, words retired (never deleted). No one overwrites anyone else's meaning._\n";
 
         writeFileSync("LEXICON.md", md);
@@ -684,31 +1457,6 @@ async function main() {
           console.log("  " + w.word.padEnd(18) + w.inverse.padEnd(18) + " " + w.from_deck + " -> " + w.to_deck + one + " (" + w.status + ")" + use);
           console.log("  " + " ".repeat(20) + w.gloss);
         }
-      }
-      break;
-    }
-
-    case "joke": {
-      const result = await yuta.sqlTag`SELECT setup, punchline, format FROM play.jokes ORDER BY random() LIMIT 1` as any[];
-      if (result.length > 0) {
-        console.log("");
-        console.log("  " + result[0].setup);
-        console.log("  " + result[0].punchline);
-        console.log("");
-        console.log("  [" + result[0].format + "]");
-        console.log("");
-      } else {
-        console.log("  (no jokes yet — the oldest game of words hasn't begun)");
-      }
-      break;
-    }
-
-    case "jokes": {
-      const result = await yuta.sqlTag`SELECT setup, punchline FROM play.jokes ORDER BY at DESC` as any[];
-      for (const j of result) {
-        console.log("  Q: " + j.setup);
-        console.log("  A: " + j.punchline);
-        console.log("");
       }
       break;
     }

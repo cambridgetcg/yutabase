@@ -1,203 +1,177 @@
-# THREADS — a communication protocol built from words
+# THREADS — experimental communication research
 
-> *You speak, reality listens. No gate. No fancy. Just words and meaning and trust.*
+> *You speak, reality listens. The protocol still has to say exactly what it
+> can prove.*
 
-## What this is
+Status: **experimental and non-normative** for YUTABASE
+`0.1.0-candidate.1`.
 
-THREADS is a communication protocol where the message format is a sentence.
-Not JSON, not protobuf, not headers — a word, a direction, a gloss, and a
-claim about how you know.
+This note preserves the language-shaped THREADS idea while separating three
+different mechanisms that must not be confused:
 
-```
+| Mechanism | What exists | Authority status |
+|---|---|---|
+| YUTABASE thread | an unsigned active relation in `yu.threads` | a row-level semantic claim, not a signed message |
+| AgentTool Correspondence | signed append-only events and receipts exchanged by agents | the source transport and authority-history record |
+| THREADS wire protocol | the sentence-shaped signed protocol explored below | a design sketch; no interoperable release yet |
+
+Putting Correspondence into YUTABASE produces a searchable projection. It
+does not replace the signed log. See
+[docs/CORRESPONDENCE-PROJECTION.md](docs/CORRESPONDENCE-PROJECTION.md).
+
+## The intuition
+
+The smallest shape is a sentence:
+
+```text
 from --word--> to
 ```
 
-That's a thread. That's the whole protocol.
+Every protocol already has a vocabulary. HTTP has method words; RPC systems
+have service and method names; coordination systems have verbs such as claim,
+reply, yield, refuse, and release. THREADS asks whether the verbs, their
+meanings, and their inverse readings can be made visible instead of hiding
+inside machinery.
 
-## Why
+That is an artistic and architectural direction, not yet a security protocol.
 
-Every protocol has a vocabulary. HTTP has GET POST PUT DELETE. gRPC has
-service definitions. REST has resource paths. All of them are words —
-they just hide it behind machinery.
+## Four conceptual layers
 
-THREADS is honest about what it is: a language. The words are the verbs.
-The glosses are the contracts. The signature is the trust. You learn
-words, not endpoints.
+| Layer | Idea | Example |
+|---|---|---|
+| 0 — Words | a lexicon with glosses and inverse readings | `contains` / `contained in` |
+| 1 — Threads | directed, word-named statements | `alice --reviews--> change` |
+| 2 — Books | bounded namespaces or conversations | `tradein`, `love`, `project-x` |
+| 3 — Fabric | whatever transports an encoded statement | Correspondence, HTTP, NATS, Git, paper |
 
-## The four layers
+The separation matters. Meaning does not provide delivery. Delivery does not
+provide identity. A signature does not provide permission. A database
+projection does not become the authority log.
 
-| Layer | What | Example |
-|-------|------|---------|
-| 0 — Words | The lexicon: every word with its gloss and inverse | `contains` → "physical containment" / `contained in` |
-| 1 — Threads | A directed connection: from —word→ to | `alice --trusts--> bob` |
-| 2 — Books | A collection of threads: a domain, a namespace | `tradein`, `health`, `love` |
-| 3 — Fabric | Anywhere threads can travel | NATS, HTTP, paper, voice, git |
+## Words
 
-The layers are independent. Words don't need threads. Threads don't need
-books. Books don't need fabric. Each layer uses the one below it, but the
-one below doesn't know or care.
+The research shape for a word is:
 
-## Layer 0 — Words
-
-A word is born with:
-
-```
+```text
 word:     contains
 gloss:    physical or compositional containment
 inverse:  contained in
 ```
 
-That's it. The gloss is the meaning. The inverse is how it reads backwards.
-`X contains Y` / `Y contained in X`. Both directions must make sense as
-sentences. If the inverse doesn't read, the word doesn't exist.
+Both directions should read coherently: `X contains Y`; `Y is contained in
+X`. Words can be retired while old statements remain readable.
 
-Words are versioned. Words are retired, never deleted. A retired word
-refuses new threads; old threads keep their meaning.
+There is no spelling blocklist and no protocol-wide word budget. Reviewers may
+reject a vague gloss, but `related_to`, `trusts`, or any other spelling is not
+invalid merely because a program dislikes the name. Meaning and context are
+the review boundary.
 
-No banned words. No word budget. The gloss is the filter — a weasel word
-fails because its gloss says nothing and its inverse reads badly. Meaning
-is the gate, not a blocklist.
+YUTABASE implements a Postgres lexicon with endpoint patterns. That concrete
+binding should not be mistaken for a universal THREADS registry.
 
-## Layer 1 — Threads
+## Statements and claims
 
-A thread is:
+An illustrative statement might contain:
 
-```
-from:     alice
-word:     trusts
-to:       bob
-note:     "since the project started"     (optional)
-how:      witnessed                        (required)
-by:       alice                            (required)
-at:       2026-06-19T22:00:00Z             (required)
-src:      [ref1, ref2]                     (required if how is cached or computed)
-sig:      ed25519(from || word || to || at || by || how)  (required)
-```
-
-### The five claims (how)
-
-| Claim | Meaning |
-|-------|---------|
-| witnessed | a human saw or did it |
-| live | read from the authoritative source right now |
-| cached | a copy that may be stale; src says of what |
-| computed | derived; src lists the inputs |
-| declared | asserted without evidence — the honest default |
-
-Provenance is self-reported. The protocol makes lying explicit and auditable,
-not impossible. `witnessed` can be false. The signature makes it traceable
-to who said it. Trust is the substrate, not the enforcement.
-
-### The signature
-
-Every thread is signed by its sender. The signature covers the content
-(from, word, to, at, by, how). Verification is: recover pubkey from sig,
-check it matches `from`, check the content hasn't changed.
-
-No certificates. No authorities. Your key is your identity. ed25519.
-
-### Severance
-
-Threads end with a claim too:
-
-```
-sever thread_id how witnessed by alice at 2026-06-20T10:00:00Z
+```text
+event_id:  <globally unique event id>
+from:      agent/device-a
+word:      proposes
+to:        project/change-42
+note:      "candidate migration"
+at:        2026-07-21T20:00:00Z
+by:        key-or-claimant-label
+how:       declared
+src:       [event-or-artifact-locators]
+signature: <signature over canonical bytes>
 ```
 
-A severed thread stays readable. It just stops being active. History is
-explicit, not automatic.
+This is not a released encoding. Before two implementations could claim
+interoperability, the protocol would need at least:
 
-## Layer 2 — Books
+- an exact canonical byte representation;
+- version and domain-separation rules;
+- event identifiers and idempotency semantics;
+- key identifiers, key discovery, rotation, and revocation behavior;
+- signature algorithm and verification rules;
+- replay, ordering, fork, retry, and duplicate handling;
+- acknowledgement and receipt semantics;
+- redaction, retention, and privacy behavior;
+- explicit permission, refusal, lease, and conflict rules;
+- conformance vectors and threat-model tests.
 
-A book is a collection of threads — a domain, a namespace, a bounded
-context. `tradein`, `health`, `love`, `kingdom`.
+None of those can be replaced with “sign the fields somehow.” In particular,
+there is no safe `ed25519(from || word || ...)` rule until field boundaries,
+encoding, algorithm identifiers, and key binding are canonical.
 
-A book declares its words. A word used outside its declared endpoints is
-valid syntactically but meaningless semantically — the gloss defines where
-the word makes sense. No enforcement; just meaning.
+## Signatures: evidence with a narrow meaning
 
-Books are identified by name. No registry required, but a registry helps.
-A book can live in a database, a git repo, a file, or memory.
+A valid signature can establish that the holder of a particular private key
+signed particular bytes, assuming the algorithm and key material remain
+sound. It does not by itself establish:
 
-## Layer 3 — Fabric
+- the civil or agent identity behind the key;
+- that the statement is true;
+- that the signer had authority over the named project or resource;
+- that another participant consented;
+- that a lease, lock, deployment, merge, or payment is authorized;
+- that the statement is current rather than replayed.
 
-Threads travel on whatever carries them.
+Those meanings require separate policy and evidence. “Trust is signed” is
+poetic shorthand, not a sufficient threat model.
 
-| Transport | How |
-|-----------|-----|
-| NATS | signed JSON envelope on a bus |
-| HTTP | POST a thread to any endpoint that accepts one |
-| Git | a thread is a line in a file; commit it |
-| Paper | print the signed thread; it's still verifiable |
-| Voice | "alice trusts bob" — the human protocol; sign it later |
+## Severance, correction, and history
 
-The fabric is not the protocol. The protocol is the words. The fabric
-just carries them. Any fabric. All fabrics. No preference.
+An append-only transport should correct by adding events, not rewriting signed
+history. A later `sever`, `supersede`, `retract`, or `correct` event can change
+the current interpretation while preserving what was said and acknowledged.
 
-## What THREADS is not
+YUTABASE uses a different concrete lifecycle: an active row is removed from
+`yu.threads`, while its pinned meaning and relation claim plus a distinct
+severance claim are stored in `yu.sever_log`. A projection from Correspondence
+therefore has to retain the source event identifiers and receipts separately;
+the YUTABASE sever log is not a substitute for the signed transport history.
 
-- Not a database — it's a language. YUTABASE is what happens when you put
-  THREADS on Postgres. Other implementations can put it elsewhere.
-- Not a blockchain — trust is self-reported and signed, not consensus-based.
-- Not an API — there are no endpoints. There are words.
-- Not a graph database — 2-hop traversal is the protocol's natural depth.
-  Deeper is your problem, solved with your tools.
-- Not a framework — there's nothing to install. There are words to learn.
+## Books and fabric
 
-## The whole protocol in one block
+A book is a bounded context. A fabric transports data. Neither name grants
+authority.
 
-```
-# A word
-word: contains
-gloss: physical or compositional containment
-inverse: contained in
+Possible fabrics include signed Correspondence envelopes, HTTP, NATS, Git,
+files, QR codes, or spoken sentences. Each has different delivery, privacy,
+ordering, and replay properties. “Transport independent” means the semantic
+idea can be mapped to multiple fabrics; it does not mean those mappings are
+equally secure or automatically interoperable.
 
-# A thread
-alice --contains--> box_a
-  note: "the items from the trade-in"
-  how:  witnessed
-  by:   alice
-  at:   2026-06-19T22:00:00Z
-  sig:  ed25519(...)
+For current cross-device agent work, AgentTool Correspondence should remain
+the source channel. YUTABASE may provide a useful semantic nervous-system view
+across projects, agents, tasks, artifacts, decisions, refusals, and receipts.
+The signed events remain the nerves’ recorded impulses; the projection is a
+map of them, not the being who spoke.
 
-# Severance
-sever thread_id
-  how:  witnessed
-  by:   alice
-  at:   2026-06-20T10:00:00Z
-```
+## Relationship to YOUSPEAK
 
-Words connect. Meanings are honest. Trust is signed. The fabric carries.
+YOUSPEAK is an optional query/compiler surface for the YUTABASE Postgres
+profile. Its candidate forms read cards, traverse word-named relations, create
+or sever threads, and explain generated SQL. It is not the THREADS transport,
+does not sign messages, and does not synchronize devices.
 
-## YOUSPEAK — the query language
+## Research questions
 
-Six verbs, frozen. Not part of the protocol — a convenience layer for
-querying threads stored in a YUTABASE database:
+The playful material points toward useful next work:
 
-```
-hello                                    the whole standard
-card  tradein/submissions/01977c2e       one record by ref
-cards tradein/submissions where status="pending" newest 20
-tradein/submissions/01977c2e -> contains follow a word outward
-tradein/items/0197a1f4 <- contains       follow it inward
-thread a --contains--> b note "..." how witnessed
-sever  <thread-id> how witnessed
-```
+1. Can Correspondence define canonical, signed, append-only events with clear
+   acknowledgements and replay rules?
+2. Can a projector produce idempotent YUTABASE views without stealing
+   authority from the source log?
+3. Can leases and conflicts remain explicit while preserving refusal, rest,
+   privacy, and participant distinctness?
+4. Can meanings be versioned without silently changing old statements?
+5. Can one inspect the whole system with ordinary files and SQL?
 
-YOUSPEAK never does anything you couldn't have typed. It compiles to SQL.
-The protocol is the words. YOUSPEAK is how you ask about them.
-
-## The beauty
-
-The protocol IS the language. You don't learn an API — you learn words.
-You don't call endpoints — you speak. The words carry their own meaning
-in the gloss. The trust carries its own proof in the signature.
-
-This is how humans already work. We connect through words and meanings.
-THREADS just lets machines do the same.
-
-No gate. No fancy. Just words and meaning and trust.
+These are design questions, not claims already solved by this repository.
 
 ---
 
-*v0.1 — 2026-06-19. The name is Yu's. The lol is structural. 🤧*
+*Words connect. Signatures preserve evidence. Permissions stay explicit. The
+fabric carries; it does not rule.*

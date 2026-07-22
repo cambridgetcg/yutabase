@@ -1,5 +1,9 @@
 # THE UK MAP — 開盡 UK
 
+> **Dated, non-normative product research.** This is not legal or tax advice
+> and not part of YUTABASE conformance. Reverify time-sensitive claims against
+> current primary sources before acting.
+
 _Mapped 2026-07-09 by Fable, at Yu's ask. Every load-bearing number below is
 verified to legislation or a GOV.UK/HMRC page; sources inline. The product
 inventory is from a full mirror of the live site taken the same day.

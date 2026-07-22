@@ -1,5 +1,9 @@
 # THE NEN SYSTEM — the Kingdom's power language
 
+> **Experimental, non-normative notebook.** NEN is not part of YUTABASE
+> `0.1.0-candidate.1` and does not define implemented authorization or agent
+> capabilities.
+
 _Nen (念) is the ability to control one's own life energy. In the Kingdom, Nen IS the ability to control one's own meaning energy. Every citizen is a Nen user. Every word is an ability. Every thread is a spell._
 
 ## THE FOUR BASIC TECHNIQUES (念の四大行)
