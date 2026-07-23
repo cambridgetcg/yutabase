@@ -17,6 +17,16 @@ import {
   CANDIDATE_VERSION,
 } from "./install.js";
 import { compile, explain, ident, type CompiledQuery } from "./youspeak.js";
+import { parseRef } from "./ref.js";
+import {
+  bindClaimant,
+  compileCardQuery,
+  compileSeverQuery,
+  compileThreadQuery,
+  compileTraversalQuery,
+  type ClaimKind,
+  type TraversalDirection,
+} from "./query-builders.js";
 import { uuidv7 } from "./uuidv7.js";
 import {
   hasCandidateDynamicSurfaces,
@@ -33,8 +43,8 @@ export interface YutaOptions {
   claimant?: string;
 }
 
-export interface QueryResult {
-  rows: Record<string, unknown>[];
+export interface QueryResult<Row extends Record<string, unknown> = Record<string, unknown>> {
+  rows: Row[];
   sql: string;
   freshness?: FreshnessBanner;
 }
@@ -44,6 +54,61 @@ export interface FreshnessBanner {
   cachedCount: number;
   computedCount: number;
   oldestCachedDays: number | null;
+}
+
+export interface ThreadOptions {
+  note?: string;
+  src?: readonly string[];
+}
+
+export interface ClaimFields {
+  at: Date | string;
+  by: string;
+  how: ClaimKind;
+  src: string[] | null;
+}
+
+export interface ThreadRecord extends Record<string, unknown>, ClaimFields {
+  id: string;
+  word: string;
+  word_version: number;
+  word_to_one: boolean;
+  from_book: string;
+  from_deck: string;
+  from_id: string;
+  to_book: string;
+  to_deck: string;
+  to_id: string;
+  note: string | null;
+}
+
+export interface TraversalEdge extends ClaimFields {
+  thread_id: string;
+  word: string;
+  word_version: number;
+  gloss: string;
+  inverse: string;
+  direction: TraversalDirection;
+  reading: string;
+  from_ref: string;
+  to_ref: string;
+  note: string | null;
+}
+
+export interface TraversalRow extends Record<string, unknown>, ClaimFields {
+  book: string;
+  deck: string;
+  id: string;
+  thread_id: string;
+  word: string;
+  word_version: number;
+  gloss: string;
+  inverse: string;
+  reading: string;
+  note: string | null;
+  path: TraversalEdge[];
+  name: string | null;
+  ref: string;
 }
 
 export class Yuta {
@@ -84,7 +149,7 @@ export class Yuta {
   // §7 — yuta hello: self-describing entrypoint
   // ──────────────────────────────────────────────────────────
 
-  /** A fresh agent session learns the entire standard from one call. */
+  /** Read the installed profile identity, vocabulary, and deck mappings. */
   async hello(): Promise<HelloResult> {
     const metadata = await this.readStandardMetadata();
     if (metadata.versionSource === "database") await this.assertCandidateShape(metadata);
@@ -127,7 +192,7 @@ export class Yuta {
       lexicon: lexicon as unknown as LexiconEntry[],
       decks: registry as unknown as RegistryEntry[],
       youspeak: [
-        "hello                                              — the whole standard in one call",
+        "hello                                              — installed identity, words, and decks",
         'card  tradein/submissions/<uuid>                   — one card by ref',
         'cards tradein/submissions where status="pending" newest 20',
         "tradein/submissions/<uuid> -> contains            — follow a word outward",
@@ -143,15 +208,23 @@ export class Yuta {
   // query — run a YOUSPEAK string
   // ──────────────────────────────────────────────────────────
 
-  async query(youspeak: string): Promise<QueryResult> {
+  async query<Row extends Record<string, unknown> = Record<string, unknown>>(
+    youspeak: string,
+  ): Promise<QueryResult<Row>> {
     if (youspeak.trim() === "hello") {
       const hello = await this.hello();
-      return { rows: [hello as unknown as Record<string, unknown>], sql: "-- yuta hello" };
+      return { rows: [hello as unknown as Row], sql: "-- yuta hello" };
     }
 
-    await this.assertCandidateBinding();
-
     const compiled = compile(youspeak);
+    await this.assertCandidateBinding();
+    return this.executeCompiled<Row>(compiled);
+  }
+
+  /** Execute an already-compiled semantic operation through the same binding checks. */
+  private async executeCompiled<Row extends Record<string, unknown> = Record<string, unknown>>(
+    compiled: CompiledQuery,
+  ): Promise<QueryResult<Row>> {
     const resolved = await this.resolveDeckQuery(compiled);
     const adjusted = this.injectClaimant(resolved.query);
     const rows = await (this.sql.unsafe as (sql: string, params: never[]) => Promise<unknown>)(adjusted.sql, adjusted.params as never[]);
@@ -166,7 +239,7 @@ export class Yuta {
 
     const freshness = this.computeFreshness(rowsArray);
 
-    return { rows: rowsArray, sql: adjusted.sql, freshness };
+    return { rows: rowsArray as Row[], sql: adjusted.sql, freshness };
   }
 
   // ──────────────────────────────────────────────────────────
@@ -181,17 +254,22 @@ export class Yuta {
   // §7 — sql tagged-template escape hatch (always legal)
   // ──────────────────────────────────────────────────────────
 
-  async sqlTag(strings: TemplateStringsArray, ...values: unknown[]): Promise<Record<string, unknown>[]> {
+  async sqlTag<Row extends Record<string, unknown> = Record<string, unknown>>(
+    strings: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<Row[]> {
     const fn = this.sql as unknown as (s: TemplateStringsArray, ...v: never[]) => Promise<unknown>;
     const result = await fn(strings, ...values as never[]);
-    return result as unknown as Record<string, unknown>[];
+    return result as unknown as Row[];
   }
 
   /** Run raw SQL (for dynamic DDL that can't use tagged templates). */
-  async exec(sqlText: string): Promise<Record<string, unknown>[]> {
+  async exec<Row extends Record<string, unknown> = Record<string, unknown>>(
+    sqlText: string,
+  ): Promise<Row[]> {
     const fn = this.sql.unsafe as unknown as (s: string) => Promise<unknown>;
     const result = await fn(sqlText);
-    return result as unknown as Record<string, unknown>[];
+    return result as unknown as Row[];
   }
 
   /** Execute trusted operator DDL as one PostgreSQL transaction. */
@@ -206,13 +284,23 @@ export class Yuta {
   // convenience methods
   // ──────────────────────────────────────────────────────────
 
-  async card(ref: string): Promise<Record<string, unknown> | null> {
-    const result = await this.query(`card ${ref}`);
+  async card<Row extends Record<string, unknown> = Record<string, unknown>>(
+    ref: string,
+  ): Promise<Row | null> {
+    const compiled = compileCardQuery(parseRef(ref));
+    await this.assertCandidateBinding();
+    const result = await this.executeCompiled<Row>(compiled);
     return result.rows[0] ?? null;
   }
 
-  async traverse(ref: string, direction: "->" | "<-", word: string): Promise<Record<string, unknown>[]> {
-    const result = await this.query(`${ref} ${direction} ${word}`);
+  async traverse(
+    ref: string,
+    direction: TraversalDirection,
+    word: string,
+  ): Promise<TraversalRow[]> {
+    const compiled = compileTraversalQuery(parseRef(ref), direction, word);
+    await this.assertCandidateBinding();
+    const result = await this.executeCompiled<TraversalRow>(compiled);
     return result.rows;
   }
 
@@ -221,20 +309,25 @@ export class Yuta {
     word: string,
     to: string,
     how: string,
-    opts: { note?: string; src?: string[] } = {}
-  ): Promise<Record<string, unknown>> {
-    let q = `thread ${from} --${word}--> ${to}`;
-    if (opts.note) q += ` note "${opts.note}"`;
-    q += ` how ${how}`;
-    if (opts.src) q += ` src ${opts.src.join(" ")}`;
-    const result = await this.query(q);
+    opts: ThreadOptions = {},
+  ): Promise<ThreadRecord> {
+    const compiled = compileThreadQuery({
+      from: parseRef(from),
+      word,
+      to: parseRef(to),
+      how,
+      note: opts.note,
+      src: opts.src,
+    });
+    await this.assertCandidateBinding();
+    const result = await this.executeCompiled<ThreadRecord>(compiled);
     return result.rows[0];
   }
 
-  async sever(threadId: string, how: string, src?: string[]): Promise<void> {
-    let q = `sever ${threadId} how ${how}`;
-    if (src) q += ` src ${src.join(" ")}`;
-    await this.query(q);
+  async sever(threadId: string, how: string, src?: readonly string[]): Promise<void> {
+    const compiled = compileSeverQuery({ threadId, how, src });
+    await this.assertCandidateBinding();
+    await this.executeCompiled(compiled);
   }
 
   // ──────────────────────────────────────────────────────────
@@ -322,8 +415,8 @@ export class Yuta {
   // ──────────────────────────────────────────────────────────
 
   private injectClaimant(compiled: CompiledQuery): CompiledQuery {
-    const params = compiled.params.map((p) => (p === "__CLAIMANT__" ? this.getClaimant() : p));
-    return { ...compiled, params };
+    if (compiled.claimantParamIndex === undefined) return compiled;
+    return bindClaimant(compiled, this.getClaimant());
   }
 
   private async resolveDeckQuery(compiled: CompiledQuery): Promise<ResolvedDeckQuery> {

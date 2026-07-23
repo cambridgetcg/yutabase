@@ -1,6 +1,12 @@
 // youspeak.test.ts — test the YOUSPEAK compiler (pure function, no DB)
 import { test, expect } from "bun:test";
 import { CORE_YOUSPEAK_FORMS, compile, explain } from "../src/youspeak.js";
+import { parseRef } from "../src/ref.js";
+import {
+  bindClaimant,
+  compileThreadQuery,
+  compileTraversalQuery,
+} from "../src/query-builders.js";
 
 test("publishes the frozen core form list", () => {
   expect(CORE_YOUSPEAK_FORMS).toEqual([
@@ -26,14 +32,14 @@ test("cards with where and newest compiles correctly", () => {
   const q = compile('cards tradein/submissions where status="pending" newest 20');
   expect(q.sql).toContain('FROM "tradein"."submissions"');
   expect(q.sql).toContain('WHERE "status" = $1');
-  expect(q.sql).toContain('ORDER BY "id" DESC');
+  expect(q.sql).toContain('ORDER BY "at" DESC NULLS LAST, "id" DESC');
   expect(q.sql).toContain("LIMIT $2");
   expect(q.params).toEqual(["pending", 20]);
 });
 
-test("cards without where or limit still orders by id desc", () => {
+test("cards without where or limit orders by claimed time with an identity tie-breaker", () => {
   const q = compile("cards tradein/submissions");
-  expect(q.sql).toContain('ORDER BY "id" DESC');
+  expect(q.sql).toContain('ORDER BY "at" DESC NULLS LAST, "id" DESC');
   expect(q.params).toEqual([]);
   expect(q.deckTarget).toEqual({ kind: "cards", book: "tradein", deck: "submissions" });
 });
@@ -49,6 +55,8 @@ test("traversal outward (-> word) compiles to thread query", () => {
   expect(q.sql).toContain("t.to_book");
   expect(q.sql).toContain("t.from_book = $1");
   expect(q.sql).toContain("t.word = $4");
+  expect(q.sql).toContain("JOIN yu.word_versions v");
+  expect(q.sql).toContain("jsonb_build_array");
   expect(q.params).toEqual(["tradein", "submissions", "01977c2e-0000-7000-8000-000000000001", "contains"]);
 });
 
@@ -62,6 +70,9 @@ test("traversal inward (<- word) compiles to reverse query", () => {
 test("two-hop traversal compiles with JOIN", () => {
   const q = compile("tradein/customers/01964b10-0000-7000-8000-000000000001 -> submitted_by -> contains");
   expect(q.sql).toContain("JOIN yu.threads t2");
+  expect(q.sql).toContain("JOIN yu.word_versions v1");
+  expect(q.sql).toContain("JOIN yu.word_versions v2");
+  expect(q.sql).toContain("AS path");
   expect(q.params).toContain("submitted_by");
   expect(q.params).toContain("contains");
 });
@@ -85,6 +96,60 @@ test("thread with cached how but no src throws", () => {
   expect(() =>
     compile("thread tradein/items/0197a1f4-0000-7000-8000-000000000001 --priced_from--> pricing/quotes/01984c22-0000-7000-8000-000000000001 how cached")
   ).toThrow(/src/);
+});
+
+test("thread rejects claim kinds outside the honesty header", () => {
+  expect(() =>
+    compile(
+      "thread tradein/items/0197a1f4-0000-7000-8000-000000000001 " +
+      "--priced_from--> pricing/quotes/01984c22-0000-7000-8000-000000000001 how magical",
+    )
+  ).toThrow(/unknown claim kind/);
+});
+
+test("structured thread values never become YOUSPEAK syntax or claimant bindings", () => {
+  const note = 'quoted " note how declared src not-a-source';
+  const src = ["locator with spaces", "__CLAIMANT__"];
+  const compiled = compileThreadQuery({
+    from: parseRef("tradein/items/0197a1f4-0000-7000-8000-000000000001"),
+    word: "priced_from",
+    to: parseRef("pricing/quotes/01984c22-0000-7000-8000-000000000001"),
+    how: "computed",
+    note,
+    src,
+  });
+  const bound = bindClaimant(compiled, "agent:test/session");
+
+  expect(bound.params[8]).toBe(note);
+  expect(bound.params[compiled.claimantParamIndex!]).toBe("agent:test/session");
+  expect(bound.params.at(-1)).toEqual(src);
+});
+
+test("structured traversal keeps a word value as one parameter", () => {
+  const word = "contains -> witnesses";
+  const compiled = compileTraversalQuery(
+    parseRef("tradein/items/0197a1f4-0000-7000-8000-000000000001"),
+    "->",
+    word,
+  );
+
+  expect(compiled.sql).not.toContain("JOIN yu.threads");
+  expect(compiled.params.at(-1)).toBe(word);
+});
+
+test("structured traversal rejects runtime directions before SQL generation", () => {
+  const ref = parseRef(
+    "tradein/items/0197a1f4-0000-7000-8000-000000000001",
+  );
+  expect(() =>
+    compileTraversalQuery(ref, "x', current_user, 'injected" as never, "contains")
+  ).toThrow(/TRAVERSE direction/);
+  expect(() =>
+    compileTraversalQuery(ref, "->", "contains", {
+      direction: "x', current_user, 'injected" as never,
+      word: "related_to",
+    })
+  ).toThrow(/second-hop direction/);
 });
 
 test("sever compiles to function call", () => {

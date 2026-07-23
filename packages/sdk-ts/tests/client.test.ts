@@ -65,10 +65,23 @@ test("card forms resolve logical refs through physical registry mappings", async
   await yuta.sqlTag`
     INSERT INTO sdk_legacy.card_records (
       card_id, name, observed_at, how, claim_kind, sources
-    ) VALUES (
-      '01990000-0000-7000-8000-000000000099',
-      'Mapped card', now(), 'agent:test/session', 'declared', NULL
-    ) ON CONFLICT (card_id) DO NOTHING
+    ) VALUES
+      (
+        '01990000-0000-7000-8000-000000000099',
+        'Mapped card', '2026-07-22T10:00:00.000Z',
+        'agent:test/session', 'declared', NULL
+      ),
+      (
+        'ffffffff-ffff-4fff-bfff-ffffffffffff',
+        'Lexically later but older', '2026-07-22T09:00:00.000Z',
+        'agent:test/session', 'declared', NULL
+      ),
+      (
+        '00000000-0000-4000-8000-000000000001',
+        'Claim-time newest', '2026-07-22T11:00:00.000Z',
+        'agent:test/session', 'declared', NULL
+      )
+    ON CONFLICT (card_id) DO NOTHING
   `;
   await yuta.sqlTag`
     INSERT INTO yu.registry (
@@ -102,8 +115,11 @@ test("card forms resolve logical refs through physical registry mappings", async
   );
   expect(cards.sql).toContain('FROM "sdk_legacy"."card_records"');
   expect(cards.sql).toContain('WHERE "how" = $1 AND "claim_kind" = $2');
-  expect(cards.sql).toContain('ORDER BY "card_id" DESC');
-  expect(cards.rows[0].id).toBe("01990000-0000-7000-8000-000000000099");
+  expect(cards.sql).toContain(
+    'ORDER BY "observed_at" DESC NULLS LAST, "card_id" DESC',
+  );
+  expect(cards.rows[0].id).toBe("00000000-0000-4000-8000-000000000001");
+  expect(cards.rows[0].name).toBe("Claim-time newest");
 });
 
 test("traversal outward (-> contains) finds connected cards", async () => {
@@ -114,6 +130,10 @@ test("traversal outward (-> contains) finds connected cards", async () => {
   );
   expect(rows.length).toBeGreaterThanOrEqual(1);
   expect(rows[0].deck).toBe("items");
+  expect(rows[0].word).toBe("contains");
+  expect(rows[0].word_version).toBeGreaterThanOrEqual(1);
+  expect(typeof rows[0].gloss).toBe("string");
+  expect(rows[0].path).toHaveLength(1);
 });
 
 test("traversal inward (<- contains) finds the parent", async () => {
@@ -126,13 +146,49 @@ test("traversal inward (<- contains) finds the parent", async () => {
   expect(rows[0].deck).toBe("submissions");
 });
 
-test("two-hop traversal works", async () => {
-  // submission -> contains (first item) -> related_to (second item)
-  const result = await yuta.query(
-    "tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains -> related_to"
-  );
-  expect(result.rows.length).toBeGreaterThanOrEqual(1);
-  expect(result.rows[0].deck).toBe("items");
+test("two-hop traversal preserves both edges in every direction combination", async () => {
+  const cases = [
+    {
+      query: "tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains -> related_to",
+      words: ["contains", "related_to"],
+      directions: ["->", "->"],
+    },
+    {
+      query: "tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains <- contains",
+      words: ["contains", "contains"],
+      directions: ["->", "<-"],
+    },
+    {
+      query: "tradein/items/0197a1f4-0000-7000-8000-000000000001 <- contains -> contains",
+      words: ["contains", "contains"],
+      directions: ["<-", "->"],
+    },
+    {
+      query: "tradein/items/0197a1f4-0000-7000-8000-000000000002 <- related_to <- contains",
+      words: ["related_to", "contains"],
+      directions: ["<-", "<-"],
+    },
+  ] as const;
+
+  for (const item of cases) {
+    const result = await yuta.query(item.query);
+    expect(result.rows.length).toBeGreaterThanOrEqual(1);
+    const path = result.rows[0].path as Array<Record<string, unknown>>;
+    expect(path).toHaveLength(2);
+    expect(path.map((edge) => edge.word)).toEqual([...item.words]);
+    expect(path.map((edge) => edge.direction)).toEqual([...item.directions]);
+    for (const edge of path) {
+      expect(edge.thread_id).toBeTruthy();
+      expect(edge.word_version).toBeGreaterThanOrEqual(1);
+      expect(edge.from_ref).toMatch(/^[a-z_]+\/[a-z_]+\/[0-9a-f-]{36}$/);
+      expect(edge.to_ref).toMatch(/^[a-z_]+\/[a-z_]+\/[0-9a-f-]{36}$/);
+      expect(edge.by).toBeTruthy();
+      expect(edge.how).toBeTruthy();
+      expect(edge.reading).toBe(
+        edge.direction === "->" ? edge.gloss : edge.inverse,
+      );
+    }
+  }
 });
 
 test("thread creates a worded connection with honesty header", async () => {
@@ -164,9 +220,16 @@ test("thread creates a worded connection with honesty header", async () => {
     "priced_from",
     "pricing/quotes/01984c22-0000-7000-8000-000000000001",
     "computed",
-    { note: "ebay last-sold comp", src: ["tradein/items/0197a1f4-0000-7000-8000-000000000001"] }
+    {
+      note: 'ebay "last-sold" comp how declared src not-a-source',
+      src: ["source locator with spaces", "__CLAIMANT__"],
+    },
   );
   expect(result).toBeDefined();
+  expect(result.note).toBe('ebay "last-sold" comp how declared src not-a-source');
+  expect(result.by).toBe("agent:test/session");
+  expect(result.how).toBe("computed");
+  expect(result.src).toEqual(["source locator with spaces", "__CLAIMANT__"]);
 });
 
 test("thread with cached how and no src throws", async () => {
@@ -193,12 +256,14 @@ test("sever ends a thread with a claim", async () => {
   if (threads.length === 0) return; // skip if no thread
 
   const threadId = threads[0].id as string;
-  await yuta.sever(threadId, "witnessed");
+  await yuta.sever(threadId, "computed", ["source locator with spaces", "__CLAIMANT__"]);
 
   // Verify it's in the sever log
   const log = await yuta.sqlTag`SELECT * FROM yu.sever_log WHERE id = ${threadId}`;
   expect(log.length).toBe(1);
-  expect(log[0].how).toBe("witnessed");
+  expect(log[0].by).toBe("agent:test/session");
+  expect(log[0].how).toBe("computed");
+  expect(log[0].src).toEqual(["source locator with spaces", "__CLAIMANT__"]);
 });
 
 test("explain returns SQL without executing", () => {

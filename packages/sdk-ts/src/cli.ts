@@ -717,7 +717,7 @@ async function doRepl(conn: string | undefined, by: string | undefined): Promise
   console.log("  YOUSPEAK — you speak, and reality listens.");
   console.log("  Type sentences. They compile to SQL; explain shows the logical form.");
   console.log("");
-  console.log("  hello                  — learn the whole standard");
+  console.log("  hello                  — inspect installed identity, words, and decks");
   console.log("  card tradein/sub/...   — fetch one card");
   console.log("  ref -> word            — follow a word outward");
   console.log("  ref <- word            — follow it inward");
@@ -1203,7 +1203,7 @@ function printHelp(): void {
   console.log("Commands:");
   console.log("  init                     Install the yu schema + starter lexicon");
   console.log("  repl                     Interactive YOUSPEAK session");
-  console.log("  hello                    The whole standard in one call");
+  console.log("  hello                    Installed identity, words, and decks");
   console.log("  card <ref>               Fetch one card by ref");
   console.log("  cards <book/deck> [...]  List cards with optional filter");
   console.log('  query "<youspeak>"       Run any YOUSPEAK sentence');

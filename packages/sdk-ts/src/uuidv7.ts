@@ -4,7 +4,8 @@
 // mergeable, no sequences)"
 //
 // UUIDv7: 48-bit Unix timestamp (ms) + 12-bit random + 62-bit random.
-// Time-sortable means `ORDER BY id DESC LIMIT 20` gives "newest 20" for free.
+// The embedded time is useful for locality and rough ordering, but it is not
+// row truth. YOUSPEAK `newest` orders by the explicit `at` claim instead.
 
 import { randomFillSync } from "node:crypto";
 

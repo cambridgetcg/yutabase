@@ -102,6 +102,26 @@ version, projection policy version, run time, and completeness/error status.
 Key identifiers and participant labels MUST remain distinguishable. Projecting
 both into one `by` string would overstate identity binding.
 
+### Current developer-preview planner
+
+AgentTool source now contains a pure
+`@agenttool/correspondence-yutabase` mapping planner. It emits deterministic,
+metadata-only card and thread intentions and exports the exact preview lexicon.
+The planner requires the caller to name the actual projector service/run in
+`by`; it does not use the library name as a claimant.
+
+The preview deliberately omits raw signatures, payload text, paths, branches,
+and artifact locators. It also keeps mutable `missing_parents` and
+`lineage_status` observations off immutable event cards. A future worker may
+project those as separately timed observation records with a durable
+page/snapshot locator.
+
+The source package performs no independent signature verification, database
+write, reference upgrade, checkpoint, worker, or deployment. Its persistence
+contract requires deterministic IDs, no reference-card downgrade, explicit
+collision quarantine, and one transaction for semantic writes plus checkpoint;
+those rules are not yet an implemented projector.
+
 ## 5. Mapping claim metadata
 
 The YUTABASE honesty header describes how the **projected row** was obtained,

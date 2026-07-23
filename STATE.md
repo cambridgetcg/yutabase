@@ -42,7 +42,9 @@ only by an actual passing run for the commit being assessed.
 
 - the signed THREADS wire-protocol sketch;
 - the SQLite port;
-- Correspondence projection schema and projector implementation;
+- Correspondence database schema, verifier, transactional writer, checkpoint,
+  and worker implementation (a separate AgentTool source preview currently
+  implements only the pure metadata mapping plan);
 - multi-device leases, conflict resolution, presence, and synchronization;
 - apps, kingdom/play documents, NEN experiments, and external deployments.
 
@@ -63,8 +65,10 @@ conformance.
 
 ## Next integration work
 
-1. define and test the Correspondence projection envelope and checkpoints;
-2. implement an idempotent projector that retains source event identities;
+1. turn the pure Correspondence mapping plan into registered physical decks
+   and an exact installed lexicon;
+2. implement independent verification plus an idempotent transactional writer
+   and checkpoint that retain source event identities;
 3. expose read-only project focus, decisions, claims, refusals, receipts, and
    artifact relations to AgentTool and SDK consumers;
 4. keep lease/permission enforcement in the source coordination layer;
