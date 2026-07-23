@@ -12,6 +12,51 @@ The candidate is intentionally small. PostgreSQL remains the storage,
 transaction, role, backup, and replication substrate. YUTABASE adds meaning
 that stays inspectable with SQL.
 
+## See the layer
+
+Suppose an existing task row and commit row are registered as cards. YUTABASE
+can give their relation a governed, versioned meaning:
+
+```text
+work/tasks/019... --produced--> git/commits/019...
+```
+
+The thread remains ordinary PostgreSQL data. Read it through the generated SQL
+view:
+
+```sql
+SELECT from_ref, to_ref, gloss, word_version, how, src
+FROM via.produced
+WHERE from_ref = 'work/tasks/019...';
+```
+
+Or use the optional sentence-shaped client:
+
+```text
+work/tasks/019... -> produced
+```
+
+The useful invariant is not the poetry by itself. It is that `produced` has one
+declared meaning, every thread pins the version it used, and every row says how
+it was obtained. The application tables, SQL access, and source evidence stay
+where they already belong.
+
+### Fit it around what already exists
+
+- **Existing PostgreSQL:** annex compatible tables under logical `book/deck`
+  names; rows do not move.
+- **New application data:** create ordinary tables, then register only the
+  relations that need shared meaning.
+- **ORM or API stack:** keep Prisma, Drizzle, PostgREST, Hasura, or Supabase as
+  the application/access layer and expose YUTABASE tables or `via.*` views in
+  the same database.
+- **Events and agent systems:** retain the signed or append-only source log;
+  atomically project a rebuildable semantic read model plus its checkpoint.
+
+[Integration patterns](docs/INTEGRATIONS.md) shows the common shape and the
+flagship AgentTool Correspondence flow. YUTABASE does not replace any source's
+signature verification, authorization, sync, or retention policy.
+
 ## Status and layers
 
 The repository separates four things that earlier drafts sometimes blended:
@@ -253,6 +298,7 @@ inheritance, or generated-view definitions.
 ```text
 SPEC.md                         normative candidate Core + Postgres binding
 docs/CONFORMANCE.md             compatibility, tests, and threat boundary
+docs/INTEGRATIONS.md            practical adapter and coexistence patterns
 docs/CORRESPONDENCE-PROJECTION.md
                                  signed-source projection profile
 sql/0001_yu_core.sql            original Postgres objects

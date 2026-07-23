@@ -15,6 +15,8 @@ release claim is made.
 
 ## Integration design
 
+- [`INTEGRATIONS.md`](INTEGRATIONS.md) — practical patterns for existing
+  PostgreSQL, ORMs/APIs, event projectors, and Kingdom ecosystem adapters.
 - [`CORRESPONDENCE-PROJECTION.md`](CORRESPONDENCE-PROJECTION.md) — signed
   Correspondence as the retained source history; YUTABASE as a rebuildable,
   non-authoritative semantic projection.

@@ -1,6 +1,6 @@
 {
   "name": "yutabase",
-  "version": "0.1.0-candidate.1",
+  "version": "0.1.0-candidate.2",
   "description": "YUTABASE client — ref parser, UUIDv7, YOUSPEAK compiler, thin wrapper over postgres.js",
   "license": "MIT",
   "repository": {
