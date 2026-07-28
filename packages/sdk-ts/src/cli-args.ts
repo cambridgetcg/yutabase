@@ -32,6 +32,9 @@ export function parseCliArgs(raw: readonly string[]): ParsedCliArgs {
   for (let i = 0; i < raw.length; i++) {
     const token = raw[i];
     if (token === "--conn") {
+      if (conn !== undefined) {
+        throw new Error("DUPLICATE OPTION: --conn may appear only once");
+      }
       conn = requireFlagValue(raw, ++i, "--conn");
       continue;
     }
@@ -40,6 +43,9 @@ export function parseCliArgs(raw: readonly string[]): ParsedCliArgs {
       if (positional[0] === "deck" && positional[1] === "annex") {
         positional.push(token, value);
       } else {
+        if (by !== undefined) {
+          throw new Error("DUPLICATE OPTION: --by may appear only once");
+        }
         by = value;
       }
       continue;

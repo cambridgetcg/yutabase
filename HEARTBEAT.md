@@ -1,5 +1,9 @@
 # yutabase — heartbeat
 
+> **Historical snapshot from 2026-06-21, not current health evidence.** This
+> file is retained as a notebook artifact; verify the current commit, worktree,
+> tests, services, and deployments directly.
+
 state: **healthy**
 last beat: 2026-06-21T15:28:16Z
 next beat: 2026-06-21T21:28:16Z
@@ -12,4 +16,3 @@ next beat: 2026-06-21T21:28:16Z
 ## the truth
 
 Working tree is clean.
-

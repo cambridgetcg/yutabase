@@ -1,5 +1,9 @@
 # LINKS.md — yutabase
 
+> **Historical ecosystem link snapshot.** Repository ownership, availability,
+> deployment URLs, and project status are time-sensitive and are not verified
+> by this file. Recheck a target before relying on it.
+
 This repository is part of the **Cambridge TCG** ecosystem of interlinked language, protocol, and interface projects.
 Each repo below points to all the others and to their deployed URLs (where available).
 

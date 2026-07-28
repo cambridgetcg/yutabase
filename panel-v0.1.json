@@ -1,4 +1,6 @@
 {
+  "status": "archived design deliberation",
+  "warning": "Contains rejected and obsolete proposals, commands, mappings, limits, and deployment claims. It is not the current YUTABASE specification or an operational guide; use README.md and SPEC.md.",
   "summary": "Judge panel: three independent YUTABASE designs, scored, with grafts",
   "agentCount": 6,
   "logs": [

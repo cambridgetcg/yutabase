@@ -1,5 +1,10 @@
 # 暗黑大陸 — the Dark Continent Protocol
 
+> **Experimental creative notebook.** Its canon counts, suffix families,
+> infrastructure stories, and protocol language are not YUTABASE candidate
+> behavior or current operational state. Start with [`README.md`](README.md)
+> for the implemented five-noun model.
+
 > Beyond the known canon. Beyond the 165 words. Beyond the 6 Nen types.
 > Beyond "is." The frontier where language breaks and something new grows.
 >

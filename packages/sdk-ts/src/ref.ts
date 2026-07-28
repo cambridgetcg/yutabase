@@ -2,12 +2,14 @@
 //
 // Doctrine: SPEC.md §2 — "globally addressable by ref `book/deck/id`"
 //
-// A ref is three slashes: tradein/submissions/01977c2e-...
+// A ref is three segments: tradein/submissions/01977c2e-...
 // It identifies exactly one card.
 
+import { isLogicalIdentifier } from "./identifier.js";
+
 export interface Ref {
-  book: string;   // schema name, e.g. "tradein"
-  deck: string;   // table name, e.g. "submissions"
+  book: string;   // logical namespace label, e.g. "tradein"
+  deck: string;   // logical collection label, e.g. "submissions"
   id: string;     // UUID, e.g. "01977c2e-0000-7000-8000-000000000001"
 }
 
@@ -68,7 +70,7 @@ export function parseDeckPattern(pattern: string): { book: string; deck: string 
 }
 
 function validateIdentifier(value: string, label: string): void {
-  if (!/^[a-z_][a-z0-9_]*$/.test(value)) {
+  if (!isLogicalIdentifier(value)) {
     throw new Error(`BAD REF: ${label} "${value}" is not lower_snake`);
   }
 }

@@ -7,8 +7,6 @@
 // The embedded time is useful for locality and rough ordering, but it is not
 // row truth. YOUSPEAK `newest` orders by the explicit `at` claim instead.
 
-import { randomFillSync } from "node:crypto";
-
 /**
  * Generate a UUIDv7 string.
  * @param timestampMs Optional timestamp override (for testing / deterministic IDs)
@@ -19,7 +17,11 @@ export function uuidv7(timestampMs?: number): string {
     throw new RangeError("UUIDV7 TIMESTAMP: expected an integer from 0 through 2^48 - 1 milliseconds");
   }
   const bytes = new Uint8Array(16);
-  randomFillSync(bytes);
+  const crypto = globalThis.crypto;
+  if (!crypto?.getRandomValues) {
+    throw new Error("UUIDV7 RANDOMNESS: Web Crypto getRandomValues is unavailable");
+  }
+  crypto.getRandomValues(bytes);
 
   // 48-bit timestamp (big-endian) in bytes 0-5
   // JS bitwise ops wrap at 32-bit, so use division for the high bytes

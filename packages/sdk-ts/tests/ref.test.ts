@@ -1,6 +1,7 @@
 // ref.test.ts — test the ref parser
 import { test, expect } from "bun:test";
 import { parseRef, formatRef, makeRef, parseDeckPattern } from "../src/ref.js";
+import { assertDistinctMappedColumns } from "../src/identifier.js";
 
 test("parseRef parses a valid ref", () => {
   const ref = parseRef("tradein/submissions/01977c2e-0000-7000-8000-000000000001");
@@ -47,4 +48,25 @@ test("parseDeckPattern supports globs", () => {
 test("parseDeckPattern rejects non-core identifiers", () => {
   expect(() => parseDeckPattern("TradeIn/items")).toThrow(/lower_snake/);
   expect(() => parseDeckPattern("tradein/items;drop")).toThrow(/lower_snake/);
+});
+
+test("physical card and claim mappings must be pairwise distinct", () => {
+  expect(() =>
+    assertDistinctMappedColumns([
+      "card_id",
+      "observed_at",
+      "claimant",
+      "claim_kind",
+      "sources",
+    ]),
+  ).not.toThrow();
+  expect(() =>
+    assertDistinctMappedColumns([
+      "card_id",
+      "observed_at",
+      "claimant",
+      "claimant",
+      "sources",
+    ]),
+  ).toThrow(/DUPLICATE MAPPED COLUMN.*claimant/);
 });

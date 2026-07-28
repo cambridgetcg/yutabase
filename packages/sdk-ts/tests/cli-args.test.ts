@@ -33,6 +33,27 @@ test("rejects global flags without values", () => {
     .toThrow(/--by requires a value/);
 });
 
+test("rejects duplicate global options instead of silently taking the last", () => {
+  expect(() => parseCliArgs([
+    "hello",
+    "--conn",
+    "postgresql://localhost/one",
+    "--conn",
+    "postgresql://localhost/two",
+  ])).toThrow(/--conn may appear only once/);
+  expect(() => parseCliArgs([
+    "--by",
+    "agent:one",
+    "word",
+    "retire",
+    "contains",
+    "how",
+    "declared",
+    "--by",
+    "agent:two",
+  ])).toThrow(/--by may appear only once/);
+});
+
 test("redacts every potentially credential-bearing URL component", () => {
   const redacted = redactConnectionUrl(
     "postgresql://alice:swordfish@db.example:5432/app?credential=hunter2&sslmode=require#private",

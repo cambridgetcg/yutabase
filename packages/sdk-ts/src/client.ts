@@ -1,8 +1,8 @@
 // client.ts — yutabase: thin wrapper over postgres.js
 //
-// Doctrine: SPEC.md §7 — "A thin wrapper over postgres.js (~500 lines):
-// ref parser, UUIDv7, the YOUSPEAK compiler, and a sql tagged-template
-// escape hatch that is always legal."
+// Doctrine: SPEC.md §7 — an optional wrapper over postgres.js with a ref
+// parser, UUIDv7, the YOUSPEAK compiler, exact binding checks, and a direct SQL
+// escape hatch.
 //
 // Features:
 // - Session-default claimant: set by once; every write inherits it
@@ -13,9 +13,15 @@
 import postgres from "postgres";
 import { execFileSync } from "node:child_process";
 import {
+  CANDIDATE_CAPABILITIES,
   CANDIDATE_REVISION,
   CANDIDATE_VERSION,
 } from "./install.js";
+import {
+  summarizeFreshness,
+  type FreshnessBanner,
+} from "./freshness.js";
+import { isNonblankText } from "./nonblank.js";
 import { compile, explain, ident, type CompiledQuery } from "./youspeak.js";
 import { parseRef } from "./ref.js";
 import {
@@ -24,14 +30,18 @@ import {
   compileSeverQuery,
   compileThreadQuery,
   compileTraversalQuery,
+  LOGICAL_DECK_SQL,
   type ClaimKind,
   type TraversalDirection,
 } from "./query-builders.js";
 import { uuidv7 } from "./uuidv7.js";
 import {
   hasCandidateDynamicSurfaces,
+  hasExactCandidateCapabilitySurface,
   hasExactCandidateConstraintSurface,
   hasExactCandidateFunctionSurface,
+  hasExactCandidatePrivilegeSurface,
+  hasExactCandidateTriggerSurface,
   hasExactCoreColumnSurface,
   hasExactCoreIndexSurface,
   hasLegacyConstraintSurface,
@@ -47,13 +57,6 @@ export interface QueryResult<Row extends Record<string, unknown> = Record<string
   rows: Row[];
   sql: string;
   freshness?: FreshnessBanner;
-}
-
-export interface FreshnessBanner {
-  totalValues: number;
-  cachedCount: number;
-  computedCount: number;
-  oldestCachedDays: number | null;
 }
 
 export interface ThreadOptions {
@@ -119,7 +122,10 @@ export class Yuta {
   constructor(opts: YutaOptions = {}) {
     const connStr = opts.connectionString ?? this.getConnectionFromKeychain();
     this.sql = postgres(connStr, { max: 10 });
-    this.claimant = opts.claimant;
+    this.claimant =
+      opts.claimant === undefined
+        ? undefined
+        : requireClaimant(opts.claimant);
   }
 
   // ──────────────────────────────────────────────────────────
@@ -128,12 +134,11 @@ export class Yuta {
 
   /** Set the default `by` for all writes. The true claim becomes the laziest claim. */
   setClaimant(who: string): void {
-    if (who.trim() === "") throw new Error("CLAIMANT: by must be non-empty");
-    this.claimant = who;
+    this.claimant = requireClaimant(who);
   }
 
   getClaimant(): string {
-    if (!this.claimant || this.claimant.trim() === "") {
+    if (this.claimant === undefined) {
       throw new Error("CLAIMANT REQUIRED: pass claimant in Yuta options or call setClaimant before writing");
     }
     return this.claimant;
@@ -141,8 +146,21 @@ export class Yuta {
 
   /** Refuse semantic operations unless the database is the exact candidate binding. */
   async assertCandidateBinding(): Promise<void> {
-    this.candidateBindingCheck ??= this.checkCandidateBinding();
-    return this.candidateBindingCheck;
+    if (this.candidateBindingCheck) return this.candidateBindingCheck;
+
+    const check = this.checkCandidateBinding();
+    this.candidateBindingCheck = check;
+    try {
+      await check;
+    } catch (error) {
+      // A migration or transient connection problem can be repaired while a
+      // long-lived client remains open. Cache successful observation, not a
+      // rejected promise that makes every later attempt fail without looking.
+      if (this.candidateBindingCheck === check) {
+        this.candidateBindingCheck = undefined;
+      }
+      throw error;
+    }
   }
 
   // ──────────────────────────────────────────────────────────
@@ -156,13 +174,14 @@ export class Yuta {
     const registryQuery = metadata.versionSource === "database"
       ? this.sql`
           SELECT book, deck, native, physical_schema, physical_table,
-                 id_col, at_col, by_col, how_col, src_col
+                 id_col, at_col, by_col, how_col, src_col, ttl::text AS ttl
           FROM yu.registry
           ORDER BY book, deck
         `
       : this.sql`
           SELECT book, deck, native, book AS physical_schema,
-                 deck AS physical_table, id_col, at_col, by_col, how_col, src_col
+                 deck AS physical_table, id_col, at_col, by_col, how_col,
+                 src_col, ttl::text AS ttl
           FROM yu.registry
           ORDER BY book, deck
         `;
@@ -180,14 +199,14 @@ export class Yuta {
       versionSource: metadata.versionSource,
       creed: [
         "Straightforward — every primitive is a one-word rename of something Postgres already does well",
-        "Organised — one place for vocabulary, one place for connections, one shape for every record's provenance",
+        "Organised — one place for vocabulary, one place for connections, one shape for each YUTABASE row's claim context",
         "Connected by words — a relation without a word does not exist",
       ],
       primitives: ["BOOK", "DECK", "CARD", "THREAD", "LEXICON"],
       honesty: {
         columns: ["at", "by", "how", "src"],
         claims: ["witnessed", "live", "cached", "computed", "declared"],
-        rule: "No SQL defaults for how and by — a write that doesn't say is refused",
+        rule: "YUTABASE thread and lexicon writes must state how and by; these are self-reported claims, not proof",
       },
       lexicon: lexicon as unknown as LexiconEntry[],
       decks: registry as unknown as RegistryEntry[],
@@ -225,19 +244,38 @@ export class Yuta {
   private async executeCompiled<Row extends Record<string, unknown> = Record<string, unknown>>(
     compiled: CompiledQuery,
   ): Promise<QueryResult<Row>> {
-    const resolved = await this.resolveDeckQuery(compiled);
+    // Keep registry resolution, physical execution, and optional name
+    // enrichment in one transaction. The owner-rights mapping helper pins each
+    // selected registry row with FOR SHARE until the physical reads finish, so
+    // a concurrent remap/delete cannot make one operation straddle meanings.
+    return this.sql.begin(
+      "isolation level read committed",
+      (tx) => this.executeCompiledInTransaction<Row>(tx, compiled),
+    );
+  }
+
+  private async executeCompiledInTransaction<
+    Row extends Record<string, unknown> = Record<string, unknown>,
+  >(
+    sql: postgres.ISql,
+    compiled: CompiledQuery,
+  ): Promise<QueryResult<Row>> {
+    await this.assertCurrentCandidateMetadata(sql);
+    const resolved = await this.resolveDeckQuery(sql, compiled);
     const adjusted = this.injectClaimant(resolved.query);
-    const rows = await (this.sql.unsafe as (sql: string, params: never[]) => Promise<unknown>)(adjusted.sql, adjusted.params as never[]);
+    const rows = await (
+      sql.unsafe as (sql: string, params: never[]) => Promise<unknown>
+    )(adjusted.sql, adjusted.params as never[]);
 
     let rowsArray = rows as unknown as Record<string, unknown>[];
     if (resolved.mapping) rowsArray = normalizeMappedRows(rowsArray, resolved.mapping);
 
     // Enrich traversal results with card names
     if (rowsArray.length > 0 && rowsArray[0].book && rowsArray[0].deck && rowsArray[0].id) {
-      rowsArray = await this.enrichCards(rowsArray);
+      rowsArray = await this.enrichCards(sql, rowsArray);
     }
 
-    const freshness = this.computeFreshness(rowsArray);
+    const freshness = summarizeFreshness(rowsArray);
 
     return { rows: rowsArray as Row[], sql: adjusted.sql, freshness };
   }
@@ -275,9 +313,12 @@ export class Yuta {
   /** Execute trusted operator DDL as one PostgreSQL transaction. */
   async execTransaction(statements: readonly string[]): Promise<void> {
     if (statements.length === 0) return;
-    await this.sql.begin(async (tx) => {
-      for (const statement of statements) await tx.unsafe(statement);
-    });
+    await this.sql.begin(
+      "isolation level read committed",
+      async (tx) => {
+        for (const statement of statements) await tx.unsafe(statement);
+      },
+    );
   }
 
   // ──────────────────────────────────────────────────────────
@@ -342,7 +383,10 @@ export class Yuta {
   // enrich — join card refs to their card tables for names
   // ──────────────────────────────────────────────────────────
 
-  private async enrichCards(rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  private async enrichCards(
+    sql: postgres.ISql,
+    rows: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
     // Collect logical book/deck pairs and only the IDs present in this result.
     const pairs = new Map<string, { book: string; deck: string; ids: Set<string> }>();
     for (const r of rows) {
@@ -354,13 +398,17 @@ export class Yuta {
     }
 
     // Resolve logical refs through the registry. Never interpolate names read
-    // from rows until the core identifier grammar has accepted them.
+    // from rows until the core identifier grammar has accepted them. Sort the
+    // lock order so multi-deck traversals do not manufacture avoidable
+    // deadlocks with another enrichment operation.
     const nameMap = new Map<string, string>();
-    for (const pair of pairs.values()) {
-      const mappings = await this.sql`
+    const orderedPairs = [...pairs.values()].sort((left, right) =>
+      compareAscii(left.book, right.book) || compareAscii(left.deck, right.deck)
+    );
+    for (const pair of orderedPairs) {
+      const mappings = await sql`
         SELECT physical_schema, physical_table, id_col
-        FROM yu.registry
-        WHERE book = ${pair.book} AND deck = ${pair.deck}
+        FROM yu._lock_registry_mapping(${pair.book}, ${pair.deck})
       `;
       const mapping = mappings[0] as Record<string, unknown> | undefined;
       if (!mapping) continue;
@@ -369,7 +417,7 @@ export class Yuta {
       const physicalTable = requireIdentifier(mapping.physical_table, "registry physical_table");
       const idColumn = requireIdentifier(mapping.id_col, "registry id_col");
 
-      const nameColumns = await this.sql`
+      const nameColumns = await sql`
         SELECT 1
         FROM information_schema.columns
         WHERE table_schema = ${physicalSchema}
@@ -384,7 +432,7 @@ export class Yuta {
         FROM ${ident(physicalSchema)}.${ident(physicalTable)}
         WHERE ${ident(idColumn)}::text = ANY($1::text[])
       `;
-      const cards = await this.sql.unsafe(query, [[...pair.ids]]);
+      const cards = await sql.unsafe(query, [[...pair.ids]]);
       for (const card of cards) {
         if (typeof card.id === "string" && typeof card.name === "string") {
           nameMap.set(cardKey(pair.book, pair.deck, card.id), card.name);
@@ -419,14 +467,16 @@ export class Yuta {
     return bindClaimant(compiled, this.getClaimant());
   }
 
-  private async resolveDeckQuery(compiled: CompiledQuery): Promise<ResolvedDeckQuery> {
+  private async resolveDeckQuery(
+    db: postgres.ISql,
+    compiled: CompiledQuery,
+  ): Promise<ResolvedDeckQuery> {
     if (!compiled.deckTarget) return { query: compiled };
 
     const { book, deck } = compiled.deckTarget;
-    const mappings = await this.sql`
+    const mappings = await db`
       SELECT physical_schema, physical_table, id_col, at_col, by_col, how_col, src_col
-      FROM yu.registry
-      WHERE book = ${book} AND deck = ${deck}
+      FROM yu._lock_registry_mapping(${book}, ${deck})
     `;
     if (mappings.length !== 1) throw new Error(`UNREGISTERED DECK: ${book}/${deck}`);
 
@@ -441,8 +491,7 @@ export class Yuta {
       srcColumn: requireIdentifier(row.src_col, "registry src_col"),
     };
 
-    const logicalTable = `${ident(book)}.${ident(deck)}`;
-    if (!compiled.sql.includes(logicalTable)) {
+    if (!compiled.sql.includes(LOGICAL_DECK_SQL)) {
       throw new Error(`COMPILER CONTRACT: missing logical table ${book}/${deck}`);
     }
 
@@ -450,21 +499,24 @@ export class Yuta {
     // physical schema named `id`, for example, must not be mistaken for the
     // logical card identifier column.
     const tableToken = "__YUTABASE_RESOLVED_TABLE__";
-    let sql = compiled.sql.replace(logicalTable, tableToken);
+    let resolvedSql = compiled.sql.replace(LOGICAL_DECK_SQL, tableToken);
     const columnTokens = mappedColumns(mapping).map(([logical, physical], index) => ({
       logical,
       physical,
       token: `__YUTABASE_RESOLVED_COLUMN_${index}__`,
     }));
     for (const column of columnTokens) {
-      sql = sql.replaceAll(ident(column.logical), column.token);
+      resolvedSql = resolvedSql.replaceAll(ident(column.logical), column.token);
     }
     for (const column of columnTokens) {
-      sql = sql.replaceAll(column.token, ident(column.physical));
+      resolvedSql = resolvedSql.replaceAll(column.token, ident(column.physical));
     }
-    sql = sql.replace(tableToken, `${ident(mapping.physicalSchema)}.${ident(mapping.physicalTable)}`);
+    resolvedSql = resolvedSql.replace(
+      tableToken,
+      `${ident(mapping.physicalSchema)}.${ident(mapping.physicalTable)}`,
+    );
 
-    return { query: { ...compiled, sql }, mapping };
+    return { query: { ...compiled, sql: resolvedSql }, mapping };
   }
 
   private async checkCandidateBinding(): Promise<void> {
@@ -477,6 +529,46 @@ export class Yuta {
     await this.assertCandidateShape(metadata);
   }
 
+  /**
+   * Re-read the cheap database identity for every semantic operation.
+   *
+   * The full catalog binding probe remains cached. This read runs inside the
+   * operation's READ COMMITTED transaction so a long-lived client does not
+   * continue on a visibly replaced revision or capability contract. The
+   * candidate grants yu_reader SELECT, but not UPDATE, on standard_meta;
+   * PostgreSQL therefore does not permit the reader-compatible SDK to add a
+   * FOR SHARE row lock here.
+   */
+  private async assertCurrentCandidateMetadata(sql: postgres.ISql): Promise<void> {
+    const rows = await sql`
+      SELECT standard, profile, version, revision, capabilities
+      FROM yu.standard_meta
+      WHERE singleton = true
+    `;
+    const row = rows[0] as Record<string, unknown> | undefined;
+    const capabilities = row?.capabilities;
+    const hasExactCapabilities =
+      Array.isArray(capabilities) &&
+      capabilities.length === CANDIDATE_CAPABILITIES.length &&
+      capabilities.every(
+        (capability, index) => capability === CANDIDATE_CAPABILITIES[index],
+      );
+
+    if (
+      rows.length !== 1 ||
+      row?.standard !== "YUTABASE" ||
+      row.profile !== "postgres" ||
+      row.version !== CANDIDATE_VERSION ||
+      row.revision !== CANDIDATE_REVISION ||
+      !hasExactCapabilities
+    ) {
+      throw new Error(
+        `STALE YUTABASE BINDING: expected YUTABASE/postgres@${CANDIDATE_VERSION}` +
+        ` revision ${CANDIDATE_REVISION} with exact candidate capabilities`,
+      );
+    }
+  }
+
   private async assertCandidateShape(metadata: StandardMetadata): Promise<void> {
     assertCandidateMetadata(metadata);
     const [
@@ -485,20 +577,28 @@ export class Yuta {
       hasExactCandidateConstraints,
       hasCandidateObjects,
       hasDynamicSurfaces,
+      hasExactCapabilities,
+      hasExactPrivileges,
     ] = await Promise.all([
       hasExactCoreColumnSurface(this.sql, "candidate"),
       this.hasLegacyIntegrity("candidate"),
-      hasExactCandidateConstraintSurface(this.sql),
-      this.hasCandidateObjects(),
-      hasCandidateDynamicSurfaces(this.sql),
+      hasExactCandidateConstraintSurface(this.sql, CANDIDATE_REVISION),
+      this.hasCandidateObjects(CANDIDATE_REVISION),
+      hasCandidateDynamicSurfaces(this.sql, CANDIDATE_REVISION),
+      hasExactCandidateCapabilitySurface(this.sql, CANDIDATE_REVISION),
+      hasExactCandidatePrivilegeSurface(this.sql, CANDIDATE_REVISION),
     ]);
     if (
       !hasExactColumns ||
       !hasLegacyIntegrity ||
       !hasExactCandidateConstraints ||
-      !hasDynamicSurfaces
+      !hasDynamicSurfaces ||
+      !hasExactCapabilities ||
+      !hasExactPrivileges
     ) {
-      throw new Error("PARTIAL YUTABASE INSTALL: candidate base integrity does not match revision 4");
+      throw new Error(
+        `PARTIAL YUTABASE INSTALL: candidate base integrity does not match revision ${CANDIDATE_REVISION}`,
+      );
     }
     if (!hasCandidateObjects) {
       throw new Error("PARTIAL YUTABASE INSTALL: candidate functions, triggers, or roles are incomplete");
@@ -663,8 +763,10 @@ export class Yuta {
     return rows[0]?.complete === true && hasExactConstraints && hasExactIndexes;
   }
 
-  private async hasCandidateObjects(): Promise<boolean> {
-    const [rows, hasExactFunctions] = await Promise.all([
+  private async hasCandidateObjects(
+    revision: 4 | 5 = CANDIDATE_REVISION,
+  ): Promise<boolean> {
+    const [rows, hasExactFunctions, hasExactTriggers] = await Promise.all([
       this.sql`
       SELECT
         to_regnamespace('via') IS NOT NULL
@@ -698,6 +800,7 @@ export class Yuta {
         AND to_regprocedure('yu._registry_referenced_ids(text,text)') IS NOT NULL
         AND to_regprocedure('yu._reserve_thread_id()') IS NOT NULL
         AND to_regprocedure('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)') IS NOT NULL
+        AND to_regprocedure('yu._lock_registry_mapping(text,text)') IS NOT NULL
         AND to_regprocedure('yu._validate_registry_mapping()') IS NOT NULL
         AND to_regprocedure('yu._validate_thread()') IS NOT NULL
         AND to_regprocedure('yu._begin_word_version()') IS NOT NULL
@@ -741,6 +844,7 @@ export class Yuta {
             ('yu._capture_word_version()', true, true),
             ('yu._reserve_thread_id()', true, true),
             ('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)', true, true),
+            ('yu._lock_registry_mapping(text,text)', true, true),
             ('yu._version_gloss()', true, true),
             ('yu.sever(uuid,text,text,text[])', true, true),
             ('yu._guard_delete()', true, true),
@@ -886,7 +990,7 @@ export class Yuta {
               to_regclass('yu.thread_ids'),
               to_regclass('yu.sever_log')
             )
-        ) = 11
+        ) IN (11, 12)
         AND NOT EXISTS (
           SELECT 1
           FROM (VALUES
@@ -960,9 +1064,10 @@ export class Yuta {
           )
         ) AS complete
       `,
-      hasExactCandidateFunctionSurface(this.sql),
+      hasExactCandidateFunctionSurface(this.sql, revision),
+      hasExactCandidateTriggerSurface(this.sql, revision),
     ]);
-    return rows[0]?.complete === true && hasExactFunctions;
+    return rows[0]?.complete === true && hasExactFunctions && hasExactTriggers;
   }
 
   private async readStandardMetadata(): Promise<StandardMetadata> {
@@ -978,6 +1083,7 @@ export class Yuta {
           OR to_regprocedure('yu._registry_referenced_ids(text,text)') IS NOT NULL
           OR to_regprocedure('yu._reserve_thread_id()') IS NOT NULL
           OR to_regprocedure('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)') IS NOT NULL
+          OR to_regprocedure('yu._lock_registry_mapping(text,text)') IS NOT NULL
           OR to_regprocedure('yu._validate_registry_mapping()') IS NOT NULL
           OR to_regprocedure('yu._begin_word_version()') IS NOT NULL
           OR to_regprocedure('yu._capture_word_version()') IS NOT NULL
@@ -985,11 +1091,21 @@ export class Yuta {
           OR to_regprocedure('yu._refuse_word_version_mutation()') IS NOT NULL
           OR to_regprocedure('yu._refuse_thread_mutation()') IS NOT NULL
           OR to_regprocedure('yu._refuse_sever_log_mutation()') IS NOT NULL
+          OR to_regprocedure('yu._guard_truncate()') IS NOT NULL
+          OR to_regprocedure('yu._maintain_registry_guard()') IS NOT NULL
+          OR to_regprocedure('yu._nonblank_text(text)') IS NOT NULL
+          OR to_regprocedure('yu._source_locators_valid(text[])') IS NOT NULL
           OR EXISTS (
             SELECT 1 FROM pg_catalog.pg_constraint
             WHERE conname IN (
               'lexicon_status_candidate', 'lexicon_how_candidate',
-              'threads_how_candidate', 'sever_log_how_candidate'
+              'threads_how_candidate', 'sever_log_how_candidate',
+              'lexicon_src_locators_valid',
+              'word_versions_src_locators_valid',
+              'threads_src_locators_valid',
+              'sever_log_src_locators_valid',
+              'sever_log_thread_src_locators_valid',
+              'registry_mapped_columns_distinct'
             ) AND connamespace = to_regnamespace('yu')
           )
           OR EXISTS (
@@ -1002,7 +1118,8 @@ export class Yuta {
               'lexicon_capture_update_version',
               'word_versions_immutable',
               'threads_immutable',
-              'sever_log_immutable'
+              'sever_log_immutable',
+              'registry_guard_lifecycle'
             )
               AND tgrelid IN (
                 to_regclass('yu.registry'), to_regclass('yu.lexicon'),
@@ -1063,38 +1180,6 @@ export class Yuta {
       revision: row.revision,
       capabilities: row.capabilities as string[],
       versionSource: "database",
-    };
-  }
-
-  private computeFreshness(rows: Record<string, unknown>[]): FreshnessBanner | undefined {
-    let totalValues = 0;
-    let cachedCount = 0;
-    let computedCount = 0;
-    let oldestAt: Date | null = null;
-
-    for (const row of rows) {
-      if (typeof row.how === "string") {
-        totalValues++;
-        if (row.how === "cached") cachedCount++;
-        if (row.how === "computed") computedCount++;
-      }
-      if (row.how === "cached" && row.at) {
-        const at = new Date(row.at as string);
-        if (!oldestAt || at < oldestAt) oldestAt = at;
-      }
-    }
-
-    if (totalValues === 0) return undefined;
-
-    const oldestCachedDays = oldestAt
-      ? Math.floor((Date.now() - oldestAt.getTime()) / (1000 * 60 * 60 * 24))
-      : null;
-
-    return {
-      totalValues,
-      cachedCount,
-      computedCount,
-      oldestCachedDays,
     };
   }
 
@@ -1164,6 +1249,7 @@ export interface RegistryEntry {
   by_col: string;
   how_col: string;
   src_col: string;
+  ttl: string | null;
 }
 
 function requireIdentifier(value: unknown, label: string): string {
@@ -1174,8 +1260,23 @@ function requireIdentifier(value: unknown, label: string): string {
   return value;
 }
 
+function requireClaimant(value: unknown): string {
+  if (!isNonblankText(value)) {
+    throw new Error(
+      "CLAIMANT: by must be a non-blank string without NUL",
+    );
+  }
+  return value;
+}
+
 function cardKey(book: string, deck: string, id: string): string {
   return JSON.stringify([book, deck, id]);
+}
+
+function compareAscii(left: string, right: string): number {
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 interface DeckMapping {

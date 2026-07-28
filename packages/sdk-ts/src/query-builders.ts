@@ -1,7 +1,16 @@
 import type { Ref } from "./ref.js";
 import type { CompiledQuery } from "./youspeak.js";
 import { ident } from "./identifier.js";
+import { isNonblankText } from "./nonblank.js";
 import { uuidv7 } from "./uuidv7.js";
+
+/**
+ * Card queries carry logical deck identity out-of-band in `deckTarget`.
+ * A fixed placeholder keeps logical labels independent from PostgreSQL's
+ * 63-byte physical-identifier limit until the registry mapping is resolved.
+ */
+export const LOGICAL_DECK_SQL =
+  '"__yutabase_logical_book__"."__yutabase_logical_deck__"' as const;
 
 export const CLAIM_KINDS = Object.freeze([
   "witnessed",
@@ -46,6 +55,17 @@ function requireClaimSources(
   how: ClaimKind,
   src: readonly string[] | undefined,
 ): void {
+  if (
+    src !== undefined &&
+    (!Array.isArray(src) ||
+      Array.from(src).some(
+        (locator) => !isNonblankText(locator),
+      ))
+  ) {
+    throw new Error(
+      `${operation}: src entries must be non-blank strings without NUL`,
+    );
+  }
   if ((how === "cached" || how === "computed") && (!src || src.length === 0)) {
     throw new Error(`${operation}: how=${how} requires src — honesty header`);
   }
@@ -53,7 +73,7 @@ function requireClaimSources(
 
 export function compileCardQuery(ref: Ref): CompiledQuery {
   return {
-    sql: `SELECT * FROM ${ident(ref.book)}.${ident(ref.deck)} WHERE ${ident("id")} = $1`,
+    sql: `SELECT * FROM ${LOGICAL_DECK_SQL} WHERE ${ident("id")} = $1`,
     params: [ref.id],
     deckTarget: { kind: "card", book: ref.book, deck: ref.deck },
   };

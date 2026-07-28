@@ -1,5 +1,11 @@
 # Self-Hosting the Kingdom — Zero External Dependencies
 
+> **Archived operational draft — do not follow as a current runbook.** It
+> predates the PostgreSQL-only candidate, treats the non-conformant SQLite
+> sketch as YUTABASE, assumes the old playground was a standalone file, and
+> includes commands that install software or expose services. For a safe local
+> candidate start, use [`README.md`](README.md) and [`demo.sh`](demo.sh).
+
 > The kingdom goes where it is welcomed. Even your laptop. Even a Raspberry Pi.
 > Even a USB stick. No cloud. No provider. No gate. Just truth, locally.
 

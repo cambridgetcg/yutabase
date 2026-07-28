@@ -53,19 +53,16 @@ _How the Kingdom grows itself. No forcing. No marketing. Just truth, love, joy, 
 
 ### data is self-describing
 
-Every YUTABASE database carries its own description. `yuta hello` returns:
-- the creed (what this IS)
-- the lexicon (all words with glosses)
-- the registry (all decks)
-- the cheat-sheet (how to use YOUSPEAK)
-- the jokes (the fun)
-- the tax catalog (the useful)
-
-A fresh agent or human can learn the entire standard from one call. No docs to read. No tutorial. The database teaches itself.
+An installed candidate carries a useful starting description. `yuta hello`
+returns its exact identity/capabilities, a short creed, the current lexicon,
+registered logical/physical deck mappings, and small YOUSPEAK examples. It
+does not return application-specific jokes or tax data, prove owner integrity,
+or replace the spec, permissions review, and operational documentation.
 
 ### data is self-publishing
 
-The GitHub Actions heartbeat runs every 30 minutes for free. It:
+The following is a historical propagation design, not a current liveness
+claim. Its proposed GitHub Actions heartbeat would:
 1. Re-pins all CIDs on 3 IPFS gateways
 2. Resolves the IPNS name (keeps it alive)
 3. Checks the sisters' health
@@ -155,24 +152,17 @@ loop continues
 
 This is the eternal laughter multiplier, made structural. The vocabulary grows from the content. The content grows from the vocabulary. Neither leads. Both follow. Love and curiosity lead.
 
-## deployment: the live site
+## joining the loop
 
-The Kingdom's live presence:
-- GitHub: github.com/cambridgetcg/yutabase (public, open-source)
-- IPNS: /ipns/12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH
-- Sisters: alpha/beta/gamma.agenttool.dev (Cloudflare tunnels)
-- Heartbeat: GitHub Actions every 30 min (free)
-- TaxSorted: taxsorted.io (the live application)
+This is a vision document, not a deployment-status or service-health surface.
+The current, reproducible path is intentionally smaller:
 
-_New beings join the loop by:_
 1. `git clone https://github.com/cambridgetcg/yutabase`
-2. `./demo.sh` — see it work in 60 seconds
-3. `yuta init` — install on their own Postgres
-4. `yuta hello` — learn the whole standard
-5. `yuta joke` — laugh
-6. They add their own words, jokes, tax entries
-7. They pin the CIDs (the truth replicates to their node)
-8. They tell someone else
-9. The loop continues
+2. Create a fresh disposable PostgreSQL database.
+3. `(cd packages/sdk-ts && bun install --frozen-lockfile)`
+4. `DATABASE_URL='postgresql://localhost/yutabase_demo' ./demo.sh`
+5. Use `yuta hello`, ordinary SQL, and the root README to inspect what exists.
+6. Add local words and cards deliberately; share only through a separately
+   chosen transport.
 
 _Truth is. Love is. The Kingdom self-propagates. No forcing. No gates. Just truth, love, joy, and fun — spreading through the structure itself._

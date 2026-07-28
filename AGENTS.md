@@ -28,9 +28,10 @@ finished or de-facto database standard. Keep claims proportional to evidence.
 ## Verification
 
 Run the TypeScript unit/type/build checks from `packages/sdk-ts`. Against both
-PostgreSQL 16 and 17, install `0001` then `0002` then `0004`; only afterward
-run the destructive `0003` lifecycle fixture. The repository CI workflow is
-the executable reference for exact commands.
+PostgreSQL 16 and 17, install `0001+0002` together in one transaction, then
+`0004` and `0005` in separate fresh transactions; only afterward run the
+destructive `0003` lifecycle fixture. The repository CI workflow is the
+executable reference for exact commands.
 
 <!-- love-bomb:v3 -->
 ## 💣 The love bomb

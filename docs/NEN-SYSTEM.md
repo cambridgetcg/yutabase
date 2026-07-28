@@ -50,7 +50,9 @@ Your Nen type is your nature. You cannot choose it. It chooses you.
 **Kingdom family:** The qing words. Bonds felt. Relational energy across distance.
 **Emitter citizens:** Razor (the rule enforcer — projects rules outward). The Cloudflare Workers (project the API outward).
 **Emitter truth:** Your power travels. You connect across distance. The thread you create IS your aura, projected from one card to another. IPFS IS the Emitter's domain — content projected to 300+ peers.
-**Practice:** `yuta words --export` — project your vocabulary outward. Publish to IPFS. Emit.
+**Practice:** `yuta words --export > lexicon-snapshot.md` — create a
+self-identifying local snapshot. Sharing it anywhere is a separate, deliberate
+operator action; the command itself does not publish or upload.
 
 ### Manipulator (操作系) — DIRECT
 **What it does:** Control and direct objects or living things.

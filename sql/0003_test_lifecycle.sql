@@ -1,6 +1,6 @@
 -- YUTABASE 0.1.0-candidate.1 lifecycle conformance test
 --
--- Run only after 0001, 0002, and 0004, against a disposable database:
+-- Run only after 0001, 0002, 0004, and 0005, against a disposable database:
 --   psql --single-transaction -v ON_ERROR_STOP=1 -f sql/0003_test_lifecycle.sql
 --
 -- Every negative test raises an exception if the expected refusal does not
@@ -23,18 +23,43 @@ BEGIN
          AND standard = 'YUTABASE'
          AND profile = 'postgres'
          AND version = '0.1.0-candidate.1'
-         AND revision = 4
+         AND revision = 5
          AND capabilities @> ARRAY[
            'word-version-pinning',
            'global-thread-id-ledger',
            'endpoint-existence-on-insert',
-           'concurrency-safe-to-one'
+           'concurrency-safe-to-one',
+           'guarded-card-identity',
+           'nonblank-source-locators'
          ]::text[]
      ) THEN
     RAISE EXCEPTION 'TEST FAILED: candidate identity is absent or incorrect';
   END IF;
 
-  IF NOT pg_has_role('yu_writer', 'yu_reader', 'member')
+  IF EXISTS (
+    SELECT 1
+    FROM yu.lexicon word
+    JOIN yu.threads thread ON thread.word = word.word
+    WHERE word.to_one
+    GROUP BY
+      thread.word,
+      thread.from_book,
+      thread.from_deck,
+      thread.from_id
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION
+      'TEST FAILED: current to_one meaning has duplicate active outgoing refs';
+  END IF;
+
+  IF NOT pg_has_role('yu_appender', 'yu_reader', 'member')
+     OR NOT pg_has_role('yu_writer', 'yu_reader', 'member')
+     OR NOT has_table_privilege('yu_appender', 'yu.threads', 'INSERT')
+     OR has_table_privilege('yu_appender', 'yu.threads', 'UPDATE')
+     OR has_table_privilege('yu_appender', 'yu.threads', 'DELETE')
+     OR has_column_privilege('yu_appender', 'yu.threads', 'note', 'UPDATE')
+     OR has_table_privilege('yu_appender', 'yu.thread_ids', 'INSERT')
+     OR has_table_privilege('yu_appender', 'yu.lexicon', 'INSERT')
      OR NOT has_table_privilege('yu_writer', 'yu.threads', 'INSERT')
      OR has_table_privilege('yu_writer', 'yu.threads', 'UPDATE')
      OR has_table_privilege('yu_writer', 'yu.threads', 'DELETE')
@@ -44,8 +69,21 @@ BEGIN
      OR has_table_privilege('yu_writer', 'yu.thread_ids', 'DELETE')
      OR has_table_privilege('yu_lexicographer', 'yu.lexicon_versions', 'INSERT')
      OR NOT has_function_privilege(
+       'yu_appender',
+       'yu._lock_thread_context(text,text,text,uuid,text,text,uuid)',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'yu_appender', 'yu.sever(uuid,text,text,text[])', 'EXECUTE'
+     )
+     OR NOT has_function_privilege(
        'yu_writer',
        'yu._lock_thread_context(text,text,text,uuid,text,text,uuid)',
+       'EXECUTE'
+     )
+     OR NOT has_function_privilege(
+       'yu_reader',
+       'yu._lock_registry_mapping(text,text)',
        'EXECUTE'
      )
      OR NOT has_function_privilege(
@@ -55,8 +93,97 @@ BEGIN
      )
      OR NOT has_function_privilege(
        'yu_writer', 'yu.sever(uuid,text,text,text[])', 'EXECUTE'
+     )
+     OR NOT has_function_privilege(
+       'yu_writer', 'yu._source_locators_valid(text[])', 'EXECUTE'
+     )
+     OR NOT has_function_privilege(
+       'yu_lexicographer', 'yu._source_locators_valid(text[])', 'EXECUTE'
+     )
+     OR NOT has_function_privilege(
+       'yu_writer', 'yu._nonblank_text(text)', 'EXECUTE'
+     )
+     OR NOT has_function_privilege(
+       'yu_lexicographer', 'yu._nonblank_text(text)', 'EXECUTE'
+     )
+     OR NOT EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_proc p
+       CROSS JOIN LATERAL pg_catalog.aclexplode(
+         coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))
+       ) acl
+       WHERE p.oid = 'yu._source_locators_valid(text[])'::regprocedure
+         AND acl.grantee = 0
+         AND acl.privilege_type = 'EXECUTE'
+         AND NOT acl.is_grantable
+     )
+     OR NOT has_function_privilege(
+       'yu_lexicographer', 'yu._guard_delete()', 'EXECUTE'
+     )
+     OR NOT has_function_privilege(
+       'yu_lexicographer', 'yu._guard_truncate()', 'EXECUTE'
+     )
+     OR EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_roles role
+       WHERE role.rolname IN (
+         'yu_reader', 'yu_appender', 'yu_writer', 'yu_lexicographer'
+       )
+         AND (
+           role.rolcanlogin
+           OR role.rolsuper
+           OR role.rolcreatedb
+           OR role.rolcreaterole
+           OR NOT role.rolinherit
+           OR role.rolreplication
+           OR role.rolbypassrls
+         )
      ) THEN
     RAISE EXCEPTION 'TEST FAILED: candidate role capabilities are incorrect';
+  END IF;
+
+  IF EXISTS (
+    WITH capability_roles AS (
+      SELECT role.oid, role.rolname
+      FROM pg_catalog.pg_roles role
+      WHERE role.rolname IN (
+        'yu_reader', 'yu_appender', 'yu_writer', 'yu_lexicographer'
+      )
+    ),
+    expected(parent_name, member_name) AS (
+      VALUES
+        ('yu_reader', 'yu_appender'),
+        ('yu_reader', 'yu_writer'),
+        ('yu_reader', 'yu_lexicographer')
+    ),
+    actual AS (
+      SELECT DISTINCT
+        parent.rolname AS parent_name,
+        member.rolname AS member_name
+      FROM pg_catalog.pg_auth_members membership
+      JOIN capability_roles parent ON parent.oid = membership.roleid
+      JOIN capability_roles member ON member.oid = membership.member
+    ),
+    bad_options AS (
+      SELECT 1
+      FROM pg_catalog.pg_auth_members membership
+      JOIN capability_roles parent ON parent.oid = membership.roleid
+      JOIN capability_roles member ON member.oid = membership.member
+      WHERE membership.admin_option
+         OR NOT membership.inherit_option
+         OR NOT membership.set_option
+    ),
+    difference AS (
+      (SELECT * FROM actual EXCEPT SELECT * FROM expected)
+      UNION ALL
+      (SELECT * FROM expected EXCEPT SELECT * FROM actual)
+    )
+    SELECT 1 FROM bad_options
+    UNION ALL
+    SELECT 1 FROM difference
+  ) THEN
+    RAISE EXCEPTION
+      'TEST FAILED: standard capability role hierarchy is not exact';
   END IF;
 
   IF (
@@ -67,6 +194,18 @@ BEGIN
        SELECT prosecdef
        FROM pg_catalog.pg_proc
        WHERE oid = to_regprocedure('yu._validate_registry_mapping()')
+     ) OR (
+       SELECT prosecdef
+       FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._maintain_registry_guard()')
+     ) OR NOT (
+       SELECT prosecdef
+       FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._guard_delete()')
+     ) OR NOT (
+       SELECT prosecdef
+       FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._guard_truncate()')
      ) OR NOT (
        SELECT prosecdef
        FROM pg_catalog.pg_proc
@@ -74,9 +213,125 @@ BEGIN
      ) OR NOT (
        SELECT prosecdef
        FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._lock_registry_mapping(text,text)')
+     ) OR NOT (
+       SELECT prosecdef
+       FROM pg_catalog.pg_proc
        WHERE oid = to_regprocedure('yu._registry_referenced_ids(text,text)')
   ) THEN
     RAISE EXCEPTION 'TEST FAILED: invoker/definer privilege split is incorrect';
+  END IF;
+
+  IF (
+       SELECT provolatile <> 'i'
+           OR prosecdef
+           OR NOT proparallel = 's'
+       FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._nonblank_text(text)')
+     ) OR (
+       SELECT provolatile <> 'i'
+           OR prosecdef
+           OR NOT proparallel = 's'
+       FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._source_locators_valid(text[])')
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: nonblank predicates are not immutable/invoker/parallel-safe';
+  END IF;
+
+  IF (
+       SELECT provolatile <> 'v'
+           OR NOT prosecdef
+           OR proparallel <> 'u'
+           OR proconfig IS DISTINCT FROM ARRAY[
+                'search_path=pg_catalog, yu, pg_temp',
+                'row_security=off'
+              ]::text[]
+           OR pg_catalog.pg_get_function_result(oid) IS DISTINCT FROM
+                'TABLE(physical_schema text, physical_table text, id_col text, at_col text, by_col text, how_col text, src_col text)'
+       FROM pg_catalog.pg_proc
+       WHERE oid = to_regprocedure('yu._lock_registry_mapping(text,text)')
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: registry mapping lock helper contract is incorrect';
+  END IF;
+
+  IF (
+       SELECT count(*)
+       FROM pg_catalog.pg_constraint c
+       WHERE (c.conrelid, c.conname) IN (
+         ('yu.lexicon'::regclass, 'lexicon_src_locators_valid'),
+         ('yu.word_versions'::regclass, 'word_versions_src_locators_valid'),
+         ('yu.threads'::regclass, 'threads_src_locators_valid'),
+         ('yu.sever_log'::regclass, 'sever_log_src_locators_valid'),
+         ('yu.sever_log'::regclass, 'sever_log_thread_src_locators_valid')
+       )
+         AND c.contype = 'c'
+         AND c.convalidated
+     ) <> 5 THEN
+    RAISE EXCEPTION 'TEST FAILED: source-locator hard constraints are incomplete';
+  END IF;
+
+  IF (
+       SELECT count(*)
+       FROM pg_catalog.pg_constraint c
+       WHERE (c.conrelid, c.conname) IN (
+         ('yu.lexicon'::regclass, 'lexicon_gloss_nonempty'),
+         ('yu.lexicon'::regclass, 'lexicon_inverse_nonempty'),
+         ('yu.lexicon'::regclass, 'lexicon_claimant_nonempty'),
+         ('yu.lexicon_versions'::regclass, 'lexicon_versions_gloss_nonempty'),
+         ('yu.lexicon_versions'::regclass, 'lexicon_versions_inverse_nonempty'),
+         ('yu.lexicon_versions'::regclass, 'lexicon_versions_claimant_nonempty'),
+         ('yu.word_versions'::regclass, 'word_versions_gloss_check'),
+         ('yu.word_versions'::regclass, 'word_versions_inverse_check'),
+         ('yu.word_versions'::regclass, 'word_versions_by_check'),
+         ('yu.registry'::regclass, 'registry_claimant_nonempty'),
+         ('yu.threads'::regclass, 'threads_claimant_nonempty'),
+         ('yu.sever_log'::regclass, 'sever_log_claimant_nonempty'),
+         ('yu.sever_log'::regclass, 'sever_log_thread_claimant_nonempty')
+       )
+         AND c.contype = 'c'
+         AND c.convalidated
+     ) <> 13 THEN
+    RAISE EXCEPTION 'TEST FAILED: portable nonblank hard constraints are incomplete';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_constraint c
+    WHERE c.conrelid = 'yu.registry'::regclass
+      AND c.conname = 'registry_mapped_columns_distinct'
+      AND c.contype = 'c'
+      AND c.convalidated
+      AND pg_catalog.pg_get_expr(c.conbin, c.conrelid, false) =
+        '((id_col <> at_col) AND (id_col <> by_col) AND (id_col <> how_col) AND (id_col <> src_col) AND (at_col <> by_col) AND (at_col <> how_col) AND (at_col <> src_col) AND (by_col <> how_col) AND (by_col <> src_col) AND (how_col <> src_col))'
+  ) THEN
+    RAISE EXCEPTION 'TEST FAILED: mapped card/claim columns are not constrained distinct';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger t
+    WHERE t.tgrelid = 'yu.registry'::regclass
+      AND t.tgname = 'registry_guard_lifecycle'
+      AND NOT t.tgisinternal
+      AND t.tgtype = 31
+      AND t.tgenabled = 'O'
+      AND t.tgfoid = 'yu._maintain_registry_guard()'::regprocedure
+      AND ARRAY(
+        SELECT a.attname::text
+        FROM pg_catalog.unnest(t.tgattr::smallint[])
+          WITH ORDINALITY AS key(attnum, position)
+        JOIN pg_catalog.pg_attribute a
+          ON a.attrelid = t.tgrelid AND a.attnum = key.attnum
+        ORDER BY key.position
+      ) = ARRAY[
+        'book',
+        'deck',
+        'physical_schema',
+        'physical_table',
+        'id_col'
+      ]::text[]
+  ) THEN
+    RAISE EXCEPTION 'TEST FAILED: registry guard lifecycle trigger is absent or incorrect';
   END IF;
 
   IF EXISTS (
@@ -87,9 +342,11 @@ BEGIN
       ('yu._capture_word_version()'),
       ('yu._reserve_thread_id()'),
       ('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)'),
+      ('yu._lock_registry_mapping(text,text)'),
       ('yu._version_gloss()'),
       ('yu.sever(uuid,text,text,text[])'),
       ('yu._guard_delete()'),
+      ('yu._guard_truncate()'),
       ('yu.refresh_via()')
     ) AS required(signature)
     LEFT JOIN pg_catalog.pg_proc p
@@ -175,6 +432,11 @@ CREATE TABLE test_cards.empty_item_cards (
   sources text[]
 );
 
+CREATE TABLE test_cards.guard_old_cards
+  (LIKE test_cards.empty_item_cards INCLUDING ALL);
+CREATE TABLE test_cards.guard_new_cards
+  (LIKE test_cards.empty_item_cards INCLUDING ALL);
+
 INSERT INTO yu.registry (
   book, deck, physical_schema, physical_table,
   id_col, at_col, by_col, how_col, src_col,
@@ -196,15 +458,238 @@ INSERT INTO yu.registry (
     NULL, false, 'human:test'
   );
 
-CREATE TRIGGER submission_cards_guard_delete
-  BEFORE DELETE ON test_cards.submission_cards
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    UPDATE yu.registry
+    SET how_col = by_col
+    WHERE book = 'tradein' AND deck = 'items';
+  EXCEPTION WHEN check_violation THEN
+    refused := true;
+  END;
+  IF NOT refused
+     OR (SELECT how_col = by_col
+         FROM yu.registry
+         WHERE book = 'tradein' AND deck = 'items') THEN
+    RAISE EXCEPTION
+      'TEST FAILED: registry allowed by/how to collapse onto one column';
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF (
+    SELECT count(*)
+    FROM yu.registry r
+    JOIN pg_catalog.pg_namespace n ON n.nspname = r.physical_schema
+    JOIN pg_catalog.pg_class c
+      ON c.relnamespace = n.oid AND c.relname = r.physical_table
+    JOIN pg_catalog.pg_trigger t
+      ON t.tgrelid = c.oid AND t.tgname = 'yutabase_guard_delete'
+    WHERE r.book = 'tradein'
+      AND NOT t.tgisinternal
+      AND t.tgtype = 25
+      AND t.tgenabled = 'O'
+      AND t.tgfoid = 'yu._guard_delete()'::regprocedure
+      AND cardinality(t.tgattr::smallint[]) = 0
+  ) <> 3 THEN
+    RAISE EXCEPTION 'TEST FAILED: registry insert did not install exact canonical card guards';
+  END IF;
+
+  IF (
+    SELECT count(*)
+    FROM yu.registry r
+    JOIN pg_catalog.pg_namespace n ON n.nspname = r.physical_schema
+    JOIN pg_catalog.pg_class c
+      ON c.relnamespace = n.oid AND c.relname = r.physical_table
+    JOIN pg_catalog.pg_trigger t
+      ON t.tgrelid = c.oid AND t.tgname = 'yutabase_guard_truncate'
+    WHERE r.book = 'tradein'
+      AND NOT t.tgisinternal
+      AND t.tgtype = 32
+      AND t.tgenabled = 'O'
+      AND t.tgfoid = 'yu._guard_truncate()'::regprocedure
+      AND cardinality(t.tgattr::smallint[]) = 0
+  ) <> 3 THEN
+    RAISE EXCEPTION 'TEST FAILED: registry insert did not install exact canonical truncate guards';
+  END IF;
+END $$;
+
+-- The lifecycle upgrades the released canonical DELETE-only shape, maintains
+-- both guards across a no-ref remap, refuses same-name conflicts, permits a
+-- no-ref truncate, and removes only its exact canonical triggers on cleanup.
+CREATE TRIGGER yutabase_guard_delete
+  BEFORE DELETE ON test_cards.guard_old_cards
   FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
-CREATE TRIGGER item_cards_guard_delete
-  BEFORE DELETE ON test_cards.item_cards
-  FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
-CREATE TRIGGER customer_cards_guard_delete
-  BEFORE DELETE ON test_cards.customer_cards
-  FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
+
+INSERT INTO yu.registry (
+  book, deck, physical_schema, physical_table,
+  id_col, at_col, by_col, how_col, src_col,
+  native, by
+) VALUES (
+  'test', 'guard_lifecycle', 'test_cards', 'guard_old_cards',
+  'card_uuid', 'claimed_at', 'claimant', 'claim_kind', 'sources',
+  false, 'human:test'
+);
+
+INSERT INTO test_cards.guard_old_cards VALUES (
+  '0197a1f4-0000-7000-8000-0000000000aa',
+  'truncate me',
+  clock_timestamp(),
+  'human:test',
+  'declared',
+  NULL
+);
+
+-- A BEFORE TRUNCATE application trigger runs while the cards still exist and
+-- can therefore create a valid thread. The canonical AFTER guard must observe
+-- that final trigger state and roll back both the truncate and inserted ref.
+CREATE FUNCTION test_cards.zz_thread_before_truncate()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO yu.threads (
+    id, word,
+    from_book, from_deck, from_id,
+    to_book, to_deck, to_id,
+    at, by, how
+  ) VALUES (
+    '019a0000-0000-7000-8000-0000000000aa', 'acted_for',
+    'test', 'guard_lifecycle',
+    '0197a1f4-0000-7000-8000-0000000000aa',
+    'test', 'guard_lifecycle',
+    '0197a1f4-0000-7000-8000-0000000000aa',
+    clock_timestamp(), 'agent:test', 'witnessed'
+  );
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER zz_create_thread
+  BEFORE TRUNCATE ON test_cards.guard_old_cards
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION test_cards.zz_thread_before_truncate();
+
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    TRUNCATE TABLE test_cards.guard_old_cards;
+  EXCEPTION WHEN foreign_key_violation THEN
+    refused := true;
+  END;
+  IF NOT refused
+     OR NOT EXISTS (
+       SELECT 1 FROM test_cards.guard_old_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-0000000000aa'
+     )
+     OR EXISTS (
+       SELECT 1 FROM yu.threads
+       WHERE id = '019a0000-0000-7000-8000-0000000000aa'
+     )
+     OR EXISTS (
+       SELECT 1 FROM yu.thread_ids
+       WHERE id = '019a0000-0000-7000-8000-0000000000aa'
+     ) THEN
+    RAISE EXCEPTION
+      'TEST FAILED: AFTER truncate guard missed or retained a BEFORE-trigger ref';
+  END IF;
+END $$;
+
+DROP TRIGGER zz_create_thread ON test_cards.guard_old_cards;
+DROP FUNCTION test_cards.zz_thread_before_truncate();
+
+TRUNCATE TABLE test_cards.guard_old_cards;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM test_cards.guard_old_cards)
+     OR NOT EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_trigger
+       WHERE tgrelid = 'test_cards.guard_old_cards'::regclass
+         AND tgname = 'yutabase_guard_delete'
+         AND tgtype = 25
+         AND tgfoid = 'yu._guard_delete()'::regprocedure
+     )
+     OR NOT EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_trigger
+       WHERE tgrelid = 'test_cards.guard_old_cards'::regclass
+         AND tgname = 'yutabase_guard_truncate'
+         AND tgtype = 32
+         AND tgfoid = 'yu._guard_truncate()'::regprocedure
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: legacy guard upgrade or no-ref truncate failed';
+  END IF;
+END $$;
+
+CREATE TRIGGER yutabase_guard_truncate
+  BEFORE TRUNCATE ON test_cards.guard_new_cards
+  FOR EACH STATEMENT EXECUTE FUNCTION yu._guard_truncate();
+
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    UPDATE yu.registry
+    SET physical_table = 'guard_new_cards',
+        at = clock_timestamp(),
+        by = 'human:test'
+    WHERE book = 'test' AND deck = 'guard_lifecycle';
+  EXCEPTION WHEN duplicate_object THEN
+    refused := true;
+  END;
+  IF NOT refused
+     OR (SELECT physical_table FROM yu.registry
+         WHERE book = 'test' AND deck = 'guard_lifecycle') <> 'guard_old_cards' THEN
+    RAISE EXCEPTION 'TEST FAILED: lifecycle overwrote a same-name trigger conflict';
+  END IF;
+END $$;
+
+DROP TRIGGER yutabase_guard_truncate ON test_cards.guard_new_cards;
+UPDATE yu.registry
+SET physical_table = 'guard_new_cards',
+    at = clock_timestamp(),
+    by = 'human:test'
+WHERE book = 'test' AND deck = 'guard_lifecycle';
+
+DO $$
+BEGIN
+  IF EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_trigger
+       WHERE tgrelid = 'test_cards.guard_old_cards'::regclass
+         AND tgname IN ('yutabase_guard_delete', 'yutabase_guard_truncate')
+     ) OR (
+       SELECT count(*)
+       FROM pg_catalog.pg_trigger
+       WHERE tgrelid = 'test_cards.guard_new_cards'::regclass
+         AND tgname IN ('yutabase_guard_delete', 'yutabase_guard_truncate')
+     ) <> 2 THEN
+    RAISE EXCEPTION 'TEST FAILED: no-ref remap did not move both canonical guards';
+  END IF;
+END $$;
+
+DELETE FROM yu.registry
+WHERE book = 'test' AND deck = 'guard_lifecycle';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_trigger
+    WHERE tgrelid = 'test_cards.guard_new_cards'::regclass
+      AND tgname IN ('yutabase_guard_delete', 'yutabase_guard_truncate')
+  ) THEN
+    RAISE EXCEPTION 'TEST FAILED: registry delete left canonical guards behind';
+  END IF;
+END $$;
+
+DROP TABLE test_cards.guard_old_cards, test_cards.guard_new_cards;
 
 -- A UUID-typed column is not enough: card identity must also be unique.
 CREATE TABLE test_cards.no_unique_identity (
@@ -443,6 +928,21 @@ DO $$
 DECLARE
   refused boolean := false;
 BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM yu._lock_registry_mapping('tradein', 'items') mapping
+    WHERE mapping.physical_schema = 'test_cards'
+      AND mapping.physical_table = 'item_cards'
+      AND mapping.id_col = 'card_uuid'
+      AND mapping.at_col = 'claimed_at'
+      AND mapping.by_col = 'claimant'
+      AND mapping.how_col = 'claim_kind'
+      AND mapping.src_col = 'sources'
+  ) THEN
+    RAISE EXCEPTION
+      'TEST FAILED: reader could not resolve a mapping through the lock helper';
+  END IF;
+
   BEGIN
     PERFORM yu._card_exists(
       'tradein', 'items', '0197a1f4-0000-7000-8000-000000000001'
@@ -456,10 +956,11 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Writer endpoint validation is security-invoker. Grant only the writer the
--- application-deck read surface after proving the reader lacks that oracle.
-GRANT USAGE ON SCHEMA test_cards TO yu_writer;
-GRANT SELECT ON ALL TABLES IN SCHEMA test_cards TO yu_writer;
+-- Endpoint validation is security-invoker. Grant the two thread-creation roles
+-- only the application-deck read surface after proving the reader lacks that
+-- oracle.
+GRANT USAGE ON SCHEMA test_cards TO yu_appender, yu_writer;
+GRANT SELECT ON ALL TABLES IN SCHEMA test_cards TO yu_appender, yu_writer;
 
 \echo 'ok - logical/physical registry mapping and unique card identity'
 
@@ -535,8 +1036,156 @@ BEGIN
   END IF;
 END $$;
 
+DO $$
+DECLARE
+  invalid_locator text;
+  refused boolean;
+BEGIN
+  IF yu._nonblank_text(NULL)
+     OR yu._nonblank_text('')
+     OR yu._nonblank_text(E' \t\n\013\f\r ')
+     OR NOT yu._nonblank_text(E' \t portable \n ')
+     OR NOT yu._nonblank_text(chr(160))
+     OR NOT yu._source_locators_valid(NULL)
+     OR NOT yu._source_locators_valid(ARRAY[]::text[])
+     OR NOT yu._source_locators_valid(ARRAY['source locator'])
+     OR yu._source_locators_valid(
+          ARRAY[['one', 'two'], ['three', 'four']]::text[]
+        )
+     OR yu._source_locators_valid('[0:1]={one,two}'::text[])
+     OR yu._source_locators_valid(ARRAY[NULL::text])
+     OR yu._source_locators_valid(ARRAY[''])
+     OR yu._source_locators_valid(ARRAY['   '])
+     OR yu._source_locators_valid(ARRAY[E'\t'])
+     OR yu._source_locators_valid(ARRAY[E'\n'])
+     OR yu._source_locators_valid(ARRAY[E'\013'])
+     OR yu._source_locators_valid(ARRAY[E'\f'])
+     OR yu._source_locators_valid(ARRAY[E'\r'])
+     OR yu._source_locators_valid(ARRAY[E' \t\n\013\f\r ']) THEN
+    RAISE EXCEPTION 'TEST FAILED: portable nonblank predicates accepted ASCII whitespace or refused valid text';
+  END IF;
+
+  FOREACH invalid_locator IN ARRAY ARRAY[
+    NULL::text, '', '   ', E'\t', E'\n', E'\013', E'\f', E'\r',
+    E' \t\n\013\f\r '
+  ]::text[]
+  LOOP
+    refused := false;
+    BEGIN
+      INSERT INTO yu.lexicon (
+        word, gloss, inverse, from_deck, to_deck,
+        at, by, how, src
+      ) VALUES (
+        'invalid_source_locator',
+        'invalid source locator',
+        'invalid source locator inverse',
+        '*/*', '*/*',
+        clock_timestamp(), 'human:test', 'declared',
+        ARRAY[invalid_locator]
+      );
+    EXCEPTION WHEN check_violation THEN
+      refused := true;
+    END;
+    IF NOT refused THEN
+      RAISE EXCEPTION
+        'TEST FAILED: lexicon accepted invalid source locator %',
+        quote_nullable(invalid_locator);
+    END IF;
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO yu.lexicon (
+      word, gloss, inverse, from_deck, to_deck,
+      at, by, how, src
+    ) VALUES (
+      'invalid_multidimensional_sources',
+      'invalid multidimensional sources',
+      'invalid multidimensional sources inverse',
+      '*/*', '*/*',
+      clock_timestamp(), 'human:test', 'declared',
+      ARRAY[['one', 'two'], ['three', 'four']]::text[]
+    );
+  EXCEPTION WHEN check_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION
+      'TEST FAILED: lexicon accepted a multidimensional source array';
+  END IF;
+
+  refused := false;
+  BEGIN
+    INSERT INTO yu.lexicon (
+      word, gloss, inverse, from_deck, to_deck,
+      at, by, how, src
+    ) VALUES (
+      'invalid_nonstandard_source_bounds',
+      'invalid nonstandard source bounds',
+      'invalid nonstandard source bounds inverse',
+      '*/*', '*/*',
+      clock_timestamp(), 'human:test', 'declared',
+      '[0:1]={one,two}'::text[]
+    );
+  EXCEPTION WHEN check_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION
+      'TEST FAILED: lexicon accepted a non-one-based source array';
+  END IF;
+END $$;
+
 SELECT yu.refresh_via();
 RESET ROLE;
+
+CREATE ROLE yutabase_locator_probe NOLOGIN;
+GRANT USAGE ON SCHEMA yu TO yutabase_locator_probe;
+CREATE SCHEMA locator_probe AUTHORIZATION yutabase_locator_probe;
+SET ROLE yutabase_locator_probe;
+CREATE TABLE locator_probe.claims (
+  id integer PRIMARY KEY,
+  by text NOT NULL CHECK (yu._nonblank_text(by)),
+  src text[],
+  CONSTRAINT claims_source_locators_valid
+    CHECK (yu._source_locators_valid(src))
+);
+INSERT INTO locator_probe.claims VALUES (1, 'agent:probe', ARRAY['app/source']);
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    INSERT INTO locator_probe.claims
+    VALUES (2, 'agent:probe', ARRAY['   ']);
+  EXCEPTION WHEN check_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION
+      'TEST FAILED: public source predicate did not enforce an application-owned table';
+  END IF;
+
+  refused := false;
+  BEGIN
+    INSERT INTO locator_probe.claims
+    VALUES (3, E' \t\n\013\f\r ', ARRAY['app/source']);
+  EXCEPTION WHEN check_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION
+      'TEST FAILED: public nonblank predicate did not enforce an application-owned table';
+  END IF;
+END $$;
+RESET ROLE;
+DROP SCHEMA locator_probe CASCADE;
+REVOKE USAGE ON SCHEMA yu FROM yutabase_locator_probe;
+DROP ROLE yutabase_locator_probe;
 
 DO $$
 BEGIN
@@ -554,6 +1203,61 @@ END $$;
 -- ──────────────────────────────────────────────────────────
 -- Writer path, endpoint existence, claims, and to_one
 -- ──────────────────────────────────────────────────────────
+
+SET ROLE yu_appender;
+
+INSERT INTO yu.threads (
+  id, word,
+  from_book, from_deck, from_id,
+  to_book, to_deck, to_id,
+  note, at, by, how
+) VALUES (
+  '01980000-0000-7000-8000-000000000000', 'contains',
+  'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000001',
+  'tradein', 'items', '0197a1f4-0000-7000-8000-000000000001',
+  'append-only capability probe', clock_timestamp(),
+  'agent:test/appender', 'witnessed'
+);
+
+DO $$
+DECLARE
+  sever_refused boolean := false;
+  mutation_refused boolean := false;
+BEGIN
+  BEGIN
+    PERFORM yu.sever(
+      '01980000-0000-7000-8000-000000000000',
+      'agent:test/appender',
+      'witnessed'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    sever_refused := true;
+  END;
+
+  BEGIN
+    UPDATE yu.threads
+    SET note = 'not allowed'
+    WHERE id = '01980000-0000-7000-8000-000000000000';
+  EXCEPTION WHEN insufficient_privilege THEN
+    mutation_refused := true;
+  END;
+
+  IF NOT sever_refused OR NOT mutation_refused THEN
+    RAISE EXCEPTION
+      'TEST FAILED: appender could sever or mutate an active thread';
+  END IF;
+END $$;
+
+RESET ROLE;
+SET ROLE yu_writer;
+SELECT yu.sever(
+  '01980000-0000-7000-8000-000000000000',
+  'agent:test/writer',
+  'witnessed'
+);
+RESET ROLE;
+
+\echo 'ok - appender creates immutable threads but cannot sever or mutate them'
 
 SET ROLE yu_writer;
 
@@ -791,6 +1495,38 @@ END $$;
 
 DO $$
 DECLARE
+  invalid_locator text;
+  refused boolean;
+BEGIN
+  FOREACH invalid_locator IN ARRAY ARRAY[
+    NULL::text, '', '   ', E'\t', E'\n', E' \t\n '
+  ]::text[]
+  LOOP
+    refused := false;
+    BEGIN
+      INSERT INTO yu.threads (
+        id, word, from_book, from_deck, from_id,
+        to_book, to_deck, to_id, at, by, how, src
+      ) VALUES (
+        gen_random_uuid(), 'acted_for',
+        'tradein', 'items', '0197a1f4-0000-7000-8000-000000000002',
+        'tradein', 'customers', '01964b10-0000-7000-8000-000000000001',
+        clock_timestamp(), 'agent:test', 'declared',
+        ARRAY[invalid_locator]
+      );
+    EXCEPTION WHEN check_violation THEN
+      refused := true;
+    END;
+    IF NOT refused THEN
+      RAISE EXCEPTION
+        'TEST FAILED: thread accepted invalid source locator %',
+        quote_nullable(invalid_locator);
+    END IF;
+  END LOOP;
+END $$;
+
+DO $$
+DECLARE
   refused boolean := false;
 BEGIN
   BEGIN
@@ -834,26 +1570,70 @@ CREATE POLICY lifecycle_allow_writer_insert
   ON yu.threads FOR INSERT TO yu_writer WITH CHECK (true);
 
 SET ROLE yu_lexicographer;
-UPDATE yu.registry
-SET physical_table = 'remap_item_cards',
-    at = clock_timestamp(),
-    by = 'human:test/lexicographer'
-WHERE book = 'tradein' AND deck = 'items';
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    UPDATE yu.registry
+    SET physical_table = 'remap_item_cards',
+        at = clock_timestamp(),
+        by = 'human:test/nonowner'
+    WHERE book = 'tradein' AND deck = 'items';
+  EXCEPTION WHEN insufficient_privilege THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION 'TEST FAILED: non-owner could maintain physical card guards';
+  END IF;
+END $$;
+RESET ROLE;
+
+ALTER TABLE test_cards.item_cards OWNER TO yu_lexicographer;
+ALTER TABLE test_cards.remap_item_cards OWNER TO yu_lexicographer;
+
+SET ROLE yu_lexicographer;
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    UPDATE yu.registry
+    SET physical_table = 'remap_item_cards',
+        at = clock_timestamp(),
+        by = 'human:test/owner'
+    WHERE book = 'tradein' AND deck = 'items';
+  EXCEPTION WHEN foreign_key_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION 'TEST FAILED: physical owner remapped a deck with active refs hidden by RLS';
+  END IF;
+END $$;
 RESET ROLE;
 
 DO $$
 BEGIN
   IF (SELECT physical_table FROM yu.registry
-      WHERE book = 'tradein' AND deck = 'items') <> 'remap_item_cards' THEN
-    RAISE EXCEPTION 'TEST FAILED: authorized lexicographer remap was refused';
+      WHERE book = 'tradein' AND deck = 'items') <> 'item_cards'
+     OR NOT EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_trigger
+       WHERE tgrelid = 'test_cards.item_cards'::regclass
+         AND tgname = 'yutabase_guard_delete'
+     )
+     OR EXISTS (
+       SELECT 1
+       FROM pg_catalog.pg_trigger
+       WHERE tgrelid = 'test_cards.remap_item_cards'::regclass
+         AND tgname IN ('yutabase_guard_delete', 'yutabase_guard_truncate')
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: refused registry remap changed mapping or guards';
   END IF;
 END $$;
 
-UPDATE yu.registry
-SET physical_table = 'item_cards',
-    at = clock_timestamp(),
-    by = 'human:test/reset'
-WHERE book = 'tradein' AND deck = 'items';
+ALTER TABLE test_cards.item_cards OWNER TO CURRENT_USER;
+ALTER TABLE test_cards.remap_item_cards OWNER TO CURRENT_USER;
 DROP TABLE test_cards.remap_item_cards;
 
 SET ROLE yu_lexicographer;
@@ -907,6 +1687,33 @@ RESET ROLE;
 DROP POLICY lifecycle_hide_threads ON yu.threads;
 DROP POLICY lifecycle_allow_writer_insert ON yu.threads;
 ALTER TABLE yu.threads DISABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE
+  truncate_refused boolean := false;
+  delete_mapping_refused boolean := false;
+BEGIN
+  BEGIN
+    TRUNCATE TABLE test_cards.item_cards;
+  EXCEPTION WHEN foreign_key_violation THEN
+    truncate_refused := true;
+  END;
+  BEGIN
+    DELETE FROM yu.registry
+    WHERE book = 'tradein' AND deck = 'items';
+  EXCEPTION WHEN foreign_key_violation THEN
+    delete_mapping_refused := true;
+  END;
+  IF NOT truncate_refused
+     OR NOT delete_mapping_refused
+     OR (SELECT count(*) FROM test_cards.item_cards) <> 4
+     OR NOT EXISTS (
+       SELECT 1 FROM yu.registry
+       WHERE book = 'tradein' AND deck = 'items'
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: active refs did not protect truncate and registry deletion';
+  END IF;
+END $$;
 
 DO $$
 DECLARE
@@ -1125,6 +1932,87 @@ DO $$
 DECLARE
   refused boolean := false;
 BEGIN
+  -- The all-column AFTER guard runs for an unrelated UPDATE and leaves a
+  -- same-identity row change intact.
+  UPDATE test_cards.item_cards
+  SET name = 'Mew guarded'
+  WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003';
+  IF (SELECT name FROM test_cards.item_cards
+      WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003') <> 'Mew guarded' THEN
+    RAISE EXCEPTION 'TEST FAILED: identity guard discarded a same-identity update';
+  END IF;
+
+  BEGIN
+    UPDATE test_cards.item_cards
+    SET card_uuid = '0197a1f4-0000-7000-8000-000000000009'
+    WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003';
+  EXCEPTION WHEN foreign_key_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION 'TEST FAILED: identity guard allowed a mapped UUID with live threads to change';
+  END IF;
+  IF NOT EXISTS (
+       SELECT 1 FROM test_cards.item_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003'
+     ) OR EXISTS (
+       SELECT 1 FROM test_cards.item_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000009'
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: refused identity change altered the physical card';
+  END IF;
+END $$;
+
+-- A column-filtered or BEFORE-row identity guard can miss a UUID written by a
+-- later BEFORE trigger when the original SET list omits that UUID. The
+-- canonical AFTER guard must inspect the final NEW row and refuse it.
+CREATE FUNCTION test_cards.zz_mutate_mapped_identity()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.name = 'attempt hidden identity mutation' THEN
+    NEW.card_uuid := '0197a1f4-0000-7000-8000-000000000008';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER zz_mutate_id
+  BEFORE UPDATE ON test_cards.item_cards
+  FOR EACH ROW EXECUTE FUNCTION test_cards.zz_mutate_mapped_identity();
+
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
+  BEGIN
+    UPDATE test_cards.item_cards
+    SET name = 'attempt hidden identity mutation'
+    WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003';
+  EXCEPTION WHEN foreign_key_violation THEN
+    refused := true;
+  END;
+  IF NOT refused THEN
+    RAISE EXCEPTION 'TEST FAILED: identity guard missed a UUID changed by a BEFORE trigger';
+  END IF;
+  IF NOT EXISTS (
+       SELECT 1 FROM test_cards.item_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003'
+         AND name = 'Mew guarded'
+     ) OR EXISTS (
+       SELECT 1 FROM test_cards.item_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000008'
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: hidden identity refusal did not roll back the row';
+  END IF;
+END $$;
+
+DROP TRIGGER zz_mutate_id ON test_cards.item_cards;
+DROP FUNCTION test_cards.zz_mutate_mapped_identity();
+
+DO $$
+DECLARE
+  refused boolean := false;
+BEGIN
   BEGIN
     DELETE FROM test_cards.item_cards
     WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003';
@@ -1211,18 +2099,115 @@ BEGIN
   END IF;
 END $$;
 
-DELETE FROM test_cards.item_cards
+-- A privileged operator can bypass immutable-row triggers, but the candidate
+-- binding must still recognize denormalized meaning that no longer matches
+-- the pinned word-version snapshot. Exercise both active and severed ledgers,
+-- then repair the disposable fixture before continuing.
+BEGIN;
+ALTER TABLE yu.threads DISABLE TRIGGER threads_immutable;
+UPDATE yu.threads
+SET word_to_one = NOT word_to_one
+WHERE id = '01980000-0000-7000-8000-000000000001';
+ALTER TABLE yu.threads ENABLE TRIGGER threads_immutable;
+
+ALTER TABLE yu.sever_log DISABLE TRIGGER sever_log_immutable;
+UPDATE yu.sever_log
+SET word_to_one = NOT word_to_one
+WHERE id = '01980000-0000-7000-8000-000000000003';
+ALTER TABLE yu.sever_log ENABLE TRIGGER sever_log_immutable;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+       SELECT 1
+       FROM yu.threads child
+       JOIN yu.word_versions parent
+         ON parent.word = child.word
+        AND parent.word_version = child.word_version
+       WHERE child.id = '01980000-0000-7000-8000-000000000001'
+         AND child.word_to_one IS DISTINCT FROM parent.to_one
+     ) OR NOT EXISTS (
+       SELECT 1
+       FROM yu.sever_log child
+       JOIN yu.word_versions parent
+         ON parent.word = child.word
+        AND parent.word_version = child.word_version
+       WHERE child.id = '01980000-0000-7000-8000-000000000003'
+         AND child.word_to_one IS DISTINCT FROM parent.to_one
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: pinned word-version meaning drift was not observable';
+  END IF;
+END $$;
+
+ALTER TABLE yu.threads DISABLE TRIGGER threads_immutable;
+UPDATE yu.threads child
+SET word_to_one = parent.to_one
+FROM yu.word_versions parent
+WHERE parent.word = child.word
+  AND parent.word_version = child.word_version
+  AND child.word_to_one IS DISTINCT FROM parent.to_one;
+ALTER TABLE yu.threads ENABLE TRIGGER threads_immutable;
+
+ALTER TABLE yu.sever_log DISABLE TRIGGER sever_log_immutable;
+UPDATE yu.sever_log child
+SET word_to_one = parent.to_one
+FROM yu.word_versions parent
+WHERE parent.word = child.word
+  AND parent.word_version = child.word_version
+  AND child.word_to_one IS DISTINCT FROM parent.to_one;
+ALTER TABLE yu.sever_log ENABLE TRIGGER sever_log_immutable;
+
+DO $$
+BEGIN
+  IF EXISTS (
+       SELECT 1
+       FROM yu.threads child
+       JOIN yu.word_versions parent
+         ON parent.word = child.word
+        AND parent.word_version = child.word_version
+       WHERE child.word_to_one IS DISTINCT FROM parent.to_one
+     ) OR EXISTS (
+       SELECT 1
+       FROM yu.sever_log child
+       JOIN yu.word_versions parent
+         ON parent.word = child.word
+        AND parent.word_version = child.word_version
+       WHERE child.word_to_one IS DISTINCT FROM parent.to_one
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: pinned word-version meaning repair was incomplete';
+  END IF;
+END $$;
+COMMIT;
+
+UPDATE test_cards.item_cards
+SET card_uuid = '0197a1f4-0000-7000-8000-000000000009'
 WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003';
 
 DO $$
 BEGIN
   IF EXISTS (
+       SELECT 1 FROM test_cards.item_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003'
+     ) OR NOT EXISTS (
+       SELECT 1 FROM test_cards.item_cards
+       WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000009'
+     ) THEN
+    RAISE EXCEPTION 'TEST FAILED: identity remained blocked after sever';
+  END IF;
+END $$;
+
+DELETE FROM test_cards.item_cards
+WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000009';
+
+DO $$
+BEGIN
+  IF EXISTS (
     SELECT 1 FROM test_cards.item_cards
-    WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000003'
+    WHERE card_uuid = '0197a1f4-0000-7000-8000-000000000009'
   ) THEN
     RAISE EXCEPTION 'TEST FAILED: delete remained blocked after sever';
   END IF;
 END $$;
 
-\echo 'ok - retirement, historical reads, logical delete guard, sever provenance'
+\echo 'ok - retirement, historical reads, card identity/delete guard, sever provenance'
 \echo '=== ALL CANDIDATE LIFECYCLE TESTS PASSED ==='

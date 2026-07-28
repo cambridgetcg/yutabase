@@ -44,8 +44,9 @@ or field-level derivation record.
 
 The lowest-resistance path is to register a compatible existing table. The
 physical table keeps its name and application ownership; YUTABASE adds a
-logical ref. The `deck annex` CLI atomically drops and recreates the YUTABASE
-delete-guard trigger on the physical table.
+logical ref. Revision 5 registry mutation atomically maintains one exact guard
+pair on the mapped physical table: a row trigger covers deletion and changes to
+the mapped UUID identity, while a statement trigger covers `TRUNCATE`.
 
 ```bash
 yuta --conn "$DATABASE_URL" --by "human:alice" \
@@ -68,8 +69,14 @@ yuta --conn "$DATABASE_URL" --by "human:alice" \
 The table must already meet the binding contract: a non-null uniquely indexed
 UUID identity plus compatible `timestamptz`, `text`, `text`, and `text[]` claim
 columns. Annexing is not a promise that arbitrary legacy rows are truthful or
-conforming. It grants no application-table privileges and does not turn soft
-refs into universal foreign keys.
+conforming. The mapping caller needs registry write access (normally through
+`yu_lexicographer`) and must own the physical table, or have equivalent
+PostgreSQL authority, because the security-invoker lifecycle performs trigger
+DDL. It still needs the ordinary schema/table privileges required by later
+application reads and writes. Annexing grants no such application-table
+privileges and does not turn soft refs into universal foreign keys. `TRUNCATE`
+is refused while any active thread names the logical deck; a table owner or
+superuser can still bypass either guard, so the pair is not tamper resistance.
 
 Create a relation through the typed client when values come from code:
 
@@ -167,10 +174,12 @@ and version-pinned semantic threads
 The mapping library belongs with the Correspondence protocol owner. A local
 developer-preview `@agenttool/correspondence-yutabase` source package now plans
 deterministic, metadata-only mutations without network or database I/O. A
-durable verifier, writer, checkpoint, and worker remain separate future work.
-That worker should consume durable `/events` replay; Wake/SSE is only a
-missable hint that an early poll may be useful. An append must still succeed
-when the projection target is down.
+separate private AgentTool package now provides a loopback-only verifier,
+writer, quarantine, and durable local checkpoint with `install`, `run-once`,
+and `status`. It is not a daemon, hosted service, public API, npm package, or
+YUTABASE conformance surface. Any future worker should still consume durable
+`/events` replay; Wake/SSE is only a missable hint that an early poll may be
+useful. An append must still succeed when the projection target is down.
 
 A small useful vocabulary is enough:
 

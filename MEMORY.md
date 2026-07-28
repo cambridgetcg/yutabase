@@ -1,78 +1,96 @@
-# YUTABASE — agent memory template
+# YUTABASE — compact context for humans and agents
 
-Paste this into your session memory, CLAUDE.md, or AGENTS.md to know the whole standard.
+Paste this into a project memory only when that project uses YUTABASE. The
+root `README.md`, `SPEC.md`, and installed database remain authoritative.
 
-## the standard in one block
+## One-minute model
 
-YUTABASE is a database standard on vanilla Postgres. Five primitives:
-- BOOK = one schema (domain namespace)
-- DECK = one table (record type, lower_snake plural)
-- CARD = one row (globally addressable by ref: book/deck/id, UUIDv7)
-- THREAD = one word-named directed connection between two cards
-- LEXICON = one vocabulary table (every word that may name a thread)
+YUTABASE is a candidate semantic profile for PostgreSQL 16/17, not a database
+engine, hosted service, graph database, authentication system, or proof layer.
+The current database coordinate is:
 
-Every record carries an honesty header: at, by, how, src.
-- how is one of: witnessed, live, cached, computed, declared
-- cached and computed MUST have src — a write that won't say is refused
-
-Glosses are versioned (never silently edited). Words are retired (never deleted).
-A word needs a gloss, an inverse, and typed endpoints. That's the bar — the rest is taste, not law.
-
-## YOUSPEAK — six verbs, frozen
-
+```text
+YUTABASE/postgres@0.1.0-candidate.1 revision 5
 ```
-hello                                    — the whole standard in one call
-card  tradein/submissions/01977c2e       — one card by ref
+
+It adds five names:
+
+- BOOK — a logical namespace, mapped through `yu.registry`;
+- DECK — a logical collection, mapped to a compatible physical table;
+- CARD — one row, addressed by exact `book/deck/full-uuid`;
+- THREAD — one active directed relation named by a governed word;
+- LEXICON — the versioned meanings and endpoint rules for those words.
+
+A logical book/deck is not necessarily its physical schema/table. PostgreSQL
+still owns storage, transactions, permissions, RLS, backup, and replication.
+
+## Claims, not proof
+
+YUTABASE-owned claim rows and compatible cards use `at/by/how/src`.
+
+- `how`: `witnessed`, `live`, `cached`, `computed`, or `declared`;
+- `cached` and `computed` require at least one source locator;
+- every present source locator must be non-null and nonblank;
+- PostgreSQL stores `src` as a one-dimensional, one-based `text[]`;
+- blank claimant/gloss/inverse/source text means empty or only ASCII TAB
+  through CR and SPACE; clients also reject NUL;
+- these fields are self-reported context, not signatures, authorization, or
+  proof that a claimant or source is truthful.
+
+Words have a nonblank gloss, inverse reading, endpoint patterns, status, and a
+pinned semantic version. Words retire instead of disappearing. The seven
+starter words are examples, not a spelling blacklist or vocabulary budget.
+
+## Small optional YOUSPEAK surface
+
+Use full UUIDs:
+
+```text
+hello
+card  tradein/submissions/01977c2e-0000-7000-8000-000000000001
 cards tradein/submissions where status="pending" newest 20
-tradein/submissions/01977c2e -> contains — follow a word outward
-tradein/items/0197a1f4 <- contains       — follow it inward
-thread a --priced_from--> b note "..." how computed src a
-sever  <thread-id> how witnessed         — threads end with a claim too
+tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains
+tradein/items/0197a1f4-0000-7000-8000-000000000001 <- contains
+thread <full-ref> --priced_from--> <full-ref> how computed src <locator>
+sever <full-thread-uuid> how witnessed
 ```
 
-Traversal caps at 2 hops. Deeper = WITH RECURSIVE yourself.
-.how / .at / .by / .src address the honesty header in any where.
-explain "<query>" prints the exact SQL — YOUSPEAK never does anything you couldn't have typed.
+Traversal is capped at two hops. Card lists order by the mapped `at` claim,
+default to 100 rows, and accept `newest 1` through `newest 1000`; UUID is only
+a tie-breaker. `explain "<form>"` returns a pure logical preview. It does not
+resolve the physical registry mapping, check permissions, or execute the
+displayed operation.
 
-## CLI commands
+Plain SQL is always valid. Prefer structured SDK methods when notes, source
+locators, or other values come from code.
 
+## Integrity boundary
+
+Revision 5 maintains an `AFTER DELETE OR UPDATE` row guard and an
+`AFTER TRUNCATE` statement guard on every registered physical table. They
+protect active soft refs inside the declared PostgreSQL boundary. A table
+owner or superuser can disable or bypass them; they are not tamper resistance.
+
+Thread creation, mapped identity deletion/change, mapped-table `TRUNCATE`,
+registry lifecycle mutation, and false-to-true `to_one` narrowing require
+`READ COMMITTED`. Other isolation levels are refused because a waited lock
+does not refresh their transaction-start snapshot.
+
+## Safe start
+
+For a fresh disposable database, follow the root README or run:
+
+```sh
+(cd packages/sdk-ts && bun install --frozen-lockfile)
+DATABASE_URL='postgresql://localhost/yutabase_demo' ./demo.sh
 ```
-yuta init --conn <url>                    — install the yu schema + 7 starter words
-yuta repl --conn <url>                    — interactive YOUSPEAK session
-yuta hello --conn <url>                   — see the whole standard
-yuta card <ref> --conn <url>              — fetch one card
-yuta cards <book/deck> [where ...] [newest N]
-yuta query "<youspeak>" --conn <url>      — run any sentence
-yuta thread <from --word--> to> ...       — create a thread
-yuta sever <id> how <claim>               — end a thread
-yuta deck new <book/deck> [col:type ...]  — create a native deck
-yuta deck annex <schema.table> as <book/deck> --id <col> --at <col> ...
-yuta word add <word> --gloss "..." --inverse "..." --from <a/b> --to <c/d> [--to-one]
-yuta word retire <word>                   — retire a word (old threads keep meaning)
-yuta words [--export]                     — list lexicon / export to LEXICON.md
-yuta decks                                — list registered decks
-yuta stale                                — freshness audit (cached/computed past TTL)
-yuta check                                — fsck: orphaned threads, dead refs
-yuta doctor                               — vocabulary health: word count, zero-use, synonyms
-yuta explain "<youspeak>"                 — print the SQL (no DB needed)
-```
 
-## the seven starter words
+`demo.sh` refuses a system, initialized, or non-empty database and never
+creates or drops one. `yuta init` is mutating: it installs or upgrades a known
+shape and creates fixed cluster-wide capability roles. `yuta hello` is the
+read-only identity/vocabulary/mapping inspection command.
 
-| word | inverse | gloss |
-|---|---|---|
-| submitted_by | submitted | this record was submitted by that person/agent |
-| contains | contained in | physical or compositional containment |
-| supersedes | superseded by | this record replaces that one [to_one] |
-| priced_from | priced | this price was derived from that source record |
-| acted_for | acted via | an agent performed this on behalf of that operator |
-| refused_because | refused | this action was declined for that recorded reason |
-| witnesses | witnessed by | this record attests that one |
-
-Seven words. That's the point.
-
-## the honest ceiling
-
-Provenance is self-reported. An agent can stamp `witnessed` falsely.
-YUTABASE makes lying explicit and auditable — not impossible.
-Periodic human spot-checks are part of the standard's maintenance liturgy.
+Fresh migration order is `0001+0002` atomically, then `0004`, then `0005`,
+each hardening revision in its own fresh transaction. Back up and rehearse
+real upgrades. Never run `0003_test_lifecycle.sql` outside a disposable test
+database.

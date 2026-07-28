@@ -1,10 +1,12 @@
 -- YUTABASE v0.1 — starter lexicon: the kingdom's first words
 --
 -- Doctrine: SPEC.md §11
--- Seven words. Five spare in the budget. That's the point.
+-- Seven illustrative starter words. They are not a vocabulary budget or
+-- spelling blacklist.
 --
--- This migration coins the seven starter words. It must be run as a
--- member of the yu_lexicographer role, or as the database owner.
+-- This migration coins the seven starter words. Because it uses SET ROLE, it
+-- must be run by a superuser or a member of yu_lexicographer. A fresh
+-- revision-5 candidate commits 0001+0002 together before applying 0004/0005.
 --
 -- Column order: (word, gloss, inverse, from_deck, to_deck, to_one, status, at, by, how)
 --   gloss  = the meaning — what this word IS (one sentence)

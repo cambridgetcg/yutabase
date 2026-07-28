@@ -1,14 +1,36 @@
 export const CANDIDATE_VERSION = "0.1.0-candidate.1" as const;
-export const CANDIDATE_REVISION = 4 as const;
+export const CANDIDATE_REVISION = 5 as const;
 
 export const FRESH_INSTALL_MIGRATIONS = Object.freeze([
   "0001_yu_core.sql",
   "0002_starter_lexicon.sql",
   "0004_candidate_hardening.sql",
+  "0005_candidate_integrity.sql",
 ] as const);
 
 export const LEGACY_UPGRADE_MIGRATIONS = Object.freeze([
   "0004_candidate_hardening.sql",
+  "0005_candidate_integrity.sql",
+] as const);
+
+export const REVISION_FOUR_UPGRADE_MIGRATIONS = Object.freeze([
+  "0005_candidate_integrity.sql",
+] as const);
+
+export const REVISION_FOUR_CAPABILITIES = Object.freeze([
+  "row-claims",
+  "logical-physical-registry",
+  "word-version-pinning",
+  "global-thread-id-ledger",
+  "endpoint-existence-on-insert",
+  "concurrency-safe-to-one",
+  "role-scoped-functions",
+] as const);
+
+export const CANDIDATE_CAPABILITIES = Object.freeze([
+  ...REVISION_FOUR_CAPABILITIES,
+  "guarded-card-identity",
+  "nonblank-source-locators",
 ] as const);
 
 export interface ColumnShape {
@@ -152,7 +174,12 @@ export interface InstallProbe {
 
 export type InstallPlan =
   | { mode: "fresh"; migrations: typeof FRESH_INSTALL_MIGRATIONS }
-  | { mode: "upgrade"; migrations: typeof LEGACY_UPGRADE_MIGRATIONS }
+  | {
+      mode: "upgrade";
+      migrations:
+        | typeof LEGACY_UPGRADE_MIGRATIONS
+        | typeof REVISION_FOUR_UPGRADE_MIGRATIONS;
+    }
   | { mode: "current"; migrations: readonly [] };
 
 /**
@@ -193,13 +220,18 @@ export function planInstall(probe: InstallProbe): InstallPlan {
     hasAllMappingColumns &&
     probe.hasStandardMeta
   ) {
-    if (
+    const exactCandidateLine =
       probe.standard === "YUTABASE" &&
       probe.profile === "postgres" &&
-      probe.version === CANDIDATE_VERSION &&
-      probe.revision === CANDIDATE_REVISION
-    ) {
+      probe.version === CANDIDATE_VERSION;
+    if (exactCandidateLine && probe.revision === CANDIDATE_REVISION) {
       return { mode: "current", migrations: [] };
+    }
+    if (exactCandidateLine && probe.revision === 4) {
+      return {
+        mode: "upgrade",
+        migrations: REVISION_FOUR_UPGRADE_MIGRATIONS,
+      };
     }
     throw new Error(
       `UNSUPPORTED YUTABASE IDENTITY: ${probe.standard ?? "?"}/` +

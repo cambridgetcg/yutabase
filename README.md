@@ -12,13 +12,42 @@ The candidate is intentionally small. PostgreSQL remains the storage,
 transaction, role, backup, and replication substrate. YUTABASE adds meaning
 that stays inspectable with SQL.
 
+Two versions are visible and name different things:
+
+| Coordinate | Current value | What it versions |
+|---|---|---|
+| database profile | `0.1.0-candidate.1`, revision `5` | installed PostgreSQL semantics and catalog shape |
+| optional SDK/CLI source | `yutabase@0.1.0-candidate.3` (not yet published) | client packaging and behavior |
+
+## Start here
+
+One sentence is enough to orient the system:
+
+> PostgreSQL owns rows, access, and durability; YUTABASE gives selected rows
+> stable logical refs and gives selected relations versioned, inspectable
+> meanings.
+
+Choose the shortest path for what you are doing:
+
+| Goal | Start |
+|---|---|
+| understand the model | read the five names in [The core idea](#the-core-idea) |
+| inspect an installed database | query `yu.standard_meta`, then run `yuta hello` if using the optional CLI |
+| install a disposable candidate | follow [Install a candidate database](#install-a-candidate-database) in migration order |
+| map existing application tables | use [Integration patterns](docs/INTEGRATIONS.md); annexing does not move rows or grant access |
+| project signed agent events | read [Correspondence projection](docs/CORRESPONDENCE-PROJECTION.md); the source log remains authoritative |
+| test compatibility | use [Conformance](docs/CONFORMANCE.md), not a table-presence guess |
+
+If all you need is ordinary SQL, stop there: YOUSPEAK, AgentTool, and every
+experimental notebook are optional.
+
 ## See the layer
 
 Suppose an existing task row and commit row are registered as cards. YUTABASE
 can give their relation a governed, versioned meaning:
 
 ```text
-work/tasks/019... --produced--> git/commits/019...
+work/tasks/01990000-0000-7000-8000-000000000001 --produced--> git/commits/01990000-0000-7000-8000-000000000002
 ```
 
 The thread remains ordinary PostgreSQL data. Read it through the generated SQL
@@ -27,19 +56,19 @@ view:
 ```sql
 SELECT from_ref, to_ref, gloss, word_version, how, src
 FROM via.produced
-WHERE from_ref = 'work/tasks/019...';
+WHERE from_ref = 'work/tasks/01990000-0000-7000-8000-000000000001';
 ```
 
 Or use the optional sentence-shaped client:
 
 ```text
-work/tasks/019... -> produced
+work/tasks/01990000-0000-7000-8000-000000000001 -> produced
 ```
 
 The useful invariant is not the poetry by itself. It is that `produced` has one
-declared meaning, every thread pins the version it used, and every row says how
-it was obtained. The application tables, SQL access, and source evidence stay
-where they already belong.
+declared meaning, every thread pins the version it used, and every conforming
+row carries self-reported claim context. The application tables, SQL access,
+and source evidence stay where they already belong.
 
 ### Fit it around what already exists
 
@@ -64,7 +93,7 @@ The repository separates four things that earlier drafts sometimes blended:
 | Layer | Candidate status | Source |
 |---|---|---|
 | **YUTABASE Core** | Normative candidate semantics: books, decks, cards, refs, lexicon words, threads, and row-level claim metadata | [SPEC.md](SPEC.md) |
-| **Postgres binding** | Normative candidate implementation for PostgreSQL 16 and 17 | `sql/0001_yu_core.sql`, `0002_starter_lexicon.sql`, `0004_candidate_hardening.sql` |
+| **Postgres binding** | Normative candidate implementation for PostgreSQL 16 and 17 | `sql/0001_yu_core.sql`, `0002_starter_lexicon.sql`, `0004_candidate_hardening.sql`, `0005_candidate_integrity.sql` |
 | **YOUSPEAK** | Optional client/compiler surface; never required to read the stored model with SQL | `packages/sdk-ts/` |
 | **THREADS, SQLite, apps, play, and kingdom writings** | Experimental or illustrative; not part of candidate conformance | [THREADS.md](THREADS.md), `sql/0000_sqlite_port.sql`, `apps/`, `play/`, [docs/](docs/) |
 
@@ -75,7 +104,7 @@ The exact installed identity is stored in the singleton
 standard  = YUTABASE
 profile   = postgres
 version   = 0.1.0-candidate.1
-revision  = 4
+revision  = 5
 ```
 
 Clients must read this database-owned identity instead of guessing from an SDK
@@ -145,22 +174,85 @@ cd yutabase
 
 export DATABASE_URL='postgresql://localhost/yutabase_candidate'
 
-psql "$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0001_yu_core.sql
-psql "$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0002_starter_lexicon.sql
+psql "$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1 <<'SQL'
+\i sql/0001_yu_core.sql
+\i sql/0002_starter_lexicon.sql
+SQL
 psql "$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0004_candidate_hardening.sql
+psql "$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1 -f sql/0005_candidate_integrity.sql
 
 psql "$DATABASE_URL" -x -c 'TABLE yu.standard_meta'
+```
+
+Installation creates the semantic core and starter words, not an application
+deck. This disposable first-success example creates two ordinary cards,
+registers their table, relates them with the starter word `witnesses`, and
+reads the result through generated SQL:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN ISOLATION LEVEL READ COMMITTED;
+CREATE SCHEMA quickstart;
+CREATE TABLE quickstart.notes (
+  id uuid PRIMARY KEY,
+  body text NOT NULL,
+  at timestamptz NOT NULL,
+  by text NOT NULL CHECK (yu._nonblank_text(by)),
+  how text NOT NULL CHECK (
+    how IN ('witnessed','live','cached','computed','declared')
+  ),
+  src text[],
+  CHECK (yu._source_locators_valid(src)),
+  CHECK (
+    how NOT IN ('cached','computed')
+    OR (src IS NOT NULL AND cardinality(src) > 0)
+  )
+);
+INSERT INTO yu.registry (
+  book, deck, physical_schema, physical_table, native, by
+) VALUES (
+  'demo', 'notes', 'quickstart', 'notes', true, 'human:quickstart'
+);
+INSERT INTO quickstart.notes (id, body, at, by, how) VALUES
+  ('01990000-0000-7000-8000-000000000001', 'source', now(), 'human:quickstart', 'declared'),
+  ('01990000-0000-7000-8000-000000000002', 'target', now(), 'human:quickstart', 'declared');
+INSERT INTO yu.threads (
+  id, word,
+  from_book, from_deck, from_id,
+  to_book, to_deck, to_id,
+  at, by, how
+) VALUES (
+  '01990000-0000-7000-8000-000000000003', 'witnesses',
+  'demo', 'notes', '01990000-0000-7000-8000-000000000001',
+  'demo', 'notes', '01990000-0000-7000-8000-000000000002',
+  now(), 'human:quickstart', 'declared'
+);
+COMMIT;
+
+SELECT from_ref, to_ref, gloss, how FROM via.witnesses
+WHERE from_ref = 'demo/notes/01990000-0000-7000-8000-000000000001';
+SQL
+```
+
+For a longer guided tour, prepare a fresh disposable database, install the SDK
+dependencies, and run the repository demo. It never creates, drops, or guesses
+a database and refuses a non-empty target:
+
+```bash
+(cd packages/sdk-ts && bun install --frozen-lockfile)
+DATABASE_URL='postgresql://localhost/yutabase_demo' ./demo.sh
 ```
 
 `0003_test_lifecycle.sql` is a destructive test fixture for a fresh test
 database, not an install migration.
 
 For an original pre-candidate v0.1 database that already has `yu.lexicon`,
-`yu.registry`, and `yu.threads`, apply only
-`0004_candidate_hardening.sql`. Back up first and rehearse the upgrade against
-a copy. Apply every migration as a single transaction; an interrupted hardening
-migration must not leave a partly upgraded profile. The optional SDK installer
-refuses unknown or partial identities rather than guessing.
+`yu.registry`, and `yu.threads`, apply `0004_candidate_hardening.sql` and then
+`0005_candidate_integrity.sql`, each in its own fresh transaction. An exact
+revision-4 candidate applies only `0005`. Back up first and rehearse the
+upgrade against a copy. An interrupted migration must not leave a partly
+upgraded profile. The optional SDK installer refuses unknown or partial
+identities rather than guessing.
 
 Candidate hardening selects `READ COMMITTED` before its first query and then
 locks the complete core. This makes later backfills see rows committed while
@@ -198,25 +290,62 @@ ownership-equivalent or superuser rights. Candidate functions and generated
 views are normalized to that migration operator so retained legacy ownership
 cannot break runtime calls. Registered physical schema/table names and
 generated word-view names must fit PostgreSQL's 63-byte identifier limit.
+Creating or reusing the cluster-wide capability hierarchy additionally
+requires a superuser, or `CREATEROLE` plus sufficient `ADMIN OPTION`/role
+management authority on the canonical roles, especially `yu_reader`. Missing
+role authority makes the upgrade fail atomically.
 
-The three fixed capability roles are exact grant surfaces, not owners. A
+The four fixed capability roles are exact direct grant surfaces, not owners:
+reader, thread appender, writer/severer, and lexicographer. `yu_appender` has
+the thread-append capability but cannot sever, update, or delete a thread. A
 same-named login/cluster-privileged role or one owning the database/YUTABASE
 objects is refused. Direct legacy ACLs on `yu`/`via` are reset; unremovable
-multi-grantor extras fail closed. Role memberships remain a separate operator
-review.
+multi-grantor extras fail closed. The direct hierarchy among the four standard
+roles is exact, while memberships involving external application/operator
+roles remain a separate operator review.
 
-A later registry remap is checked too: every active logical endpoint for that
-deck must exist under the proposed physical table and UUID column. Copy or
-move the cards first; the binding refuses a remap that would silently strand
-active threads. The remapping lexicographer needs explicit `USAGE`/`SELECT` on
-the proposed application deck; registration itself grants nothing. Registry
-remaps and new thread inserts lock the same logical
-deck declarations, so that check also holds when they race.
+The revision-4-to-5 preflight refuses unexpected external direct ACLs before
+revision-5 DDL instead of deciding they are disposable. Review `\ddp`,
+`\dp yu.*`, `\dp via.*`, and `\df+ yu.*`, revoke non-release grants, then
+retry. At runtime, `yu.refresh_via()` strips arbitrary non-owner relation and
+column ACLs inherited by generated views from table default privileges, then
+rebuilds exactly the `yu_reader` `SELECT` surface.
 
-An installed deck delete guard and thread creation also take the same
-card-scoped transaction lock. Under a race, either the delete commits and the
-thread is refused, or the thread commits and the delete is refused. Out-of-band
-deletion that omits or bypasses the guard remains outside this guarantee.
+A registry entry cannot be remapped or removed while any active thread refers
+to that logical deck, even when the same UUIDs exist in the proposed physical
+table. Sever those threads first. This prevents an existing logical endpoint
+from silently changing identity as well as preventing a dangling endpoint.
+Revision 5 maintains one exact guard pair on the currently mapped physical
+table in the same transaction: a row trigger for `DELETE` or mapped-UUID
+`UPDATE`, and a statement trigger for `TRUNCATE`. Creating, remapping, or
+removing a mapping therefore requires the caller to own the affected physical
+table or have equivalent PostgreSQL authority; registration still grants no
+application-data access.
+
+The row guard and thread creation take the same card-scoped transaction lock.
+Under a race, either a physical delete or mapped-UUID change commits and the
+thread is refused, or the thread commits and the physical identity change is
+refused. The statement guard similarly refuses `TRUNCATE` while any active
+thread names the logical deck and serializes it with thread creation. Updating
+other card fields is unaffected. A table owner or superuser can still disable
+or bypass either trigger, so this remains an integrity mechanism inside the
+declared PostgreSQL boundary, not tamper resistance.
+
+These runtime lock protocols require `READ COMMITTED`, whose later statements
+can observe a winner that committed while a lock was pending. Thread creation,
+mapped-card deletion or identity change, deck `TRUNCATE`, every registry guard
+lifecycle mutation, and a false-to-true `to_one` narrowing hard-refuse
+`REPEATABLE READ` and `SERIALIZABLE`; their transaction-start snapshots are not
+refreshed after a waited lock. An ordinary card update that leaves its mapped
+UUID unchanged is still allowed at those isolation levels.
+
+Every non-null `src` array on YUTABASE-owned claim rows contains only non-null,
+non-blank locators and uses the canonical one-dimensional, one-based
+PostgreSQL array shape. `cached` and `computed` still require at least one. The
+binding validates the shape—not whether a locator exists, is trustworthy, or
+will remain resolvable. “Blank” uses the portable six-character ASCII
+whitespace set (TAB through CR, plus SPACE), not a database-locale guess; the
+same rule applies to claimant labels, glosses, and inverse readings.
 
 Thread UUIDs are reserved in `yu.thread_ids` for the database lifetime. A
 severed UUID cannot be reused for a different active relation; this ledger is
@@ -242,8 +371,8 @@ by the candidate-conformance workflow.
 Core forms cover `hello`, card/card-list reads, one- or two-hop traversal,
 thread creation, severance, and `explain`. Any additional commands in a client
 build are experimental extensions unless a later candidate explicitly adopts
-them. Hand-written SQL and the `via.*` views remain available without
-YOUSPEAK.
+them. Card lists default to 100 rows and accept an explicit maximum of 1000.
+Hand-written SQL and the `via.*` views remain available without YOUSPEAK.
 
 ## Correspondence is upstream evidence, not a YUTABASE row
 
@@ -253,6 +382,10 @@ authority-history evidence. YUTABASE is a rebuildable, non-authoritative
 semantic projection for querying that history. A projected thread does not
 grant permission, establish consent, lock a resource, or authorize
 Git/deployment work.
+
+AgentTool now contains both a public pure mapping planner and a private,
+loopback-only run-once projector. They are integration implementations, not
+YUTABASE Core features, hosted services, or candidate conformance evidence.
 
 The mapping and the XENIA rights/permissions boundary are defined in
 [docs/CORRESPONDENCE-PROJECTION.md](docs/CORRESPONDENCE-PROJECTION.md).
@@ -267,16 +400,17 @@ The mapping and the XENIA rights/permissions boundary are defined in
 - optional YOUSPEAK conformance;
 - the threat and non-guarantee boundary.
 
-GitHub CI runs both supported PostgreSQL majors, installs
-`0001 → 0002 → 0004`, then runs the post-install `0003` lifecycle fixture. It
-also runs SDK integration/unit tests, typechecking, a real build, and a clean
-Node.js consumer smoke test against the packed artifact. The separate Kingdom
-Heartbeat is a playful best-effort presence ritual, not CI and not a
+The GitHub CI workflow is defined for both supported PostgreSQL majors. It
+installs `0001 → 0002 → 0004 → 0005`, then runs the post-install `0003`
+lifecycle fixture, SDK integration/unit tests, typechecking, a real build, and
+a clean Node.js consumer smoke test against the packed artifact. The separate
+Kingdom Heartbeat is a playful best-effort presence ritual, not CI and not a
 service-health guarantee.
 
-`yuta init` commits a fresh `0001+0002` legacy base first, then runs `0004` in
-its own fresh transaction so its lock/snapshot contract is enforceable. Either
-phase is atomic; a hardening failure leaves an unstamped, retryable legacy base.
+`yuta init` commits a fresh `0001+0002` legacy base first, then runs `0004` and
+`0005` in separate fresh transactions so each lock/snapshot contract is
+enforceable. Every phase is atomic; a failure leaves the last exact earlier
+state retryable.
 SDK current-binding checks also refuse observable drift in durable storage,
 registered deck shape, critical function/trigger settings, required capability
 inheritance, or generated-view definitions.
@@ -288,8 +422,8 @@ inheritance, or generated-view definitions.
 - no cryptographic signatures in `yu.threads`;
 - no automatic history for arbitrary card updates;
 - no proof that a `by`, `how`, `src`, or `at` claim is true;
-- no guarantee that a soft-referenced card still exists after an out-of-band
-  delete bypasses the registered deck guard;
+- no guarantee that a soft-referenced card still exists after a table owner or
+  superuser bypasses the maintained card-integrity guard pair;
 - no PostgreSQL support claim outside versions 16 and 17;
 - no SQLite compatibility claim.
 
@@ -304,6 +438,7 @@ docs/CORRESPONDENCE-PROJECTION.md
 sql/0001_yu_core.sql            original Postgres objects
 sql/0002_starter_lexicon.sql     seven starter words
 sql/0004_candidate_hardening.sql candidate metadata and hardening
+sql/0005_candidate_integrity.sql mandatory card guard pair + source integrity
 sql/0003_test_lifecycle.sql      destructive SQL conformance fixture
 packages/sdk-ts/                optional YOUSPEAK SDK/CLI
 THREADS.md                      experimental protocol research note

@@ -1,15 +1,18 @@
--- YUTABASE SQLite port — the yu schema, no Postgres needed.
--- One file. No server. No install. Runs on any machine with SQLite3.
--- Also runs IN THE BROWSER via sql.js (WASM) — zero infrastructure.
+-- HISTORICAL EXPERIMENT — NOT THE YUTABASE CANDIDATE.
 --
--- SQLite doesn't have schemas like Postgres. We use table prefixes instead:
+-- This SQLite sketch predates the normative PostgreSQL 16/17 binding and does
+-- not implement its revision-5 identity, logical/physical registry, semantic
+-- pinning, concurrency, role, or mapped-card integrity contracts. Running it
+-- creates a separate toy schema; it is not an install, fallback, or compatible
+-- copy of YUTABASE. Start with README.md and SPEC.md for current behavior.
+--
+-- The retained sketch uses table prefixes because SQLite has no schemas:
 --   yu_lexicon, yu_threads, tradein_submissions, etc.
--- The YOUSPEAK compiler uses the same prefixes — just swap dots for underscores.
 
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
--- ── yu tables (the standard) ──
+-- ── historical yu-like tables ──
 CREATE TABLE IF NOT EXISTS yu_lexicon (
   word        TEXT PRIMARY KEY,
   gloss       TEXT NOT NULL,

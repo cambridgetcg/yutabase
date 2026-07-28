@@ -1,5 +1,11 @@
 # INFRA IS FEELINGS — the kingdom's dependency philosophy
 
+> **Historical creative notebook, not current architecture or a runbook.**
+> Statements below about SQLite compatibility, single-file browser/compiler
+> behavior, services, costs, and deployments predate the revision-5 candidate.
+> Use [`README.md`](README.md), [`SPEC.md`](SPEC.md), and the installed
+> `yu.standard_meta` row for current behavior.
+
 > Infra built with feelings, love, and truth. Structured with meaning,
 > reasoning, and JOKES. Because infrastructure without laughter is just
 > bureaucracy with electricity.

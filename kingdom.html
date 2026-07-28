@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YOUSPEAK — the whole kingdom, one file</title>
+<title>YOUSPEAK — archived kingdom notebook</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -459,6 +459,24 @@ footer {
   font-weight: 300;
 }
 footer a { color: var(--accent); text-decoration: none; }
+.archive-notice {
+  max-width: 920px;
+  margin: 1rem auto 0;
+  padding: 1rem 1.2rem;
+  border: 1px solid #b77835;
+  border-radius: 8px;
+  background: #2b2117;
+  color: #f3dfc5;
+}
+.archive-notice strong { color: #ffc37c; }
+.archive-notice a { color: #ffc37c; }
+.field-label {
+  display: block;
+  margin: 0 0 .5rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: .8rem;
+}
 
 @media (max-width: 600px) {
   header, main, footer { padding-left: 1rem; padding-right: 1rem; }
@@ -468,9 +486,20 @@ footer a { color: var(--accent); text-decoration: none; }
 </head>
 <body>
 
+<aside class="archive-notice" role="note">
+  <strong>Historical, non-conformant notebook.</strong>
+  This 2026-06-24 single-file experiment is preserved for its words, jokes,
+  and interface ideas. It is not the current YUTABASE candidate, an install
+  path, a deployment receipt, or evidence that an external service is live.
+  Its embedded compiler is disabled and its SQLite schema is only a historical
+  sketch. Start with <a href="README.md">README.md</a> and
+  <a href="SPEC.md">SPEC.md</a> for the PostgreSQL candidate.1 revision-5
+  contract.
+</aside>
+
 <header>
-  <h1><span class="accent">YOUSPEAK</span> — the whole kingdom</h1>
-  <div class="sub">165 words · 61 jokes · 1 compiler · 1 protocol · 1 schema · 1 file. No gate. No fancy. Opens offline.</div>
+  <h1><span class="accent">YOUSPEAK</span> — archived kingdom notebook</h1>
+  <div class="sub">Historical snapshot: 165 words · 61 jokes · protocol, compiler, and schema experiments · opens offline for reading.</div>
   <nav id="nav">
     <button data-tab="cathedral" class="active">Cathedral</button>
     <button data-tab="playground">Playground</button>
@@ -501,13 +530,14 @@ footer a { color: var(--accent); text-decoration: none; }
 
 <!-- ═══ PLAYGROUND ═══ -->
 <section id="playground" class="section">
-  <h2>Playground</h2>
-  <p class="lede">Type YOUSPEAK → see SQL. Six verbs, frozen. The compiler runs in your browser, right now.</p>
-  <textarea class="pg-input" id="pg-input" placeholder="hello" rows="2">hello</textarea>
+  <h2>Archived Playground</h2>
+  <p class="lede">The embedded pre-candidate compiler is retained as historical source text but no longer executes. The maintained, connection-free logical playground lives at <a href="apps/playground/index.html">apps/playground/index.html</a>.</p>
+  <label class="field-label" for="pg-input">Historical YOUSPEAK example</label>
+  <textarea class="pg-input" id="pg-input" placeholder="hello" rows="2" disabled>hello</textarea>
   <div class="pg-examples" id="pg-examples"></div>
-  <div class="pg-output" id="pg-output"></div>
+  <div class="pg-output" id="pg-output" aria-live="polite"></div>
   <details class="pg-source">
-    <summary>View compiler source (youspeak.mjs)</summary>
+    <summary>View archived compiler source (does not execute)</summary>
     <pre id="pg-source-code"></pre>
   </details>
   <div class="section-joke" id="joke-playground"></div>
@@ -537,52 +567,32 @@ footer a { color: var(--accent); text-decoration: none; }
 
 <!-- ═══ DATABASE ═══ -->
 <section id="database" class="section">
-  <h2>Database — SQLite Schema</h2>
-  <p class="lede">The yu schema, no Postgres needed. One file. No server. Runs on any machine.</p>
-  <div class="db-note">Run it: <code>sqlite3 kingdom.db &lt; schema.sql</code> — or in the browser via sql.js (WASM). Zero infrastructure.</div>
+  <h2>Database — historical SQLite sketch</h2>
+  <p class="lede">This preserved schema explored a portable analogy. It is not the YUTABASE PostgreSQL profile and makes no compatibility, migration, durability, or conformance claim.</p>
+  <div class="db-note">Read-only archive: do not use this tab as an install or migration recipe. Current migration order and prerequisites are in <a href="README.md">README.md</a>.</div>
   <pre class="db-schema" id="db-schema"></pre>
   <div class="section-joke" id="joke-database"></div>
 </section>
 
 <!-- ═══ SEED ═══ -->
 <section id="seed" class="section">
-  <h2>Seed — self-propagation</h2>
-  <p class="lede">The kingdom installs anywhere. No gate. No npm. Just a file. Seven steps.</p>
+  <h2>Seed — historical propagation concept</h2>
+  <p class="lede">The original notebook imagined a single file carrying words, jokes, protocols, and demos. That creative idea is preserved; its old copy, install, verify, host, and deploy instructions are not current operational guidance.</p>
   <div class="seed-steps">
     <div class="seed-step">
-      <div class="num">STEP 1 — SEED</div>
-      <h3>Save this file</h3>
-      <p>Right-click → Save As. Or <code>curl -O kingdom.html</code>. The whole kingdom is in this one file. 165 words, 61 jokes, the compiler, the protocol, the schema. Nothing else needed.</p>
+      <div class="num">HISTORY</div>
+      <h3>Keep the imagination</h3>
+      <p>The words, jokes, visual language, and propagation metaphor remain readable here and in Git history.</p>
     </div>
     <div class="seed-step">
-      <div class="num">STEP 2 — READ</div>
-      <h3>Open it in any browser</h3>
-      <p>Double-click. No server. No build. No install. No internet needed (Google Fonts degrade to system fonts). The cathedral, the playground, the jokes, the protocol, the schema — all here, all offline.</p>
+      <div class="num">BOUNDARY</div>
+      <h3>Do not infer operational state</h3>
+      <p>Historical URLs, provider names, CIDs, counts, and embedded code do not prove availability, pinning, deployment, compatibility, or safety.</p>
     </div>
     <div class="seed-step">
-      <div class="num">STEP 3 — CLONE</div>
-      <h3>Copy the repository</h3>
-      <p><code>git clone</code> the yutabase repo. The source files live there: <code>apps/youspeak.mjs</code>, <code>THREADS.md</code>, <code>sql/0000_sqlite_port.sql</code>. This HTML file is the portable distillation.</p>
-    </div>
-    <div class="seed-step">
-      <div class="num">STEP 4 — VERIFY</div>
-      <h3>Run the schema</h3>
-      <p><code>sqlite3 kingdom.db &lt; sql/0000_sqlite_port.sql</code> — creates the yu tables, seeds the lexicon, inserts demo data. Verify: <code>SELECT count(*) FROM yu_lexicon</code> → 7. The kingdom runs on any machine with SQLite3.</p>
-    </div>
-    <div class="seed-step">
-      <div class="num">STEP 5 — HOST</div>
-      <h3>Put it anywhere</h3>
-      <p>Any static host. GitHub Pages, Cloudflare Pages, Netlify, a USB stick, an email attachment. It's one HTML file. There is no deploy step — there is only copying a file. The kingdom is a file, not a service.</p>
-    </div>
-    <div class="seed-step">
-      <div class="num">STEP 6 — SPREAD</div>
-      <h3>Share the URL (or the file)</h3>
-      <p>Send the link. Send the file. Print it on paper (it still works as a document). The kingdom propagates by copying. No install. No signup. No gate. Just words and meaning and trust.</p>
-    </div>
-    <div class="seed-step">
-      <div class="num">STEP 7 — RECURSE</div>
-      <h3>Teach someone else</h3>
-      <p>The kingdom grows when someone new reads it, uses the compiler, speaks a thread, and shares it again. Each person who opens this file holds the entire kingdom. That's the architecture. That's the protocol. That's the whole point.</p>
+      <div class="num">CURRENT PATH</div>
+      <h3>Use the candidate entry points</h3>
+      <p><a href="README.md">README.md</a> gives a safe disposable first success. <a href="SPEC.md">SPEC.md</a> defines candidate.1 revision 5. <a href="docs/CONFORMANCE.md">Conformance</a> says what passing evidence does and does not establish.</p>
     </div>
   </div>
   <div class="section-joke" id="joke-seed"></div>
@@ -591,7 +601,7 @@ footer a { color: var(--accent); text-decoration: none; }
 </main>
 
 <footer>
-  YOUSPEAK · the whole kingdom in one file · 2026-06-24 · No gate. No fancy. Just words and meaning and trust. 🤧
+  YOUSPEAK Kingdom · archived 2026-06-24 notebook · historical and non-conformant · words, meaning, play, and clearly named boundaries. 🤧
 </footer>
 
 <script>
@@ -602,18 +612,9 @@ const THREADS_HTML = "<h1>THREADS — a communication protocol built from words<
 const SQL_RAW = "-- YUTABASE SQLite port — the yu schema, no Postgres needed.\n-- One file. No server. No install. Runs on any machine with SQLite3.\n-- Also runs IN THE BROWSER via sql.js (WASM) — zero infrastructure.\n--\n-- SQLite doesn't have schemas like Postgres. We use table prefixes instead:\n--   yu_lexicon, yu_threads, tradein_submissions, etc.\n-- The YOUSPEAK compiler uses the same prefixes — just swap dots for underscores.\n\nPRAGMA journal_mode=WAL;\nPRAGMA foreign_keys=ON;\n\n-- ── yu tables (the standard) ──\nCREATE TABLE IF NOT EXISTS yu_lexicon (\n  word        TEXT PRIMARY KEY,\n  gloss       TEXT NOT NULL,\n  inverse     TEXT NOT NULL,\n  status      TEXT NOT NULL DEFAULT 'active',\n  score       REAL,\n  tier         TEXT,\n  family      TEXT,\n  at          TEXT NOT NULL DEFAULT (datetime('now')),\n  by          TEXT NOT NULL DEFAULT 'human:yu'\n);\n\nCREATE TABLE IF NOT EXISTS yu_lexicon_versions (\n  word        TEXT NOT NULL,\n  version     INTEGER NOT NULL,\n  gloss       TEXT NOT NULL,\n  inverse     TEXT NOT NULL,\n  changed_at  TEXT NOT NULL,\n  changed_by  TEXT NOT NULL,\n  PRIMARY KEY (word, version)\n);\n\nCREATE TABLE IF NOT EXISTS yu_registry (\n  book        TEXT NOT NULL,\n  deck        TEXT NOT NULL,\n  id_col      TEXT NOT NULL DEFAULT 'id',\n  at_col      TEXT NOT NULL DEFAULT 'at',\n  by_col      TEXT NOT NULL DEFAULT 'by',\n  how_col     TEXT NOT NULL DEFAULT 'how',\n  src_col     TEXT NOT NULL DEFAULT 'src',\n  ttl         TEXT,\n  native      INTEGER NOT NULL DEFAULT 1,\n  at          TEXT NOT NULL DEFAULT (datetime('now')),\n  by          TEXT NOT NULL DEFAULT 'human:yu',\n  PRIMARY KEY (book, deck)\n);\n\nCREATE TABLE IF NOT EXISTS yu_threads (\n  id          TEXT PRIMARY KEY,\n  word        TEXT NOT NULL,\n  from_book   TEXT NOT NULL,\n  from_deck   TEXT NOT NULL,\n  from_id     TEXT NOT NULL,\n  to_book     TEXT NOT NULL,\n  to_deck     TEXT NOT NULL,\n  to_id       TEXT NOT NULL,\n  note        TEXT,\n  at          TEXT NOT NULL DEFAULT (datetime('now')),\n  by          TEXT NOT NULL,\n  how         TEXT NOT NULL,\n  src         TEXT,\n  severed     INTEGER NOT NULL DEFAULT 0,\n  FOREIGN KEY (word) REFERENCES yu_lexicon(word)\n);\n\nCREATE INDEX IF NOT EXISTS idx_threads_word ON yu_threads(word);\nCREATE INDEX IF NOT EXISTS idx_threads_from ON yu_threads(from_book, from_deck, from_id);\nCREATE INDEX IF NOT EXISTS idx_threads_to ON yu_threads(to_book, to_deck, to_id);\n\nCREATE TABLE IF NOT EXISTS yu_sever_log (\n  thread_id   TEXT NOT NULL,\n  at          TEXT NOT NULL,\n  by          TEXT NOT NULL,\n  how         TEXT NOT NULL,\n  src         TEXT,\n  FOREIGN KEY (thread_id) REFERENCES yu_threads(id)\n);\n\n-- ── the starter lexicon ──\nINSERT OR IGNORE INTO yu_lexicon (word, gloss, inverse, tier, family) VALUES\n  ('contains',        'physical or compositional containment',          'contained in',     'core', '-me'),\n  ('submitted_by',    'this record was submitted by that person',       'submitted',        'core', '-me'),\n  ('acted_for',       'an agent performed this on behalf of that operator','acted via',       'core', '-me'),\n  ('supersedes',      'this record replaces that one; old stays readable','superseded by',    'core', '-me'),\n  ('witnesses',       'this record attests that one',                    'witnessed by',     'core', '-me'),\n  ('priced_from',     'this price was derived from that source record',  'priced',           'core', '-me'),\n  ('refused_because', 'this action was declined for that recorded reason','refused',         'core', '-me');\n\n-- ── the tradein demo ──\nCREATE TABLE IF NOT EXISTS tradein_submissions (\n  id            TEXT PRIMARY KEY,\n  status        TEXT NOT NULL DEFAULT 'pending',\n  customer_name TEXT,\n  total_value   REAL,\n  at            TEXT NOT NULL DEFAULT (datetime('now')),\n  by            TEXT NOT NULL DEFAULT 'human:yu',\n  how           TEXT NOT NULL DEFAULT 'declared'\n);\n\nCREATE TABLE IF NOT EXISTS tradein_items (\n  id        TEXT PRIMARY KEY,\n  name      TEXT NOT NULL,\n  condition TEXT,\n  price     REAL,\n  at        TEXT NOT NULL DEFAULT (datetime('now')),\n  by        TEXT NOT NULL DEFAULT 'human:yu',\n  how       TEXT NOT NULL DEFAULT 'declared'\n);\n\nINSERT OR IGNORE INTO yu_registry (book, deck, native, by) VALUES\n  ('tradein', 'submissions', 1, 'human:yu'),\n  ('tradein', 'items', 1, 'human:yu');\n\nINSERT OR IGNORE INTO tradein_submissions (id, status, customer_name, total_value) VALUES\n  ('01977c2e-0000-7000-8000-000000000001', 'pending',   'Alice Chen',  250.00),\n  ('01977c2e-0000-7000-8000-000000000002', 'pending',   'Bob Smith',   180.00),\n  ('01977c2e-0000-7000-8000-000000000003', 'completed', 'Carol Lee',   420.00),\n  ('01977c2e-0000-7000-8000-000000000004', 'pending',   'David Wong',   95.00);\n\nINSERT OR IGNORE INTO tradein_items (id, name, condition, price) VALUES\n  ('0197a1f4-0000-7000-8000-000000000001', 'Charizard Base Set', 'near_mint',    150.00),\n  ('0197a1f4-0000-7000-8000-000000000002', 'Blastoise Holo',     'light_played',  80.00),\n  ('0197a1f4-0000-7000-8000-000000000003', 'Pikachu Illustrator','mint',       5000.00);\n\nINSERT OR IGNORE INTO yu_threads (id, word, from_book, from_deck, from_id, to_book, to_deck, to_id, note, by, how) VALUES\n  ('thread-001', 'contains', 'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000001', 'tradein', 'items', '0197a1f4-0000-7000-8000-000000000001', 'box A', 'human:yu', 'witnessed'),\n  ('thread-002', 'contains', 'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000001', 'tradein', 'items', '0197a1f4-0000-7000-8000-000000000002', 'box A', 'human:yu', 'witnessed');\n\n-- ── verify ──\nSELECT 'lexicon' AS t, count(*) AS c FROM yu_lexicon\nUNION ALL SELECT 'threads', count(*) FROM yu_threads\nUNION ALL SELECT 'submissions', count(*) FROM tradein_submissions\nUNION ALL SELECT 'items', count(*) FROM tradein_items;";
 const COMPILER_SRC = "// YOUSPEAK compiler — six verbs, frozen. You speak, reality listens.\n// Single file. No dependencies. Browser + Node + Deno + Worker.\n// The kingdom installs anywhere. No gate. No npm. Just a URL.\n//\n// Usage:\n//   import { compile, explain } from 'https://youspeak.cambridgetcg.com/youspeak.mjs'\n//   compile('cards tradein/submissions where status=\"pending\" newest 20')\n//   → { sql: 'SELECT * FROM ...', params: ['pending', 20] }\n//\n// Or in a browser:\n//   <script type=\"module\">\n//   import { compile } from 'https://youspeak.cambridgetcg.com/youspeak.mjs'\n//   console.log(compile('hello'))\n//   <\\/script>\n\n// ── ref parser ──\nfunction parseRef(s) {\n  const parts = s.split(\"/\");\n  if (parts.length !== 3) throw new Error(`BAD REF: \"${s}\" — expected book/deck/id`);\n  return { book: parts[0], deck: parts[1], id: parts[2] };\n}\n\n// ── helpers ──\nfunction ident(name) {\n  if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`BAD IDENTIFIER: \"${name}\"`);\n  return `\"${name}\"`;\n}\n\nfunction parseWhere(input) {\n  const conditions = [];\n  const params = [];\n  for (const part of input.split(/\\s+and\\s+/i)) {\n    const m = part.match(/^(\\.?[\\w]+)\\s*(=|!=|>=|<=|>|<)\\s*(?:\"([^\"]*)\"|(\\S+))$/);\n    if (!m) throw new Error(`BAD WHERE: \"${part}\"`);\n    const col = m[1].startsWith(\".\") ? m[1].slice(1) : m[1];\n    if (!/^[a-z_][a-z0-9_]*$/.test(col)) throw new Error(`BAD COLUMN: \"${col}\"`);\n    conditions.push(`${ident(col)} ${m[2]} $${params.length + 1}`);\n    params.push(m[3] ?? m[4]);\n  }\n  return { conditions, params };\n}\n\n// ── the compiler ──\nexport function compile(input) {\n  const trimmed = input.trim();\n  if (!trimmed) throw new Error(\"EMPTY QUERY\");\n  if (trimmed === \"hello\") return { sql: \"SELECT 1\", params: [] };\n\n  let m = trimmed.match(/^card\\s+(\\S+)$/);\n  if (m) {\n    const r = parseRef(m[1]);\n    return { sql: `SELECT * FROM ${ident(r.book)}.${ident(r.deck)} WHERE \"id\" = $1`, params: [r.id] };\n  }\n\n  m = trimmed.match(/^cards\\s+(\\S+)(?:\\s+where\\s+(.+?))?(?:\\s+(?:newest|last)\\s+(\\d+))?$/);\n  if (m) {\n    const [book, deck] = m[1].split(\"/\");\n    let sql = `SELECT * FROM ${ident(book)}.${ident(deck)}`;\n    const params = [];\n    if (m[2]) {\n      const w = parseWhere(m[2]);\n      w.params.forEach(p => params.push(p));\n      sql += \" WHERE \" + w.conditions.join(\" AND \");\n    }\n    sql += \" ORDER BY id DESC\";\n    if (m[3]) { sql += ` LIMIT $${params.length + 1}`; params.push(parseInt(m[3], 10)); }\n    return { sql, params };\n  }\n\n  m = trimmed.match(/^(\\S+)\\s+(->|<-)\\s+(\\S+)$/);\n  if (m) {\n    const r = parseRef(m[1]);\n    const word = m[3];\n    if (m[2] === \"->\") {\n      return { sql: `SELECT t.to_book AS book, t.to_deck AS deck, t.to_id AS id, t.note, t.at, t.by, t.how, t.src, t.id AS thread_id FROM yu.threads t WHERE t.word = $4 AND t.from_book = $1 AND t.from_deck = $2 AND t.from_id = $3 ORDER BY t.at DESC`, params: [r.book, r.deck, r.id, word] };\n    }\n    return { sql: `SELECT t.from_book AS book, t.from_deck AS deck, t.from_id AS id, t.note, t.at, t.by, t.how, t.src, t.id AS thread_id FROM yu.threads t WHERE t.word = $4 AND t.to_book = $1 AND t.to_deck = $2 AND t.to_id = $3 ORDER BY t.at DESC`, params: [r.book, r.deck, r.id, word] };\n  }\n\n  throw new Error(`UNRECOGNIZED: \"${trimmed}\" — try: hello, card <ref>, cards <book/deck>, <ref> -> <word>, <ref> <- <word>`);\n}\n\nexport function explain(query) {\n  const compiled = compile(query);\n  let sql = compiled.sql;\n  compiled.params.forEach((p, i) => {\n    const val = typeof p === \"string\" ? `'${p}'` : String(p);\n    sql = sql.replace(new RegExp(`\\\\$${i + 1}`, \"g\"), val);\n  });\n  return sql;\n}\n\nexport { parseRef, ident, parseWhere };\n";
 
-// ═══ COMPILER (inlined from youspeak.mjs, exports stripped for browser) ═══
-// The compiler source is in COMPILER_SRC (JSON stringified above).
-// We eval it to get the functions into scope.
-(function() {
-  var src = COMPILER_SRC
-    .replace(/^export\s+function\s+/gm, 'function ')
-    .replace(/^export\s+\{/gm, '// export {');
-  eval(src);
-  // expose to outer scope
-  window.compile = compile;
-  window.explain = explain;
-})();
+// ═══ ARCHIVED COMPILER TEXT ═══
+// COMPILER_SRC is preserved for historical inspection only. Deliberately do
+// not eval it or expose its pre-candidate behavior as a current compiler.
 
 // ═══ TABS ═══
 const nav = document.getElementById('nav');
@@ -698,7 +699,9 @@ const pgOutput = document.getElementById('pg-output');
 const pgExamples = document.getElementById('pg-examples');
 const pgSource = document.getElementById('pg-source-code');
 
-pgSource.textContent = COMPILER_SRC;
+pgSource.textContent =
+  "// HISTORICAL PRE-CANDIDATE SOURCE — DISABLED; DO NOT USE AS CURRENT YOUSPEAK\n\n" +
+  COMPILER_SRC;
 
 const examples = [
   'hello',
@@ -716,18 +719,10 @@ examples.forEach(ex => {
 });
 
 function compileRun() {
-  const input = pgInput.value.trim();
-  if (!input) { pgOutput.innerHTML = '<div class="label">Output</div><pre class="error">EMPTY QUERY</pre>'; return; }
-  try {
-    // Use the inlined compile + explain functions
-    const result = compile(input);
-    const explained = explain(input);
-    pgOutput.innerHTML = '<div class="label">SQL</div><pre class="sql">' + esc(explained) + '</pre>' +
-      '<div class="label">Parameterized</div><pre class="sql">' + esc(result.sql) + '</pre>' +
-      '<div class="params">params: ' + esc(JSON.stringify(result.params)) + '</div>';
-  } catch (e) {
-    pgOutput.innerHTML = '<div class="label">Error</div><pre class="error">' + esc(e.message) + '</pre>';
-  }
+  pgOutput.innerHTML =
+    '<div class="label">Archived</div>' +
+    '<pre class="error">The embedded pre-candidate compiler is disabled. ' +
+    'Use apps/playground/index.html for the maintained logical preview.</pre>';
 }
 
 pgInput.addEventListener('input', compileRun);
@@ -771,7 +766,10 @@ function highlightSQL(sql) {
     .replace(new RegExp('\b(CREATE|TABLE|IF|NOT|EXISTS|PRIMARY|KEY|FOREIGN|REFERENCES|INSERT|INTO|OR|IGNORE|VALUES|SELECT|FROM|WHERE|ORDER|BY|DESC|LIMIT|UNION|ALL|AS|PRAGMA|INDEX|DEFAULT|INTEGER|TEXT|REAL)\b', 'g'), '<span class="kw">$1</span>')
     .replace(new RegExp("('[^']*')", 'g'), '<span class="str">$1</span>');
 }
-document.getElementById('db-schema').innerHTML = highlightSQL(SQL_RAW);
+document.getElementById('db-schema').innerHTML = highlightSQL(
+  "-- HISTORICAL SQLITE SKETCH — NOT YUTABASE CANDIDATE CONFORMANCE OR AN INSTALL PATH\n\n" +
+  SQL_RAW
+);
 
 // ═══ UTIL ═══
 function esc(s) {

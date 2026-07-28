@@ -6,6 +6,10 @@
 -- This file is the durable layer. If every tool above it dies, the data and
 -- its meaning remain readable by any future hand with nothing but psql.
 -- ~200 lines. No magic. Everything compiles to SQL you can read.
+--
+-- Installation note: this is the original legacy-base phase, not a complete
+-- current install by itself. A fresh revision-5 candidate commits 0001+0002
+-- together, then applies 0004 and 0005 in separate fresh transactions.
 
 -- ──────────────────────────────────────────────────────────
 -- §0 — the schema itself
@@ -623,8 +627,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA via TO PUBLIC;
 -- done
 -- ──────────────────────────────────────────────────────────
 
--- After installing this migration:
---   1. Run yu.refresh_via() to generate initial via.* views (none yet — no words)
---   2. Run 0002_starter_lexicon.sql to coin the seven starter words
---   3. Register decks with INSERT INTO yu.registry before threading
---   4. Install delete guards on each deck table (yuta deck new/annex does this)
+-- This legacy-base phase is intentionally incomplete. Continue with 0002 in
+-- the same fresh transaction, then apply 0004 and 0005 in separate fresh
+-- transactions. Revision 5 makes mappings logical-to-physical and maintains
+-- the canonical row-plus-TRUNCATE guard pair through registry lifecycle.

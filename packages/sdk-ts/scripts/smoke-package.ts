@@ -35,6 +35,7 @@ try {
     "0001_yu_core.sql",
     "0002_starter_lexicon.sql",
     "0004_candidate_hardening.sql",
+    "0005_candidate_integrity.sql",
   ]) {
     if (!existsSync(join(installed, "dist", "sql", migration))) {
       throw new Error(`package smoke: missing dist/sql/${migration}`);
@@ -58,8 +59,9 @@ try {
     [
       "--input-type=module",
       "--eval",
-      "import { CANDIDATE_VERSION, compile } from 'yutabase'; " +
-      "if (CANDIDATE_VERSION !== '0.1.0-candidate.1' || compile('hello').sql !== 'SELECT 1') process.exit(1);",
+      "import { CANDIDATE_REVISION, CANDIDATE_VERSION, compile } from 'yutabase'; " +
+      "import { parseRef } from 'yutabase/browser'; " +
+      "if (CANDIDATE_VERSION !== '0.1.0-candidate.1' || CANDIDATE_REVISION !== 5 || compile('hello').sql !== 'SELECT 1' || parseRef('demo/cards/01977c2e-0000-7000-8000-000000000001').deck !== 'cards') process.exit(1);",
     ],
     { cwd: consumer, stdio: "pipe" },
   );

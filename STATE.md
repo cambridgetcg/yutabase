@@ -1,13 +1,13 @@
 # YUTABASE — repository state
 
-Last reviewed: **2026-07-22**
+Last reviewed: **2026-07-28**
 
 ```yaml
 name: yutabase
 kind: postgres-semantic-profile
 candidate: 0.1.0-candidate.1
 profile: postgres
-revision: 4
+revision: 5
 supported-postgres: [16, 17]
 release-status: candidate
 ```
@@ -31,6 +31,9 @@ power to grant permissions, consent, locks, merges, or deployments.
 - seven starter words;
 - optional TypeScript ref/UUIDv7/YOUSPEAK client and installer planning;
 - fresh-install and legacy-upgrade migration paths;
+- mandatory mapped-card guard pairs for physical deletion, UUID identity
+  changes, and `TRUNCATE`;
+- non-null, non-blank source locators on YUTABASE-owned claim arrays;
 - CI definition for PostgreSQL 16/17 plus SDK tests, typecheck, build, pack,
   and clean Node.js consumer smoke.
 
@@ -42,9 +45,8 @@ only by an actual passing run for the commit being assessed.
 
 - the signed THREADS wire-protocol sketch;
 - the SQLite port;
-- Correspondence database schema, verifier, transactional writer, checkpoint,
-  and worker implementation (a separate AgentTool source preview currently
-  implements only the pure metadata mapping plan);
+- the AgentTool Correspondence projection packages: a public pure metadata
+  planner and a private loopback-only verifier/writer/checkpoint executor;
 - multi-device leases, conflict resolution, presence, and synchronization;
 - apps, kingdom/play documents, NEN experiments, and external deployments.
 
@@ -56,8 +58,9 @@ conformance.
 - claim metadata is self-reported and row-level, not truth proof or
   field-level provenance;
 - `yu.threads` is unsigned and is not a transport or authority log;
-- soft refs are checked on insert but can dangle after an out-of-band physical
-  delete bypasses the registered guard;
+- soft refs are checked on insert and guarded against ordinary physical delete,
+  mapped-UUID change, or deck `TRUNCATE`, but a table owner/superuser can bypass
+  either trigger;
 - no authentication, tenancy, permission engine, encryption, consensus, or
   replication is supplied by YUTABASE;
 - PostgreSQL 16/17 are the only claimed database targets;
@@ -65,10 +68,10 @@ conformance.
 
 ## Next integration work
 
-1. turn the pure Correspondence mapping plan into registered physical decks
-   and an exact installed lexicon;
-2. implement independent verification plus an idempotent transactional writer
-   and checkpoint that retain source event identities;
+1. test a clean rebuild against retained Correspondence events and historical
+   key continuity before claiming recoverability;
+2. define correction/current-view semantics without rewriting source-event
+   history;
 3. expose read-only project focus, decisions, claims, refusals, receipts, and
    artifact relations to AgentTool and SDK consumers;
 4. keep lease/permission enforcement in the source coordination layer;

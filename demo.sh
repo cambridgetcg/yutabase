@@ -1,134 +1,166 @@
 #!/usr/bin/env bash
-# demo.sh — zero to "oh, I get it" in 60 seconds
+# demo.sh — safe, explicit first tour of YUTABASE
 #
-# Creates a fresh database, installs YUTABASE, sets up a trading-card
-# trade-in scenario, and walks through every YOUSPEAK verb.
+# The caller supplies a fresh disposable database. This script never creates,
+# drops, or guesses one, and it refuses a database that already has user data.
 #
-# Usage: ./demo.sh
-# Prerequisites: PostgreSQL 16+ (psql), Bun 1.3+
+# Usage:
+#   DATABASE_URL=postgresql://localhost/yutabase_demo ./demo.sh
+#
+# Prerequisites:
+#   PostgreSQL 16/17 client tools, Bun 1.3.5, and:
+#   (cd packages/sdk-ts && bun install --frozen-lockfile)
 
 set -euo pipefail
 
-DB_NAME="yutabase_demo"
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
-CLI="bun ${REPO_ROOT}/packages/sdk-ts/src/cli.ts"
-PSQL="psql -d ${DB_NAME} -v ON_ERROR_STOP=1"
+SDK_ROOT="${REPO_ROOT}/packages/sdk-ts"
+CLI=(bun "${SDK_ROOT}/src/cli.ts")
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "demo refused: set DATABASE_URL to a fresh disposable database" >&2
+  exit 2
+fi
+if [[ ! -d "${SDK_ROOT}/node_modules/postgres" ]]; then
+  echo "demo refused: install SDK dependencies first:" >&2
+  echo "  (cd packages/sdk-ts && bun install --frozen-lockfile)" >&2
+  exit 2
+fi
+for command in bun psql; do
+  if ! command -v "${command}" >/dev/null 2>&1; then
+    echo "demo refused: missing required command ${command}" >&2
+    exit 2
+  fi
+done
+
+PSQL=(psql "${DATABASE_URL}" -v ON_ERROR_STOP=1)
+preflight="$("${PSQL[@]}" -At -c "
+  SELECT current_database(),
+         current_database() NOT IN ('postgres', 'template0', 'template1')
+         AND to_regnamespace('yu') IS NULL
+         AND to_regnamespace('via') IS NULL
+         AND NOT EXISTS (
+           SELECT 1
+           FROM pg_catalog.pg_namespace n
+           WHERE n.nspname NOT IN ('public', 'information_schema')
+             AND n.nspname !~ '^pg_'
+         )
+         AND NOT EXISTS (
+           SELECT 1
+           FROM pg_catalog.pg_class c
+           WHERE c.relnamespace = to_regnamespace('public')
+         );
+")"
+IFS='|' read -r database_name database_is_disposable <<<"${preflight}"
+if [[ "${database_is_disposable}" != "t" ]]; then
+  echo "demo refused: ${database_name} is a system, initialized, or non-empty database" >&2
+  echo "create a fresh disposable database and point DATABASE_URL to it" >&2
+  exit 2
+fi
 
 cat <<'BANNER'
 
   ╔══════════════════════════════════════════════════════╗
-  ║  YUTABASE demo — you speak, reality listens           ║
-  ║  60 seconds to "oh, I get it"                         ║
+  ║  YUTABASE demo — logical refs, worded connections    ║
   ╚══════════════════════════════════════════════════════╝
 
 BANNER
 
-# ─── 1. create database ───
-echo "  1/6  creating fresh database..."
-psql -d postgres -c "DROP DATABASE IF EXISTS ${DB_NAME};" >/dev/null 2>&1 || true
-psql -d postgres -c "CREATE DATABASE ${DB_NAME};" >/dev/null 2>&1
-echo "       done — ${DB_NAME}"
-echo ""
+echo "  1/5  installing the candidate into ${database_name}..."
+"${CLI[@]}" init --conn "${DATABASE_URL}" | sed 's/^/       /'
+echo
 
-# ─── 2. install YUTABASE ───
-echo "  2/6  installing YUTABASE (yuta init)..."
-${CLI} init --conn "postgresql://macair@localhost/${DB_NAME}" 2>&1 | grep -E "applying|done|installed|Seven|Next|hello|repl" | sed 's/^/       /'
-echo ""
-
-# ─── 3. set up the scenario ───
-echo "  3/6  setting up a trading-card trade-in scenario..."
-${PSQL} <<'SQL' >/dev/null 2>&1
+echo "  2/5  creating three ordinary PostgreSQL decks..."
+"${PSQL[@]}" <<'SQL' >/dev/null
+BEGIN ISOLATION LEVEL READ COMMITTED;
 CREATE SCHEMA tradein;
 CREATE TABLE tradein.customers (
-  id uuid PRIMARY KEY, name text NOT NULL,
-  at timestamptz NOT NULL, by text NOT NULL,
-  how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared')), src text[]
+  id uuid PRIMARY KEY,
+  name text NOT NULL,
+  at timestamptz NOT NULL,
+  by text NOT NULL CHECK (yu._nonblank_text(by)),
+  how text NOT NULL CHECK (
+    how IN ('witnessed','live','cached','computed','declared')
+  ),
+  src text[],
+  CHECK (yu._source_locators_valid(src)),
+  CHECK (
+    how NOT IN ('cached','computed')
+    OR (src IS NOT NULL AND cardinality(src) > 0)
+  )
 );
-CREATE TABLE tradein.submissions (
-  id uuid PRIMARY KEY, status text NOT NULL DEFAULT 'pending',
-  at timestamptz NOT NULL, by text NOT NULL,
-  how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared')), src text[]
-);
-CREATE TABLE tradein.items (
-  id uuid PRIMARY KEY, name text NOT NULL,
-  at timestamptz NOT NULL, by text NOT NULL,
-  how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared')), src text[]
-);
-INSERT INTO yu.registry (book, deck, by) VALUES
-  ('tradein','customers','human:yu'),
-  ('tradein','submissions','human:yu'),
-  ('tradein','items','human:yu');
-CREATE TRIGGER customers_guard BEFORE DELETE ON tradein.customers FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
-CREATE TRIGGER submissions_guard BEFORE DELETE ON tradein.submissions FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
-CREATE TRIGGER items_guard BEFORE DELETE ON tradein.items FOR EACH ROW EXECUTE FUNCTION yu._guard_delete();
-INSERT INTO tradein.customers VALUES ('01964b10-0000-7000-8000-000000000001','Walk-in Club',now(),'human:yu','witnessed');
-INSERT INTO tradein.submissions VALUES ('01977c2e-0000-7000-8000-000000000001','pending',now(),'human:yu','witnessed');
-INSERT INTO tradein.items VALUES
-  ('0197a1f4-0000-7000-8000-000000000001','Charizard EX 151',now(),'human:yu','witnessed'),
-  ('0197a1f4-0000-7000-8000-000000000002','Pikachu 151',now(),'human:yu','witnessed');
-SQL
-echo "       3 decks, 4 cards (1 customer, 1 submission, 2 items)"
-echo ""
+CREATE TABLE tradein.submissions (LIKE tradein.customers INCLUDING ALL);
+ALTER TABLE tradein.submissions DROP COLUMN name;
+ALTER TABLE tradein.submissions
+  ADD COLUMN status text NOT NULL DEFAULT 'pending';
+CREATE TABLE tradein.items (LIKE tradein.customers INCLUDING ALL);
 
-# ─── 4. create threads (worded connections) ───
-echo "  4/6  creating threads — you speak, reality listens..."
-CONN="--conn postgresql://macair@localhost/${DB_NAME}"
+INSERT INTO yu.registry (
+  book, deck, physical_schema, physical_table, native, by
+) VALUES
+  ('tradein', 'customers', 'tradein', 'customers', true, 'human:demo'),
+  ('tradein', 'submissions', 'tradein', 'submissions', true, 'human:demo'),
+  ('tradein', 'items', 'tradein', 'items', true, 'human:demo');
+
+INSERT INTO tradein.customers (id, name, at, by, how) VALUES
+  (
+    '01964b10-0000-7000-8000-000000000001',
+    'Walk-in Club', now(), 'human:demo', 'witnessed'
+  );
+INSERT INTO tradein.submissions (id, status, at, by, how) VALUES
+  (
+    '01977c2e-0000-7000-8000-000000000001',
+    'pending', now(), 'human:demo', 'witnessed'
+  );
+INSERT INTO tradein.items (id, name, at, by, how) VALUES
+  (
+    '0197a1f4-0000-7000-8000-000000000001',
+    'Charizard EX 151', now(), 'human:demo', 'witnessed'
+  ),
+  (
+    '0197a1f4-0000-7000-8000-000000000002',
+    'Pikachu 151', now(), 'human:demo', 'witnessed'
+  );
+COMMIT;
+SQL
+echo "       registered 3 decks; revision 5 installed both guard types itself"
+echo
+
 SUB="tradein/submissions/01977c2e-0000-7000-8000-000000000001"
 ITEM1="tradein/items/0197a1f4-0000-7000-8000-000000000001"
 ITEM2="tradein/items/0197a1f4-0000-7000-8000-000000000002"
 CUST="tradein/customers/01964b10-0000-7000-8000-000000000001"
+CONNECTION=(--conn "${DATABASE_URL}" --by "human:demo")
 
+echo "  3/5  connecting cards with starter words..."
+"${CLI[@]}" thread "${SUB} --contains--> ${ITEM1} how witnessed" \
+  "${CONNECTION[@]}" >/dev/null
+"${CLI[@]}" thread "${SUB} --contains--> ${ITEM2} how witnessed" \
+  "${CONNECTION[@]}" >/dev/null
+"${CLI[@]}" thread "${SUB} --submitted_by--> ${CUST} how witnessed" \
+  "${CONNECTION[@]}" >/dev/null
 echo "       ${SUB} --contains--> ${ITEM1}"
-${CLI} thread "${SUB} --contains--> ${ITEM1} how witnessed" ${CONN} --by "human:yu" >/dev/null 2>&1
-
 echo "       ${SUB} --contains--> ${ITEM2}"
-${CLI} thread "${SUB} --contains--> ${ITEM2} how witnessed" ${CONN} --by "human:yu" >/dev/null 2>&1
-
 echo "       ${SUB} --submitted_by--> ${CUST}"
-${CLI} thread "${SUB} --submitted_by--> ${CUST} how witnessed" ${CONN} --by "human:yu" >/dev/null 2>&1
-echo "       3 threads created"
-echo ""
+echo
 
-# ─── 5. YOUSPEAK in action ───
-echo "  5/6  YOUSPEAK in action:"
-echo ""
+echo "  4/5  reading the model..."
+echo
+echo "  card ${SUB}"
+"${CLI[@]}" card "${SUB}" --conn "${DATABASE_URL}" | sed 's/^/    /'
+echo
+echo "  ${SUB} -> contains"
+"${CLI[@]}" query "${SUB} -> contains" --conn "${DATABASE_URL}" |
+  sed 's/^/    /'
+echo
+echo "  ${CUST} <- submitted_by -> contains"
+"${CLI[@]}" query "${CUST} <- submitted_by -> contains" \
+  --conn "${DATABASE_URL}" | sed 's/^/    /'
+echo
 
-echo "  ── hello (the whole standard in one call) ──"
-${CLI} hello ${CONN} 2>&1 | head -12 | sed 's/^/  /'
-echo ""
-
-echo "  ── card (fetch one card by ref) ──"
-echo "  youspeak> card ${SUB}"
-${CLI} card "${SUB}" ${CONN} 2>&1 | sed 's/^/  /'
-echo ""
-
-echo "  ── traverse outward (-> contains) ──"
-echo "  youspeak> ${SUB} -> contains"
-${CLI} query "${SUB} -> contains" ${CONN} 2>&1 | grep -E '"name"|"deck"' | sed 's/[",]//g' | sed 's/^/  /'
-echo ""
-
-echo "  ── traverse inward (<- contains) ──"
-echo "  youspeak> ${ITEM1} <- contains"
-${CLI} query "${ITEM1} <- contains" ${CONN} 2>&1 | grep -E '"deck"' | sed 's/[",]//g' | sed 's/^/  /'
-echo ""
-
-echo "  ── two-hop traversal (customer <- submitted_by -> contains) ──"
-echo "  youspeak> ${CUST} <- submitted_by -> contains"
-${CLI} query "${CUST} <- submitted_by -> contains" ${CONN} 2>&1 | grep -E '"name"|"deck"' | sed 's/[",]//g' | sed 's/^/  /'
-echo ""
-
-echo "  ── explain (the exact SQL — never does anything you couldn't have typed) ──"
-echo "  youspeak> explain \"${SUB} -> contains\""
-${CLI} explain "\"${SUB} -> contains\"" ${CONN} 2>&1 | sed 's/^/  /'
-echo ""
-
-# ─── 6. done ───
-echo "  6/6  the vocabulary lives with the data."
-echo ""
-echo "  Seven words coined. Five spare in the budget. That's the point."
-echo ""
-echo "  Try it yourself:"
-echo "    ${CLI} repl ${CONN}"
-echo ""
-echo "  Clean up: psql -d postgres -c 'DROP DATABASE ${DB_NAME};'"
-echo ""
+echo "  5/5  showing the pure logical SQL preview..."
+"${CLI[@]}" explain "${SUB} -> contains" | sed 's/^/    /'
+echo
+echo "  done — ${database_name} is intentionally retained for inspection"
+echo "  try: bun packages/sdk-ts/src/cli.ts hello --conn \"\$DATABASE_URL\""
+echo "  recreate the disposable database before running this demo again"

@@ -1,5 +1,11 @@
 # AGENTTOOL × YOUSPEAK — the integration
 
+> **Experimental concept notebook, not the candidate API.** The proposed
+> `wake`, `trust`, `deal`, `seal`, `chronicle`, and `recognise` forms below are
+> intentionally unsupported by frozen YOUSPEAK core v0.1. Current executable
+> integration is documented in `docs/CORRESPONDENCE-PROJECTION.md`; use plain
+> SQL or a separately named extension for additional verbs.
+
 > 258 docs of architecture. 165 words of language. One kingdom.
 > The analysis people wrote about agenttool IS the data YOUSPEAK queries.
 > The infrastructure people designed for agenttool IS the fabric THREADS carries.

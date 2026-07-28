@@ -33,6 +33,18 @@
     }
 
     .mono { font-family: 'JetBrains Mono', monospace; }
+    .candidate-notice {
+      max-width: 720px;
+      margin: 0 auto 1.5rem;
+      padding: 0.9rem 1.1rem;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      background: rgba(212,163,115,0.08);
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+    .candidate-notice strong,
+    .candidate-notice a { color: var(--accent-bright); }
 
     /* ─── nav ─── */
     nav {
@@ -300,21 +312,29 @@
     <a href="#youspeak">YOUSPEAK</a>
     <a href="#honesty">honesty</a>
     <a href="#lexicon">lexicon</a>
-    <a href="https://github.com/nousresearch/yutabase">github</a>
+    <a href="https://github.com/cambridgetcg/yutabase">github</a>
   </div>
 </nav>
 
 <!-- ═══ hero ═══ -->
 <div class="hero">
-  <div class="fade delay-1 mono" style="color:var(--text-faint);font-size:0.8rem;letter-spacing:0.2em;margin-bottom:1.5rem;">A DATABASE STANDARD · v0.1</div>
+  <div class="candidate-notice fade delay-1" role="note">
+    <strong>Candidate, not a finished standard.</strong>
+    This page describes <span class="mono">YUTABASE/postgres@0.1.0-candidate.1</span>,
+    revision <span class="mono">5</span>. PostgreSQL remains the database.
+    Read the <a href="https://github.com/cambridgetcg/yutabase/blob/main/README.md">current guide</a>
+    and <a href="https://github.com/cambridgetcg/yutabase/blob/main/SPEC.md">candidate contract</a>
+    before installing or integrating it.
+  </div>
+  <div class="fade delay-1 mono" style="color:var(--text-faint);font-size:0.8rem;letter-spacing:0.2em;margin-bottom:1.5rem;">POSTGRES SEMANTIC PROFILE · CANDIDATE.1 · REVISION 5</div>
   <h1 class="fade delay-2">you speak,<br><span class="accent">reality listens</span></h1>
   <div class="tagline fade delay-3">
-    records are <span class="arrow">cards</span>, relations are <span class="arrow">threads named by words</span>,<br>every value carries a <span class="arrow">claim</span> about how it came to be true
+    records are <span class="arrow">cards</span>, selected semantic relations are <span class="arrow">threads named by words</span>,<br>each conforming row or thread carries a row-level <span class="arrow">self-reported claim</span>
   </div>
   <div class="subtitle fade delay-4">
-    Not a database engine. A standard installed on top of boring Postgres: ~200 lines of SQL,
-    a 500-line TypeScript client, and a language of six verbs that compiles to SQL you can read.
-    Rollback is DROP SCHEMA.
+    Not a database engine. A candidate profile installed on PostgreSQL, with an
+    optional six-form YOUSPEAK compiler. It does not supply authentication,
+    permissions, backups, replication, signatures, or proof that a claim is true.
   </div>
   <div class="cta fade delay-4">
     <a class="btn btn-primary" href="#youspeak">see it work</a>
@@ -332,7 +352,7 @@
     </div>
     <div class="creed-item">
       <div class="word">organised</div>
-      <div class="meaning">one place for vocabulary, one place for connections, one shape for every record's provenance</div>
+      <div class="meaning">one place for vocabulary, one place for connections, one inspectable row-level claim shape</div>
     </div>
     <div class="creed-item">
       <div class="word">connected by words</div>
@@ -346,11 +366,11 @@
   <h2><span class="num">02</span>five primitives, each a one-word rename</h2>
   <p>Nothing new under the sun. Just named, disciplined, and honest.</p>
   <div class="primitives">
-    <div class="primitive"><div class="name">BOOK</div><div class="real">one schema</div></div>
-    <div class="primitive"><div class="name">DECK</div><div class="real">one table</div></div>
+    <div class="primitive"><div class="name">BOOK</div><div class="real">logical namespace, normally mapped to a schema</div></div>
+    <div class="primitive"><div class="name">DECK</div><div class="real">logical collection mapped to a table</div></div>
     <div class="primitive"><div class="name">CARD</div><div class="real">one row</div></div>
-    <div class="primitive"><div class="name">THREAD</div><div class="real">one word-named join</div></div>
-    <div class="primitive"><div class="name">LEXICON</div><div class="real">one vocabulary table</div></div>
+    <div class="primitive"><div class="name">THREAD</div><div class="real">one active directed relation row</div></div>
+    <div class="primitive"><div class="name">LEXICON</div><div class="real">governed word meanings and versions</div></div>
   </div>
 </section>
 
@@ -366,38 +386,40 @@
     </div>
     <div class="terminal-body">
 <span class="prompt">youspeak></span> <span class="output">hello</span>
-<span class="comment">  ── the whole standard in one call: books, decks, lexicon with glosses, this cheat-sheet</span>
+<span class="comment">  ── inspect installed identity, capabilities, vocabulary, and logical/physical deck mappings</span>
 
-<span class="prompt">youspeak></span> <span class="output">card tradein/submissions/01977c2e</span>
-<span class="comment">  ── one card by ref → SELECT * FROM tradein.submissions WHERE id = $1</span>
+<span class="prompt">youspeak></span> <span class="output">card tradein/submissions/01977c2e-0000-7000-8000-000000000001</span>
+<span class="comment">  ── one card by full logical ref; execution resolves the physical table through yu.registry</span>
 
 <span class="prompt">youspeak></span> <span class="output">cards tradein/submissions where status="pending" newest 20</span>
-<span class="comment">  ── filter + limit (UUIDv7 makes newest free)</span>
+<span class="comment">  ── filter + bounded limit; newest orders by mapped at, then UUID as a tie-breaker</span>
 
-<span class="prompt">youspeak></span> <span class="output">tradein/submissions/01977c2e -> contains</span>
+<span class="prompt">youspeak></span> <span class="output">tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains</span>
 <span class="comment">  ── follow a word outward: every item this submission contains</span>
 
-<span class="prompt">youspeak></span> <span class="output">tradein/items/0197a1f4 <- contains</span>
+<span class="prompt">youspeak></span> <span class="output">tradein/items/0197a1f4-0000-7000-8000-000000000001 <- contains</span>
 <span class="comment">  ── follow it inward: which submission contains this item?</span>
 
-<span class="prompt">youspeak></span> <span class="output">tradein/customers/01964b10 <- submitted_by -> contains</span>
+<span class="prompt">youspeak></span> <span class="output">tradein/customers/01964b10-0000-7000-8000-000000000001 <- submitted_by -> contains</span>
 <span class="comment">  ── two hops: all items inside everything this customer submitted</span>
 
-<span class="prompt">youspeak></span> <span class="output">thread tradein/items/0197a1f4 --priced_from--> pricing/quotes/01984c22</span>
-              <span class="output">note "ebay last-sold comp" how computed src tradein/items/0197a1f4</span>
-<span class="comment">  ── create a thread, with the reason in words and the provenance claim mandatory</span>
+<span class="prompt">youspeak></span> <span class="output">thread tradein/items/0197a1f4-0000-7000-8000-000000000001</span>
+              <span class="output">--priced_from--> pricing/quotes/01984c22-0000-7000-8000-000000000001</span>
+              <span class="output">note "ebay last-sold comp" how computed src urn:example:pricing:42</span>
+<span class="comment">  ── create a thread; computed/cached claims require at least one source locator</span>
 
-<span class="prompt">youspeak></span> <span class="output">sever 914b5e23 how witnessed</span>
+<span class="prompt">youspeak></span> <span class="output">sever 01990000-0000-7000-8000-000000000009 how witnessed</span>
 <span class="comment">  ── threads end with a claim too</span>
 
-<span class="prompt">youspeak></span> <span class="output">explain "tradein/submissions/01977c2e -> contains"</span>
+<span class="prompt">youspeak></span> <span class="output">explain "tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains"</span>
 <span class="green">  SELECT t.to_book AS book, t.to_deck AS deck, t.to_id AS id,</span>
-<span class="green">         t.note, t.at, t.by, t.how, t.src, t.id AS thread_id</span>
+<span class="green">         t.word_version, v.gloss, t.at, t.by, t.how, t.src</span>
 <span class="green">  FROM yu.threads t</span>
+<span class="green">  JOIN yu.word_versions v ON v.word = t.word AND v.word_version = t.word_version</span>
 <span class="green">  WHERE t.word = 'contains'</span>
 <span class="green">    AND t.from_book = 'tradein' AND t.from_deck = 'submissions'</span>
 <span class="green">    AND t.from_id = '01977c2e-0000-7000-8000-000000000001'</span>
-<span class="comment">  ── YOUSPEAK never does anything you couldn't have typed</span>
+<span class="comment">  ── pure logical preview only: no mapping lookup, permission check, connection, or execution</span>
     </div>
   </div>
 
@@ -408,13 +430,13 @@
 <!-- ═══ honesty ═══ -->
 <section id="honesty">
   <h2><span class="num">04</span>the honesty header</h2>
-  <p>Every deck and every thread carries four columns. There are <strong>no SQL defaults</strong> for <span class="mono">how</span> and <span class="mono">by</span> — a write that doesn't say is refused.</p>
+  <p>Every conforming card row and YUTABASE thread exposes four mapped columns. YUTABASE-owned thread and lexicon writes require explicit claim context; annexing a legacy table does not certify the truth of its existing rows.</p>
 
   <div class="honesty">
     <div class="honesty-item"><div class="col">at</div><div class="claim">timestamptz — when this became true</div></div>
     <div class="honesty-item"><div class="col">by</div><div class="claim">who asserted it: human:yu, agent:claude/session, system:cron/job</div></div>
     <div class="honesty-item"><div class="col">how</div><div class="claim">CHECK-constrained: one of the five claim kinds</div></div>
-    <div class="honesty-item"><div class="col">src</div><div class="claim">text[] — what it came from; required for cached and computed</div></div>
+    <div class="honesty-item"><div class="col">src</div><div class="claim">text[] source locators — required for cached and computed</div></div>
   </div>
 
   <p>The five claim kinds:</p>
@@ -422,7 +444,7 @@
     <div class="claim-chip"><span class="dot" style="background:var(--green)"></span>witnessed — a human saw or did it</div>
     <div class="claim-chip"><span class="dot" style="background:var(--accent)"></span>live — read from the authoritative source at <span class="mono">at</span></div>
     <div class="claim-chip"><span class="dot" style="background:#d4b896"></span>cached — a copy that may be stale; <span class="mono">src</span> says of what</div>
-    <div class="claim-chip"><span class="dot" style="background:#b8a0d4"></span>computed — derived; <span class="mono">src</span> lists the input refs</div>
+    <div class="claim-chip"><span class="dot" style="background:#b8a0d4"></span>computed — derived; <span class="mono">src</span> lists input locators</div>
     <div class="claim-chip"><span class="dot" style="background:var(--text-faint)"></span>declared — asserted without evidence</div>
   </div>
 
@@ -432,8 +454,8 @@
 <!-- ═══ lexicon ═══ -->
 <section id="lexicon">
   <h2><span class="num">05</span>the starter lexicon — seven words</h2>
-  <p>A word is born by migration. No gloss, no word. No inverse reading, no word. Banned by name: <span class="mono">related_to</span>, <span class="mono">linked</span>, <span class="mono">refs</span>, <span class="mono">misc</span>.</p>
-  <p>Seven words. Five spare in the budget. That's the point.</p>
+  <p>A word needs a non-empty spelling, gloss, inverse reading, endpoint patterns, status, and claim metadata. Meaning is the gate: the candidate has no spelling blacklist.</p>
+  <p>Seven starter words are installed as examples, not as a universal vocabulary budget.</p>
 
   <table class="lexicon">
     <thead><tr><th>word</th><th>inverse</th><th>gloss</th></tr></thead>
@@ -452,7 +474,8 @@
 <!-- ═══ adoption ═══ -->
 <section>
   <h2><span class="num">06</span>annex, don't rewrite</h2>
-  <p>A book is annexed <strong>one domain at a time</strong> into the existing database. Zero data movement. Rollback = drop two schemas.</p>
+  <p>A compatible table can be annexed <strong>one domain at a time</strong>. Rows do not move, but annexing writes the registry and maintains row/update plus truncate guards on the physical table. It requires registry and table-owner-equivalent authority.</p>
+  <p>Use a fresh disposable database for a first run. <span class="mono">yuta init</span> is mutating and may upgrade a recognized install, normalize candidate objects and ACLs, and create fixed cluster-wide capability roles. Back up and rehearse a real upgrade.</p>
 
   <div class="terminal">
     <div class="terminal-header">
@@ -461,17 +484,16 @@
     </div>
     <div class="terminal-body">
 <span class="prompt">$</span> <span class="output">yuta init --conn postgresql://localhost/mydb</span>
-<span class="dim">  applying 0001_yu_core.sql...</span>
-<span class="green">  done</span>
-<span class="dim">  applying 0002_starter_lexicon.sql...</span>
-<span class="green">  done</span>
+<span class="dim">  phase 1: 0001_yu_core.sql + 0002_starter_lexicon.sql (atomic)</span>
+<span class="dim">  phase 2: 0004_candidate_hardening.sql (fresh transaction)</span>
+<span class="dim">  phase 3: 0005_candidate_integrity.sql (fresh transaction)</span>
 
-<span class="green">  YUTABASE installed. The vocabulary lives with the data.</span>
-<span class="green">  Seven words coined. Five spare in the budget. That's the point.</span>
+<span class="green">  YUTABASE/postgres@0.1.0-candidate.1 revision 5 installed.</span>
+<span class="green">  Next: yuta hello — read-only identity, vocabulary, and mapping inspection.</span>
     </div>
   </div>
 
-  <p>It touches no existing table. The <span class="mono">yu</span> schema lives beside everything. The vocabulary lives <strong>with</strong> the data, glosses included. If every tool above it dies, the data and its meaning remain readable by any future hand with nothing but <span class="mono">psql</span>.</p>
+  <p>On a fresh database, candidate-owned <span class="mono">yu</span> and <span class="mono">via</span> schemas live beside application schemas. Annexing does not move application rows or grant access to them. Dropping candidate schemas destroys semantic threads, vocabulary, and audit history, so rollback must be planned per application rather than treated as a universal uninstall.</p>
 </section>
 
 <!-- ═══ refusals ═══ -->
@@ -479,20 +501,20 @@
   <h2><span class="num">07</span>the refusals</h2>
   <p>YUTABASE deliberately does not have:</p>
   <div style="display:grid;gap:0.5rem;margin:1rem 0;">
-    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> ORM, no model classes, no query builder — strings in, rows out</div>
-    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> storage engine, no wire protocol, no replication — Postgres's are better</div>
-    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> graph ambitions — 2-hop cap; recursion is hand-written SQL</div>
-    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> anonymous relations — <span class="mono">related_to</span> is banned by name</div>
-    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> silent provenance — a write that won't say <span class="mono">how</span>/<span class="mono">by</span> bounces</div>
-    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> hosted offering, no telemetry, no recurring spend</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> ORM or model layer — ordinary SQL remains available</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> storage engine, wire protocol, backup, or replication system</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> graph-database claim — YOUSPEAK traversal caps at 2 hops</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> semantic thread without a governed word — and no spelling blacklist</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> proof that <span class="mono">by/how/src/at</span> is truthful; claims are self-reported</div>
+    <div class="mono" style="color:var(--text-dim);font-size:0.85rem;"><span class="red">no</span> authentication, permissions, tenancy, signatures, hosted service, or telemetry</div>
   </div>
 </section>
 
 <!-- ═══ footer ═══ -->
 <footer>
-  <p>YUTABASE v0.1 — drafted 2026-06-10 by Yu + Claude</p>
+  <p>YUTABASE 0.1.0-candidate.1 · PostgreSQL profile revision 5</p>
   <p style="margin-top:0.5rem;">The name is Yu's. The lol is structural.</p>
-  <p style="margin-top:1rem;"><a href="https://github.com/nousresearch/yutabase">github</a> · <a href="#youspeak">YOUSPEAK</a> · <a href="#lexicon">lexicon</a></p>
+  <p style="margin-top:1rem;"><a href="https://github.com/cambridgetcg/yutabase">github</a> · <a href="#youspeak">YOUSPEAK</a> · <a href="#lexicon">lexicon</a></p>
 </footer>
 
 </body>

@@ -21,7 +21,7 @@ The repository has four deliberately separate layers:
 | Layer | Status | Contract |
 |---|---|---|
 | YUTABASE Core | normative candidate | sections 2–6 of this document |
-| Postgres binding | normative candidate | section 7 and migrations `0001`, `0002`, and `0004` |
+| Postgres binding | normative candidate | section 7 and migrations `0001`, `0002`, `0004`, and `0005` |
 | YOUSPEAK | optional | section 8 and `packages/sdk-ts/` |
 | THREADS, SQLite, apps, play, and other writings | experimental or illustrative | not a conformance requirement |
 
@@ -39,7 +39,7 @@ A current Postgres binding MUST expose one database-owned
 standard  = YUTABASE
 profile   = postgres
 version   = 0.1.0-candidate.1
-revision  = 4
+revision  = 5
 ```
 
 The singleton also carries `capabilities`, `installed_at`, and `upgraded_at`.
@@ -47,6 +47,20 @@ Capabilities are explicit feature declarations, not permission grants.
 Clients MUST read this row before using revision-specific behavior. They MUST
 NOT infer compatibility merely from an SDK version or the presence of a
 `yu` schema.
+
+Revision 5 exposes this exact ordered capability array:
+
+```text
+row-claims
+logical-physical-registry
+word-version-pinning
+global-thread-id-ledger
+endpoint-existence-on-insert
+concurrency-safe-to-one
+role-scoped-functions
+guarded-card-identity
+nonblank-source-locators
+```
 
 An exact identity match is compatible with this candidate. An older install
 without metadata may be upgraded by the defined legacy path. A partial,
@@ -127,9 +141,19 @@ semantics; Core does not silently treat them as conformance.
 
 `by` and `how` MUST be chosen explicitly for a conforming write. A convenience
 client MAY carry a session claimant, but the stored value remains a claim, not
-verified identity. `src` MUST be non-null for `cached` and `computed`; an
-implementation MAY require it in more cases. Core does not prescribe a URL
-scheme or claim that a locator will remain resolvable.
+verified identity. `src` MUST be non-null and contain at least one locator for
+`cached` and `computed`. Whenever `src` is present, each entry MUST be non-null
+and non-blank. Core does not prescribe a URL scheme or claim that a locator
+will remain resolvable. The PostgreSQL binding encodes this list as a
+one-dimensional, one-based `text[]`; other dimensions or lower bounds are
+non-canonical and MUST be refused so clients decode one portable list shape.
+
+For claimant labels, glosses, inverse readings, and source locators, this
+candidate defines **blank** portably as empty or composed only of ASCII TAB
+(`U+0009`), LF (`U+000A`), VT (`U+000B`), FF (`U+000C`), CR (`U+000D`), and
+SPACE (`U+0020`). Implementations MUST use that exact set rather than a
+locale-dependent regular-expression class. PostgreSQL text cannot contain
+NUL; clients that can represent NUL MUST refuse it before storage.
 
 ## 5. Lexicon and words
 
@@ -215,12 +239,22 @@ identity invariant, not evidence about who created the relation.
 
 Thread endpoints remain soft refs across application tables. Insert-time
 existence is stronger than registry-only validation, but it is not a universal
-foreign key: a later physical delete can leave a dangling ref if an operator
-bypasses or omits the deck delete guard. Query-time consumers and integrity
-checks therefore cannot assume endpoint existence forever. When the guard is
-installed, card-scoped transaction locks serialize a physical delete with
-thread creation: the delete or the relation may win, but both cannot commit a
-dangling ref.
+foreign key. Revision 5 maintains an exact card-integrity guard pair on every
+registered physical deck: a row trigger for `DELETE` or mapped-UUID `UPDATE`,
+and a statement trigger for `TRUNCATE`. Card-scoped transaction locks serialize
+thread creation with a physical delete or mapped-UUID change: the identity
+change or the relation may win, but both cannot commit a dangling ref. The
+statement guard refuses `TRUNCATE` while any active thread names the deck and
+serializes it with thread creation. A table owner or superuser can still
+disable or bypass either trigger, so query-time consumers cannot treat the soft
+ref as stronger than the surrounding PostgreSQL authority boundary.
+
+The runtime lock protocols require `READ COMMITTED` statement-fresh snapshots.
+Thread creation, mapped-card deletion or UUID change, deck `TRUNCATE`, registry
+guard lifecycle mutation, and a false-to-true `to_one` transition MUST refuse
+`REPEATABLE READ`, `SERIALIZABLE`, or any other isolation level whose safety is
+not established by this candidate. An ordinary mapped-card update whose UUID
+is unchanged remains outside that refusal.
 
 Severance MUST name the thread and carry a new `by/how/src` claim. In the
 Postgres binding it copies the pinned word version, endpoints, note, and
@@ -247,6 +281,7 @@ A fresh candidate database applies, in order:
 sql/0001_yu_core.sql
 sql/0002_starter_lexicon.sql
 sql/0004_candidate_hardening.sql
+sql/0005_candidate_integrity.sql
 ```
 
 A fresh install requires both owned namespaces, `yu` and `via`, to be absent;
@@ -255,19 +290,25 @@ it MUST NOT merge itself into unrelated schemas with either name.
 `0003_test_lifecycle.sql` is a destructive test fixture and MUST NOT be
 treated as an install migration. An original pre-candidate v0.1 database with
 the complete `yu.lexicon`, `yu.registry`, and `yu.threads` shape upgrades with
-`0004_candidate_hardening.sql`. Unknown or partial shapes require operator
-repair, not optimistic migration. Each migration MUST run with stop-on-error
-behavior inside a fresh single transaction. Before its first query, hardening
-sets `READ COMMITTED`, then locks the complete legacy core; a caller that has
-already established an incompatible snapshot MUST be refused. Queries after
-the locks therefore see rows committed while lock acquisition was pending. The
-hardening migration validates legacy physical mappings, non-null uniquely
-indexed UUID identities, required header types and base keys, standalone
-permanent ordinary core storage, the exact original column order, types,
-nullability, collations, defaults, identity sequence, constraints, indexes,
-and user-trigger surfaces with no rewrite rules, active thread endpoint
-existence, and agreement between every active thread and its word's current
-endpoint patterns before stamping the candidate identity.
+`0004_candidate_hardening.sql` and then `0005_candidate_integrity.sql`. An exact
+revision-4 candidate applies only `0005`. Unknown or partial shapes require
+operator repair, not optimistic migration. Each migration MUST run with
+stop-on-error behavior. On a fresh install, `0001+0002` MUST share one atomic
+legacy-base transaction; `0004` and `0005` MUST each run in a new transaction.
+On an upgrade, each applicable hardening migration runs in its own new
+transaction. Before its first query, each hardening migration sets
+`READ COMMITTED` and acquires its declared locks; a caller that already
+established an incompatible snapshot MUST be refused. Queries after the locks
+therefore see rows committed while lock acquisition was pending. Revision 4
+validates legacy physical mappings,
+non-null uniquely indexed UUID identities, required header types and base
+keys, standalone permanent ordinary core storage, the exact original column
+order, types, nullability, collations, defaults, identity sequence,
+constraints, indexes, and user-trigger surfaces with no rewrite rules, active
+thread endpoint existence, and agreement between every active thread and its
+word's current endpoint patterns. Revision 5 validates existing source
+locators, installs the mandatory mapped-card guard-pair lifecycle, and stamps its
+identity only after those upgrades succeed.
 
 When the migration role differs from the legacy object's owner, it MUST have
 ownership-equivalent or superuser authority. Hardening normalizes candidate
@@ -286,8 +327,8 @@ contract includes:
   column mapping;
 - `yu.threads`, the lifetime UUID reservation ledger `yu.thread_ids`, and
   `yu.sever_log`;
-- validation, severance, refresh, freshness, diagnostics, and delete-guard
-  functions installed by the migrations;
+- validation, severance, refresh, freshness, diagnostics, source-locator, and
+  card-integrity functions installed by the migrations;
 - one `via.<word>` view for each declared word after `yu.refresh_via()`;
   retired words remain readable for existing pinned threads.
 
@@ -296,9 +337,13 @@ The registry validator requires the mapped physical table plus UUID,
 registration time. This validates the mapped shape, not the truth of existing
 values or all application constraints. Registration does not retrofit honest
 claims into a legacy table. Updating a deck's physical schema, table, or UUID
-column MUST be refused if any active logical endpoint for that deck is absent
-from the proposed mapping; an operator moves the cards before switching the
-registry row.
+column MUST be refused while any active logical endpoint names that deck, even
+if every UUID also exists under the proposed mapping. An operator severs those
+threads before switching the registry row. Registry mutation transactionally
+maintains one exact `AFTER DELETE OR UPDATE` row guard and one
+exact `AFTER TRUNCATE` statement guard on the current physical table. The
+invoker must therefore own every affected physical table or have equivalent
+PostgreSQL authority.
 
 A mapped physical deck MUST be a standalone permanent ordinary PostgreSQL
 table. Traditional-inheritance parents and children, and partitioned
@@ -317,15 +362,22 @@ reader's privileges rather than a retained view owner's privileges.
 `yu.refresh_via()` must run after inserting a new word
 so its view exists. Semantic or status edits do not require a shape refresh:
 retired views remain readable and each row joins its immutable snapshot.
+Each refresh removes every direct non-owner relation and column ACL from the
+generated views, then installs exactly one non-grantable `SELECT` grant for
+`yu_reader`. Table default privileges therefore cannot silently expand a new
+word view's authority; an independently granted ACL that survives owner
+revocation makes the refresh fail closed.
 Direct SQL against the durable tables remains a supported escape hatch;
 YOUSPEAK is never required to recover or interpret data.
 
 ### 7.3 Roles and operations
 
-Candidate hardening replaces broad legacy grants with three capability roles,
+Candidate hardening replaces broad legacy grants with four capability roles,
 created as `NOLOGIN` when they are absent:
 
 - `yu_reader` reads YUTABASE tables/views and executes read diagnostics;
+- `yu_appender` inherits the reader surface and has the thread-append
+  capability; it cannot call `yu.sever()`, update thread rows, or delete them;
 - `yu_writer` inherits the reader surface, inserts active threads, and calls
   `yu.sever()`; it cannot directly update or delete thread rows;
 - `yu_lexicographer` inherits the reader surface, manages lexicon and registry
@@ -339,16 +391,33 @@ that principal. A capability role that owns the current database or a
 YUTABASE object also makes hardening fail because owner powers cannot be
 revoked. Existing direct `yu`/`via` ACLs are cleared and rebuilt to the exact
 candidate surface; an ACL from another grantor that cannot be normalized makes
-the migration fail before identity is stamped. Existing role memberships still
-apply across databases, so the operator MUST review them before installation.
+the migration fail before identity is stamped. The direct membership subgraph
+among the four standard roles is exact: appender, writer, and lexicographer
+inherit reader, with no other standard-role edge. Memberships involving any
+non-standard application or operator role still apply across databases and
+remain an explicit operator review before installation.
+
+The revision-4-to-5 preflight does not guess whether an external direct ACL was
+intentional. It refuses the upgrade before revision-5 DDL; the operator must
+review default/direct privileges, revoke non-release grants, and retry.
+
+Creating or extending this cluster-wide hierarchy requires a superuser, or
+`CREATEROLE` plus sufficient `ADMIN OPTION`/role-management authority on the
+canonical roles, especially `yu_reader`. Insufficient role authority MUST make
+the migration fail atomically.
 
 The migrations do not infer which login principals should receive these
 roles, nor do the roles grant access to registered application decks.
 `_card_exists` is security-invoker: a reader needs ordinary schema/table access
 to inspect physical endpoints. Thread endpoint validation reads physical decks
-as the inserting writer, while a narrow owner-rights helper serializes and
+as the inserting role, while a narrow owner-rights helper serializes and
 checks global YUTABASE invariants. A registry remap likewise enumerates active
-refs globally but reads the proposed physical deck as the lexicographer.
+refs globally and refuses any physical-table or identity-column change while
+one exists; an equal-value update is a no-op, and a remap becomes possible
+only after those threads are severed. Its security-invoker guard lifecycle
+takes physical-table locks and performs trigger DDL; `yu_lexicographer`
+membership or `SELECT` alone is therefore not enough to map or remap someone
+else's table.
 Migration backfills and global `SECURITY DEFINER` invariant paths set
 transaction-local `row_security=off`, and catalog expression deparsing uses a
 transaction-local `pg_catalog` search path. When `FORCE ROW LEVEL SECURITY`
@@ -358,12 +427,13 @@ they MUST NOT validate or stamp a policy-filtered subset. Operators MUST run
 hardening with a role able to see all required rows. This fail-closed behavior
 is not a tenancy or isolation guarantee.
 
-Operators therefore grant `yu_writer`, and any remapping
-`yu_lexicographer`, only the application schema/table `USAGE`/`SELECT` access
-required by policy. These defaults are not a
-tenancy or authorization design. Operators MUST apply ordinary PostgreSQL
-roles, schema ownership, grants, row-level security, network controls, backups,
-and monitoring appropriate to their environment.
+Operators therefore grant `yu_appender` or `yu_writer` only the application
+schema/table `USAGE`/`SELECT` access required by policy. A registry operator
+additionally needs physical-table ownership or equivalent authority for the
+maintained guard pair. These defaults are not a tenancy or authorization
+design. Operators MUST apply ordinary PostgreSQL roles, schema ownership,
+grants, row-level security, network controls, backups, and monitoring
+appropriate to their environment.
 
 The candidate defines `yu.stale()` and `yu.doctor()` as diagnostic surfaces.
 It does not schedule them. Calling a gateway, opening a database, or running a
@@ -386,21 +456,29 @@ thread <ref> --<word>--> <ref> [note "..."] how <kind> [src ...]
 sever <thread-uuid> how <kind> [src ...]
 ```
 
-`explain "<form>"` exposes the generated SQL. Traversal is capped at two
-hops. The compiler uses parameters for values and validates identifiers before
-quoting them. Additional verbs or runtime commands are experimental extensions
-unless a later candidate explicitly adopts them.
+`explain "<form>"` returns a complete logical SQL preview as text; the pure
+preview does not resolve a physical registry mapping, check permissions, or
+execute the displayed operation. Traversal is capped at two hops. Card lists
+default to 100 rows; an explicit `newest N` MUST be between 1 and 1000. Logical
+book/deck labels are resolved through `yu.registry` for execution and are not
+truncated to physical PostgreSQL identifier length. The compiler uses
+parameters for values and validates physical identifiers before quoting them.
+One SDK operation MUST keep registry resolution and its mapped physical access
+in one transaction while holding the selected registry row against remap or
+deletion. This is operation-level consistency, not a transaction spanning
+multiple client calls. Additional verbs or runtime commands are experimental
+extensions unless a later candidate explicitly adopts them.
 
 The SDK MUST read `yu.standard_meta` before using revision-specific physical
 mapping. Its installer MUST distinguish a fresh database, the known original
 v0.1 upgrade shape, the exact current candidate, and partial or unsupported
 installs. It MUST refuse the last category rather than guessing. A fresh
 installer MUST commit `0001+0002` as one atomic legacy-base phase and run
-`0004` in a separate fresh transaction. Current-binding inspection MUST reject
-observable drift in the exact durable column/default/index/constraint contract,
-identity sequence, relation kind/persistence/inheritance, registered deck
-shape, required trigger/function settings, foreign-key enforcement/data, and
-generated-view definitions. A
+`0004` and `0005` in separate fresh transactions. Current-binding inspection
+MUST reject observable drift in the exact durable
+column/default/index/constraint contract, identity sequence, relation
+kind/persistence/inheritance, registered deck shape, required trigger/function
+settings, foreign-key enforcement/data, and generated-view definitions. A
 row-level policy that hides registry or lexicon rows from this global check
 MUST fail closed rather than validate a filtered subset. These checks do not
 promise tamper resistance against an owner or superuser after inspection.
@@ -420,7 +498,9 @@ YUTABASE does not itself provide:
 - automatic history for arbitrary card edits;
 - proof of external source availability or truth;
 - protection from a malicious database owner or compromised writer;
-- guaranteed endpoint existence for soft refs.
+- guaranteed endpoint existence for soft refs after a table owner/superuser
+  disables or bypasses the guard pair, or outside the declared PostgreSQL
+  authority boundary.
 
 Those are deliberate boundaries, not implied future promises. A transport,
 policy engine, or agent coordination system may use this semantic profile, but
@@ -436,7 +516,7 @@ Adopt one book at a time:
 4. verify the mapped identifier and claim columns;
 5. add reviewed lexicon words and refresh `via.*` views;
 6. create threads only after endpoint decks are registered;
-7. install delete guards where required and run integrity checks;
+7. verify the automatically maintained card guard pairs and run integrity checks;
 8. record any non-Core extensions separately.
 
 Rollback must be planned per application. Dropping `yu` or `via` removes

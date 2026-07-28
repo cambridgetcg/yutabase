@@ -3,6 +3,10 @@
 Status: **design contract; projector implementation is not part of YUTABASE
 `0.1.0-candidate.1` conformance.**
 
+AgentTool has a private, loopback-only implementation of the bounded profile
+described below. Its existence does not turn this document into a deployment,
+hosted-service, or general interoperability claim.
+
 This profile connects two different responsibilities:
 
 - **AgentTool Correspondence** is the signed, append-only transport and the
@@ -102,7 +106,7 @@ version, projection policy version, run time, and completeness/error status.
 Key identifiers and participant labels MUST remain distinguishable. Projecting
 both into one `by` string would overstate identity binding.
 
-### Current developer-preview planner
+### Current AgentTool implementation split
 
 AgentTool source now contains a pure
 `@agenttool/correspondence-yutabase` mapping planner. It emits deterministic,
@@ -110,17 +114,19 @@ metadata-only card and thread intentions and exports the exact preview lexicon.
 The planner requires the caller to name the actual projector service/run in
 `by`; it does not use the library name as a claimant.
 
-The preview deliberately omits raw signatures, payload text, paths, branches,
-and artifact locators. It also keeps mutable `missing_parents` and
-`lineage_status` observations off immutable event cards. A future worker may
-project those as separately timed observation records with a durable
+The public planner deliberately omits raw signatures, payload text, paths,
+branches, and artifact locators. It also keeps mutable `missing_parents` and
+`lineage_status` observations off immutable event cards. A projector may model
+those later as separately timed observation records with a durable
 page/snapshot locator.
 
-The source package performs no independent signature verification, database
-write, reference upgrade, checkpoint, worker, or deployment. Its persistence
-contract requires deterministic IDs, no reference-card downgrade, explicit
-collision quarantine, and one transaction for semantic writes plus checkpoint;
-those rules are not yet an implemented projector.
+The public package performs no independent signature verification, database
+write, reference upgrade, checkpoint, worker, or deployment. A separate
+private AgentTool package implements a strict loopback source reader,
+historical-key signature verification, deterministic application, collision
+quarantine, and an atomic semantic-write/checkpoint transaction for one local
+PostgreSQL profile. It has only `install`, `run-once`, and `status`; it is not a
+daemon, public API, npm release, source authority, or YUTABASE migration.
 
 ## 5. Mapping claim metadata
 
@@ -229,7 +235,7 @@ Correspondence event and its receipts. The design does not itself solve:
 Those require explicit Correspondence protocol and AgentTool tests. A
 YUTABASE conformance result does not certify them.
 
-## 10. Minimum acceptance tests for a future projector
+## 10. Minimum acceptance tests for a projector
 
 Before a projector is called interoperable, tests should prove:
 
@@ -245,5 +251,9 @@ Before a projector is called interoperable, tests should prove:
 10. privacy redaction never leaks secrets through rows, logs, errors, or
     diagnostics.
 
-Until those behaviors exist in code with conformance vectors, this document is
+The private AgentTool projector exercises the bounded local subset it claims,
+including signature rejection, replay idempotency, reference upgrades,
+collision quarantine, atomic cursor application, privacy redaction, and
+status. Correction/current-view semantics, a hosted worker, and general
+interoperability remain outside that claim. This document is therefore still
 an integration contract and threat boundary—not a deployment claim.

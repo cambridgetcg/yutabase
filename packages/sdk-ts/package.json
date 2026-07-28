@@ -1,6 +1,6 @@
 {
   "name": "yutabase",
-  "version": "0.1.0-candidate.2",
+  "version": "0.1.0-candidate.3",
   "description": "YUTABASE client — ref parser, UUIDv7, YOUSPEAK compiler, thin wrapper over postgres.js",
   "license": "MIT",
   "repository": {
@@ -36,6 +36,10 @@
     "./uuidv7": {
       "types": "./dist/uuidv7.d.ts",
       "import": "./dist/uuidv7.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
     }
   },
   "bin": {
@@ -54,12 +58,14 @@
   },
   "scripts": {
     "test": "bun run test:unit",
-    "test:unit": "bun test tests/ref.test.ts tests/uuidv7.test.ts tests/youspeak.test.ts tests/install.test.ts tests/cli-args.test.ts tests/ddl.test.ts",
+    "test:unit": "bun test tests/ref.test.ts tests/uuidv7.test.ts tests/youspeak.test.ts tests/freshness.test.ts tests/client-binding.test.ts tests/install.test.ts tests/cli-args.test.ts tests/cli-command-args.test.ts tests/cli-output.test.ts tests/nonblank.test.ts tests/ddl.test.ts",
     "test:integration": "bun test tests/client.test.ts",
     "typecheck": "tsc --noEmit",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && bun scripts/copy-sql.ts",
     "package:smoke": "bun scripts/smoke-package.ts",
-    "ci": "bun run typecheck && bun run test:unit && bun run build && bun run package:smoke",
+    "browser:build": "bun scripts/browser-bundle.ts",
+    "browser:check": "bun scripts/browser-bundle.ts --check",
+    "ci": "bun run typecheck && bun run test:unit && bun run browser:check && bun run build && bun run package:smoke",
     "prepack": "bun run ci"
   },
   "dependencies": {

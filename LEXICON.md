@@ -1,5 +1,11 @@
 # LEXICON — the words and their meanings
 
+> **Non-normative environment snapshot.** This file records a larger local
+> vocabulary and is not the seven-word fresh candidate lexicon.
+> It does not carry a database identity or currentness receipt. Inspect
+> `yu.standard_meta` and `yu.lexicon` in the target database for operational
+> truth; see `sql/0002_starter_lexicon.sql` for the fresh starter rows.
+
 _The vocabulary lives with the data. Glosses versioned (never silently edited). Words are retired (never deleted). No one overwrites anyone else's meaning._
 
 ---

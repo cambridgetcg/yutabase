@@ -3,19 +3,47 @@
 //
 // Doctrine: SPEC.md §7-8
 // Commands: init, repl, hello, card, cards, query, thread, sever,
-//           explain, doctor, check, words, decks
+//           explain, doctor, check, words, deck, word, stale
 
-import { Yuta } from "./index.js";
+import { Yuta, type HelloResult } from "./index.js";
 import { explain } from "./youspeak.js";
 import { parseCliArgs, redactConnectionUrl } from "./cli-args.js";
+import {
+  parseDeckAnnexArgs,
+  parseDeckNewArgs,
+  parseWordAddArgs,
+  parseWordRetireArgs,
+  type DeckAnnexArgs,
+  type DeckNewArgs,
+  type WordAddArgs,
+  type WordRetireArgs,
+} from "./cli-command-args.js";
+import {
+  formatDeckMapping,
+  formatHelloHeading,
+  parseLexiconExportOptions,
+  renderLexiconSnapshot,
+  writeLexiconSnapshotFile,
+  type LexiconSnapshotWord,
+  type PrintableDeckMapping,
+} from "./cli-output.js";
 import { validateColumnType } from "./ddl.js";
 import {
+  assertDistinctMappedColumns,
+  ident,
+  isLogicalIdentifier,
+} from "./identifier.js";
+import {
   hasCandidateDynamicSurfaces,
+  hasExactCandidateCapabilitySurface,
   hasExactCandidateConstraintSurface,
   hasExactCandidateFunctionSurface,
+  hasExactCandidatePrivilegeSurface,
+  hasExactCandidateTriggerSurface,
   hasExactCoreColumnSurface,
   hasExactCoreIndexSurface,
   hasLegacyConstraintSurface,
+  type CandidateCatalogRevision,
 } from "./catalog.js";
 import {
   CANDIDATE_REVISION,
@@ -26,8 +54,10 @@ import {
   type ColumnShape,
   type InstallProbe,
 } from "./install.js";
+import { isNonblankText } from "./nonblank.js";
+import { parseDeckPattern } from "./ref.js";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
@@ -95,8 +125,11 @@ async function doInit(conn: string | undefined): Promise<void> {
 
     console.log(`  mode: ${plan.mode}`);
     const phases = plan.mode === "fresh"
-      ? [migrationSources.slice(0, 2), migrationSources.slice(2)]
-      : [migrationSources];
+      ? [
+          migrationSources.slice(0, 2),
+          ...migrationSources.slice(2).map((migration) => [migration]),
+        ]
+      : migrationSources.map((migration) => [migration]);
     for (const phase of phases) {
       await sql.begin(async (tx) => {
         for (const migration of phase) {
@@ -295,6 +328,7 @@ async function inspectInstall(sql: Database): Promise<InstallProbe> {
           OR to_regprocedure('yu._registry_referenced_ids(text,text)') IS NOT NULL
           OR to_regprocedure('yu._reserve_thread_id()') IS NOT NULL
           OR to_regprocedure('yu._lock_thread_context(text,text,text,uuid,text,text,uuid)') IS NOT NULL
+          OR to_regprocedure('yu._lock_registry_mapping(text,text)') IS NOT NULL
           OR to_regprocedure('yu._validate_registry_mapping()') IS NOT NULL
           OR to_regprocedure('yu._begin_word_version()') IS NOT NULL
           OR to_regprocedure('yu._capture_word_version()') IS NOT NULL
@@ -302,11 +336,20 @@ async function inspectInstall(sql: Database): Promise<InstallProbe> {
           OR to_regprocedure('yu._refuse_word_version_mutation()') IS NOT NULL
           OR to_regprocedure('yu._refuse_thread_mutation()') IS NOT NULL
           OR to_regprocedure('yu._refuse_sever_log_mutation()') IS NOT NULL
+          OR to_regprocedure('yu._guard_truncate()') IS NOT NULL
+          OR to_regprocedure('yu._maintain_registry_guard()') IS NOT NULL
+          OR to_regprocedure('yu._nonblank_text(text)') IS NOT NULL
+          OR to_regprocedure('yu._source_locators_valid(text[])') IS NOT NULL
           OR EXISTS (
             SELECT 1 FROM pg_catalog.pg_constraint
             WHERE conname IN (
               'lexicon_status_candidate', 'lexicon_how_candidate',
-              'threads_how_candidate', 'sever_log_how_candidate'
+              'threads_how_candidate', 'sever_log_how_candidate',
+              'lexicon_src_locators_valid',
+              'word_versions_src_locators_valid',
+              'threads_src_locators_valid',
+              'sever_log_src_locators_valid',
+              'sever_log_thread_src_locators_valid'
             ) AND connamespace = to_regnamespace('yu')
           )
           OR EXISTS (
@@ -319,7 +362,8 @@ async function inspectInstall(sql: Database): Promise<InstallProbe> {
               'lexicon_capture_update_version',
               'word_versions_immutable',
               'threads_immutable',
-              'sever_log_immutable'
+              'sever_log_immutable',
+              'registry_guard_lifecycle'
             )
               AND tgrelid IN (
                 to_regclass('yu.registry'), to_regclass('yu.lexicon'),
@@ -547,7 +591,7 @@ async function inspectInstall(sql: Database): Promise<InstallProbe> {
                 to_regclass('yu.thread_ids'),
                 to_regclass('yu.sever_log')
               )
-          ) = 11
+          ) IN (11, 12)
           AND NOT EXISTS (
             SELECT 1
             FROM (VALUES
@@ -630,20 +674,46 @@ async function inspectInstall(sql: Database): Promise<InstallProbe> {
     hasLegacyConstraintSurface(sql),
   ]);
   const row = objects[0] as Record<string, unknown>;
+  let metadataRow: Record<string, unknown> | undefined;
+  if (row.has_standard_meta === true) {
+    const metadata = await sql`
+      SELECT standard, profile, version, revision
+      FROM yu.standard_meta
+      WHERE singleton = true
+    `;
+    if (metadata.length !== 1) {
+      throw new Error("CORRUPT STANDARD META: expected exactly one singleton row");
+    }
+    metadataRow = metadata[0] as Record<string, unknown>;
+  }
+  const catalogRevision: CandidateCatalogRevision =
+    metadataRow?.revision === 4 ? 4 : 5;
   const catalogMode = row.has_standard_meta === true ? "candidate" : "legacy";
   const [
     hasExactCoreColumns,
     hasExactCoreIndexes,
     hasExactCandidateConstraints,
     hasExactCandidateFunctions,
+    hasExactCandidateTriggers,
+    hasExactCandidateCapabilities,
+    hasExactCandidatePrivileges,
   ] = await Promise.all([
     hasExactCoreColumnSurface(sql, catalogMode),
     hasExactCoreIndexSurface(sql, catalogMode),
     catalogMode === "candidate"
-      ? hasExactCandidateConstraintSurface(sql)
+      ? hasExactCandidateConstraintSurface(sql, catalogRevision)
       : Promise.resolve(false),
     catalogMode === "candidate"
-      ? hasExactCandidateFunctionSurface(sql)
+      ? hasExactCandidateFunctionSurface(sql, catalogRevision)
+      : Promise.resolve(false),
+    catalogMode === "candidate"
+      ? hasExactCandidateTriggerSurface(sql, catalogRevision)
+      : Promise.resolve(false),
+    catalogMode === "candidate"
+      ? hasExactCandidateCapabilitySurface(sql, catalogRevision)
+      : Promise.resolve(false),
+    catalogMode === "candidate"
+      ? hasExactCandidatePrivilegeSurface(sql, catalogRevision)
       : Promise.resolve(false),
   ]);
   const actualColumns: ColumnShape[] = columns.map((column) => ({
@@ -677,32 +747,38 @@ async function inspectInstall(sql: Database): Promise<InstallProbe> {
     hasCandidateShape:
       catalogMode === "candidate" &&
       hasExactCoreColumns &&
-      hasExactCandidateConstraints,
+      hasExactCandidateConstraints &&
+      hasExactCandidateCapabilities &&
+      hasExactCandidatePrivileges,
     hasCandidateObjects:
-      row.has_candidate_objects === true && hasExactCandidateFunctions,
+      row.has_candidate_objects === true &&
+      hasExactCandidateFunctions &&
+      hasExactCandidateTriggers,
     hasCandidateFootprint:
       hasAnyColumn(actualColumns, CANDIDATE_COLUMNS) ||
       row.has_candidate_footprint_objects === true,
   };
 
   if (probe.hasStandardMeta && probe.hasCandidateObjects) {
-    probe.hasCandidateObjects = await hasCandidateDynamicSurfaces(sql);
+    probe.hasCandidateObjects = await hasCandidateDynamicSurfaces(
+      sql,
+      catalogRevision,
+    );
   }
 
-  if (probe.hasStandardMeta) {
-    const metadata = await sql`
-      SELECT standard, profile, version, revision
-      FROM yu.standard_meta
-      WHERE singleton = true
-    `;
-    if (metadata.length !== 1) {
-      throw new Error("CORRUPT STANDARD META: expected exactly one singleton row");
-    }
-    const meta = metadata[0] as Record<string, unknown>;
-    probe.standard = typeof meta.standard === "string" ? meta.standard : undefined;
-    probe.profile = typeof meta.profile === "string" ? meta.profile : undefined;
-    probe.version = typeof meta.version === "string" ? meta.version : undefined;
-    probe.revision = typeof meta.revision === "number" ? meta.revision : undefined;
+  if (metadataRow !== undefined) {
+    probe.standard = typeof metadataRow.standard === "string"
+      ? metadataRow.standard
+      : undefined;
+    probe.profile = typeof metadataRow.profile === "string"
+      ? metadataRow.profile
+      : undefined;
+    probe.version = typeof metadataRow.version === "string"
+      ? metadataRow.version
+      : undefined;
+    probe.revision = typeof metadataRow.revision === "number"
+      ? metadataRow.revision
+      : undefined;
   }
 
   return probe;
@@ -782,11 +858,11 @@ async function doRepl(conn: string | undefined, by: string | undefined): Promise
 
 // --- hello pretty-printer ---
 
-function printHello(hello: any): void {
+function printHello(hello: HelloResult): void {
   console.log("");
-  console.log("  +------------------------------------------------------+");
-  console.log("  |       YUTABASE " + (hello.version || "unknown") + " — you speak, reality listens        |");
-  console.log("  +------------------------------------------------------+");
+  for (const line of formatHelloHeading(hello.version)) {
+    console.log("  " + line);
+  }
   console.log("");
 
   console.log("  creed:");
@@ -819,8 +895,9 @@ function printHello(hello: any): void {
 
   console.log("  decks (" + (hello.decks || []).length + "):");
   for (const d of hello.decks || []) {
-    const kind = d.native ? "native" : "annexed";
-    console.log("    " + d.book + "/" + d.deck + " (" + kind + ")");
+    for (const line of formatDeckMapping(d)) {
+      console.log("    " + line);
+    }
   }
   console.log("");
 
@@ -837,46 +914,91 @@ function printHello(hello: any): void {
 
 // --- yuta deck new / deck annex ---
 
-async function doDeck(yuta: Yuta, args: string[]): Promise<void> {
+type DeckCommand =
+  | { kind: "new"; args: DeckNewArgs }
+  | { kind: "annex"; args: DeckAnnexArgs }
+  | { kind: "list"; json: boolean };
+
+function parseDeckCommand(args: string[]): DeckCommand {
   const sub = args[0];
   if (sub === "new") {
-    await doDeckNew(yuta, args.slice(1));
-  } else if (sub === "annex") {
-    await doDeckAnnex(yuta, args.slice(1));
-  } else if (sub === "list") {
-    const result = await yuta.sqlTag`SELECT book, deck, native, ttl FROM yu.registry ORDER BY book, deck` as any[];
-    for (const d of result) {
-      const kind = d.native ? "native" : "annexed";
-      const ttl = d.ttl ? " ttl=" + d.ttl : "";
-      console.log("  " + d.book + "/" + d.deck + " (" + kind + ttl + ")");
-    }
+    return { kind: "new", args: parseDeckNewArgs(args.slice(1)) };
+  }
+  if (sub === "annex") {
+    return { kind: "annex", args: parseDeckAnnexArgs(args.slice(1)) };
+  }
+  if (sub === "list") {
+    return {
+      kind: "list",
+      json: readJsonFlag(args.slice(1), "yuta deck list [--json]"),
+    };
+  }
+  throw new Error(
+    "USAGE: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]\n" +
+    "       yuta --by <claimant> deck annex <schema.table> as <book/deck> " +
+    "[--id <col>] [--at <col>] [--by <col>] [--how <col>] [--src <col>]\n" +
+    "       yuta deck list [--json]",
+  );
+}
+
+async function doDeck(yuta: Yuta, command: DeckCommand): Promise<void> {
+  if (command.kind === "new") {
+    await doDeckNew(yuta, command.args);
+  } else if (command.kind === "annex") {
+    await doDeckAnnex(yuta, command.args);
   } else {
-    console.error("Usage: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]");
-    console.error("       yuta --by <claimant> deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col> [--src <col>]");
-    console.error("       yuta deck list");
-    process.exit(1);
+    const result = await readDeckMappings(yuta);
+    if (command.json) console.log(JSON.stringify(result, null, 2));
+    else printDeckMappings(result);
   }
 }
 
-async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
-  // yuta deck new tradein/submissions status:text --ttl "7 days"
-  const deckRef = args[0];
-  if (!deckRef || !deckRef.includes("/")) {
-    console.error("Usage: yuta deck new <book/deck> [column:type ...] [--ttl <interval>]");
-    process.exit(1);
+async function readDeckMappings(yuta: Yuta): Promise<PrintableDeckMapping[]> {
+  return await yuta.sqlTag`
+    SELECT
+      book,
+      deck,
+      native,
+      physical_schema,
+      physical_table,
+      id_col,
+      at_col,
+      by_col,
+      how_col,
+      src_col,
+      ttl::text AS ttl
+    FROM yu.registry
+    ORDER BY book, deck
+  ` as unknown as PrintableDeckMapping[];
+}
+
+function printDeckMappings(decks: readonly PrintableDeckMapping[]): void {
+  for (const deck of decks) {
+    for (const line of formatDeckMapping(deck)) console.log("  " + line);
   }
+}
+
+function readJsonFlag(args: readonly string[], usage: string): boolean {
+  if (args.length === 0) return false;
+  if (args.length === 1 && args[0] === "--json") return true;
+  throw new Error(`USAGE: ${usage}`);
+}
+
+async function doDeckNew(yuta: Yuta, args: DeckNewArgs): Promise<void> {
+  // yuta deck new tradein/submissions status:text --ttl "7 days"
+  const { deckRef, columnSpecs, ttl } = args;
   const [book, deck] = parseLogicalDeckRef(deckRef);
   const columns: { name: string; type: string }[] = [];
   const columnNames = new Set(["id", "at", "by", "how", "src"]);
-  let ttl: string | undefined;
-  for (let i = 1; i < args.length; i++) {
-    if (args[i] === "--ttl") { ttl = args[++i]; continue; }
-    const separator = args[i].indexOf(":");
-    const name = separator >= 0 ? args[i].slice(0, separator) : "";
-    const type = separator >= 0 ? args[i].slice(separator + 1) : "";
+  for (const columnSpec of columnSpecs) {
+    const separator = columnSpec.indexOf(":");
+    const name = separator >= 0 ? columnSpec.slice(0, separator) : "";
+    const type = separator >= 0 ? columnSpec.slice(separator + 1) : "";
     if (!name || !type) {
-      console.error("Bad column spec: " + args[i] + " — expected name:type (e.g. status:text)");
-      process.exit(1);
+      throw new Error(
+        "BAD COLUMN SPEC: " + columnSpec +
+        " — expected name:type (for example status:text)",
+      );
     }
     ident(name);
     if (columnNames.has(name)) throw new Error(`DUPLICATE OR RESERVED COLUMN: ${name}`);
@@ -889,9 +1011,10 @@ async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
     '  id uuid PRIMARY KEY',
     ...columns.map(c => '  ' + ident(c.name) + " " + c.type),
     '  at timestamptz NOT NULL',
-    "  by text NOT NULL CHECK (btrim(by) <> '')",
+    "  by text NOT NULL CHECK (yu._nonblank_text(by))",
     "  how text NOT NULL CHECK (how IN ('witnessed','live','cached','computed','declared'))",
     '  src text[]',
+    "  CHECK (yu._source_locators_valid(src))",
     "  CHECK (how NOT IN ('cached','computed') OR (src IS NOT NULL AND cardinality(src) > 0))",
   ].join(",\n");
 
@@ -900,14 +1023,16 @@ async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
   const register = 'INSERT INTO yu.registry (book, deck, physical_schema, physical_table, native, ttl, by) VALUES (' +
     literal(book) + ', ' + literal(deck) + ', ' + literal(book) + ', ' + literal(deck) + ', true, ' +
     (ttl ? literal(ttl) + '::interval' : 'NULL') + ', ' + literal(yuta.getClaimant()) + ')';
-  const dropGuard = 'DROP TRIGGER IF EXISTS yutabase_guard_delete ON ' + ident(book) + '.' + ident(deck);
-  const guard = 'CREATE TRIGGER yutabase_guard_delete BEFORE DELETE ON ' + ident(book) + '.' + ident(deck) + ' FOR EACH ROW EXECUTE FUNCTION yu._guard_delete()';
+  const assertGuard = canonicalGuardAssertion(book, deck);
 
   console.log("deck new — creating " + book + "/" + deck);
-  console.log("  columns: id, " + columns.map(c => c.name + ":" + c.type).join(", ") + ", at, by, how, src");
+  console.log(
+    "  columns: " +
+    ["id", ...columns.map((column) => `${column.name}:${column.type}`), "at", "by", "how", "src"].join(", "),
+  );
 
   try {
-    await yuta.execTransaction([createSchema, createTable, register, dropGuard, guard]);
+    await yuta.execTransaction([createSchema, createTable, register, assertGuard]);
     console.log("  done — " + book + "/" + deck + " registered (native)");
   } catch (err) {
     console.error("  FAILED: " + (err as Error).message);
@@ -915,25 +1040,21 @@ async function doDeckNew(yuta: Yuta, args: string[]): Promise<void> {
   }
 }
 
-async function doDeckAnnex(yuta: Yuta, args: string[]): Promise<void> {
+async function doDeckAnnex(yuta: Yuta, args: DeckAnnexArgs): Promise<void> {
   // yuta deck annex public.tradein_submissions as tradein/submissions --id id --at created_at --by created_by --how declared
-  const tableRef = args[0];
-  if (!tableRef || args[1] !== "as") {
-    console.error("Usage: yuta --by <claimant> deck annex <schema.table> as <book/deck> --id <col> --at <col> --by <col> --how <col> [--src <col>]");
-    process.exit(1);
-  }
+  const {
+    tableRef,
+    deckRef,
+    idCol,
+    atCol,
+    byCol,
+    howCol,
+    srcCol,
+  } = args;
   const [physicalSchema, physicalTable] = parsePhysicalTableRef(tableRef);
-  const deckRef = args[2];
   const [book, deck] = parseLogicalDeckRef(deckRef);
-  let idCol = "id", atCol = "at", byCol = "by", howCol = "how", srcCol = "src";
-  for (let i = 3; i < args.length; i++) {
-    if (args[i] === "--id") { idCol = args[++i]; continue; }
-    if (args[i] === "--at") { atCol = args[++i]; continue; }
-    if (args[i] === "--by") { byCol = args[++i]; continue; }
-    if (args[i] === "--how") { howCol = args[++i]; continue; }
-    if (args[i] === "--src") { srcCol = args[++i]; continue; }
-  }
   for (const value of [idCol, atCol, byCol, howCol, srcCol]) ident(value);
+  assertDistinctMappedColumns([idCol, atCol, byCol, howCol, srcCol]);
 
   const validate = `
     DO $yutabase$
@@ -959,10 +1080,45 @@ async function doDeckAnnex(yuta: Yuta, args: string[]): Promise<void> {
         WHERE tgrelid = to_regclass(${literal(`${physicalSchema}.${physicalTable}`)})
           AND tgname = 'yutabase_guard_delete' AND NOT tgisinternal
           AND tgfoid = to_regprocedure('yu._guard_delete()')
-          AND tgtype = 11
+          AND tgconstraint = 0
+          AND tgtype IN (11, 25)
+          AND tgenabled = 'O'
+          AND tgnargs = 0
+          AND tgparentid = 0
+          AND NOT tgdeferrable
+          AND NOT tginitdeferred
+          AND tgoldtable IS NULL
+          AND tgnewtable IS NULL
+          AND cardinality(tgattr::smallint[]) = 0
+          AND tgqual IS NULL
       ) THEN
         RAISE EXCEPTION
           'ANNEX TRIGGER CONFLICT: %.% already has a non-YUTABASE trigger named yutabase_guard_delete',
+          ${literal(physicalSchema)}, ${literal(physicalTable)};
+      END IF;
+      IF EXISTS (
+        SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = to_regclass(${literal(`${physicalSchema}.${physicalTable}`)})
+          AND tgname = 'yutabase_guard_truncate' AND NOT tgisinternal
+      ) AND NOT EXISTS (
+        SELECT 1 FROM pg_catalog.pg_trigger
+        WHERE tgrelid = to_regclass(${literal(`${physicalSchema}.${physicalTable}`)})
+          AND tgname = 'yutabase_guard_truncate' AND NOT tgisinternal
+          AND tgfoid = to_regprocedure('yu._guard_truncate()')
+          AND tgconstraint = 0
+          AND tgtype = 32
+          AND tgenabled = 'O'
+          AND tgnargs = 0
+          AND tgparentid = 0
+          AND NOT tgdeferrable
+          AND NOT tginitdeferred
+          AND tgoldtable IS NULL
+          AND tgnewtable IS NULL
+          AND cardinality(tgattr::smallint[]) = 0
+          AND tgqual IS NULL
+      ) THEN
+        RAISE EXCEPTION
+          'ANNEX TRIGGER CONFLICT: %.% already has a non-YUTABASE trigger named yutabase_guard_truncate',
           ${literal(physicalSchema)}, ${literal(physicalTable)};
       END IF;
       IF NOT EXISTS (
@@ -1015,18 +1171,15 @@ async function doDeckAnnex(yuta: Yuta, args: string[]): Promise<void> {
     'id_col = EXCLUDED.id_col, at_col = EXCLUDED.at_col, by_col = EXCLUDED.by_col, ' +
     'how_col = EXCLUDED.how_col, src_col = EXCLUDED.src_col, native = false, ' +
     'at = clock_timestamp(), by = EXCLUDED.by';
-  const qualifiedPhysicalTable = ident(physicalSchema) + '.' + ident(physicalTable);
-  const dropGuard = 'DROP TRIGGER IF EXISTS yutabase_guard_delete ON ' + qualifiedPhysicalTable;
-  const guard = 'CREATE TRIGGER yutabase_guard_delete BEFORE DELETE ON ' + qualifiedPhysicalTable +
-    ' FOR EACH ROW EXECUTE FUNCTION yu._guard_delete()';
+  const assertGuard = canonicalGuardAssertion(physicalSchema, physicalTable);
 
   console.log("deck annex — " + tableRef + " → " + book + "/" + deck);
   console.log("  physical=" + physicalSchema + "." + physicalTable);
   console.log("  id_col=" + idCol + " at_col=" + atCol + " by_col=" + byCol + " how_col=" + howCol + " src_col=" + srcCol);
 
   try {
-    await yuta.execTransaction([validate, register, dropGuard, guard]);
-    console.log("  done — mapping registered and physical delete guard installed atomically");
+    await yuta.execTransaction([validate, register, assertGuard]);
+    console.log("  done — mapping registered and physical row/truncate guards maintained atomically");
   } catch (err) {
     console.error("  FAILED: " + (err as Error).message);
     process.exit(1);
@@ -1035,43 +1188,38 @@ async function doDeckAnnex(yuta: Yuta, args: string[]): Promise<void> {
 
 // --- yuta word add / retire / export ---
 
-async function doWord(yuta: Yuta, args: string[]): Promise<void> {
+type WordCommand =
+  | { kind: "add"; args: WordAddArgs }
+  | { kind: "retire"; args: WordRetireArgs };
+
+function parseWordCommand(args: string[]): WordCommand {
   const sub = args[0];
   if (sub === "add") {
-    await doWordAdd(yuta, args.slice(1));
-  } else if (sub === "retire") {
-    await doWordRetire(yuta, args.slice(1));
+    return { kind: "add", args: parseWordAddArgs(args.slice(1)) };
+  }
+  if (sub === "retire") {
+    return { kind: "retire", args: parseWordRetireArgs(args.slice(1)) };
+  }
+  throw new Error(
+    "USAGE: yuta word add <word> --gloss \"...\" --inverse \"...\" " +
+    "--from <book/deck> --to <book/deck> [--to-one]\n" +
+    "       yuta word retire <word> how <claim> [src <locator> ...]",
+  );
+}
+
+async function doWord(yuta: Yuta, command: WordCommand): Promise<void> {
+  if (command.kind === "add") {
+    await doWordAdd(yuta, command.args);
   } else {
-    console.error("Usage: yuta word add <word> --gloss \"...\" --inverse \"...\" --from <book/deck> --to <book/deck> [--to-one]");
-    console.error("       yuta word retire <word> how <claim> [src <locator> ...]");
-    process.exit(1);
+    await doWordRetire(yuta, command.args);
   }
 }
 
-async function doWordAdd(yuta: Yuta, args: string[]): Promise<void> {
-  const word = args[0];
-  if (!word) {
-    console.error("Usage: yuta word add <word> --gloss \"...\" --inverse \"...\" --from <book/deck> --to <book/deck> [--to-one]");
-    process.exit(1);
-  }
-  let gloss: string | undefined;
-  let inverse: string | undefined;
-  let fromDeck: string | undefined;
-  let toDeck: string | undefined;
-  let toOne = false;
-  for (let i = 1; i < args.length; i++) {
-    if (args[i] === "--gloss") { gloss = args[++i]; continue; }
-    if (args[i] === "--inverse") { inverse = args[++i]; continue; }
-    if (args[i] === "--from") { fromDeck = args[++i]; continue; }
-    if (args[i] === "--to") { toDeck = args[++i]; continue; }
-    if (args[i] === "--to-one") { toOne = true; continue; }
-  }
-
-  if (!gloss || !inverse || !fromDeck || !toDeck) {
-    console.error("word add requires --gloss, --inverse, --from, --to");
-    console.error("  No gloss, no word. No inverse, no word.");
-    process.exit(1);
-  }
+async function doWordAdd(yuta: Yuta, args: WordAddArgs): Promise<void> {
+  const { word, gloss, inverse, fromDeck, toDeck, toOne } = args;
+  ident(word);
+  parseDeckPattern(fromDeck);
+  parseDeckPattern(toDeck);
 
   // Core has no normative spelling blocklist. Gloss, inverse, endpoint
   // typing, review, and later retirement carry vocabulary governance.
@@ -1101,16 +1249,9 @@ async function doWordAdd(yuta: Yuta, args: string[]): Promise<void> {
   }
 }
 
-async function doWordRetire(yuta: Yuta, args: string[]): Promise<void> {
-  const word = args[0];
-  const howIndex = args.indexOf("how");
-  const srcIndex = args.indexOf("src");
-  const how = howIndex >= 0 ? args[howIndex + 1] : undefined;
-  const src = srcIndex >= 0 ? args.slice(srcIndex + 1) : undefined;
-  if (!word || !how) {
-    console.error("Usage: yuta word retire <word> how <claim> [src <locator> ...]");
-    process.exit(1);
-  }
+async function doWordRetire(yuta: Yuta, args: WordRetireArgs): Promise<void> {
+  const { word, how, src } = args;
+  ident(word);
   validateClaim("word retire", how, src);
   const claimant = yuta.getClaimant();
 
@@ -1153,15 +1294,69 @@ async function doWordRetire(yuta: Yuta, args: string[]): Promise<void> {
 
 // --- helpers for DDL ---
 
-function ident(name: string): string {
-  if (!/^[a-z_][a-z0-9_]*$/.test(name)) {
-    throw new Error("BAD IDENTIFIER: " + name);
-  }
-  return '"' + name + '"';
-}
-
 function literal(val: string): string {
   return "'" + val.replace(/'/g, "''") + "'";
+}
+
+function canonicalGuardAssertion(
+  physicalSchema: string,
+  physicalTable: string,
+): string {
+  const relation = literal(`${physicalSchema}.${physicalTable}`);
+  return `
+    DO $yutabase$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_trigger t
+        WHERE t.tgrelid = to_regclass(${relation})
+          AND t.tgname = 'yutabase_guard_delete'
+          AND NOT t.tgisinternal
+          AND t.tgconstraint = 0
+          AND t.tgtype = 25
+          AND t.tgenabled = 'O'
+          AND t.tgfoid = to_regprocedure('yu._guard_delete()')
+          AND t.tgnargs = 0
+          AND t.tgparentid = 0
+          AND NOT t.tgdeferrable
+          AND NOT t.tginitdeferred
+          AND t.tgoldtable IS NULL
+          AND t.tgnewtable IS NULL
+          AND cardinality(t.tgattr::smallint[]) = 0
+          AND t.tgqual IS NULL
+      ) THEN
+        RAISE EXCEPTION
+          'REGISTRY GUARD: %.% does not have the exact mapped row guard',
+          ${literal(physicalSchema)}, ${literal(physicalTable)}
+          USING ERRCODE = 'object_not_in_prerequisite_state';
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_trigger t
+        WHERE t.tgrelid = to_regclass(${relation})
+          AND t.tgname = 'yutabase_guard_truncate'
+          AND NOT t.tgisinternal
+          AND t.tgconstraint = 0
+          AND t.tgtype = 32
+          AND t.tgenabled = 'O'
+          AND t.tgfoid = to_regprocedure('yu._guard_truncate()')
+          AND t.tgnargs = 0
+          AND t.tgparentid = 0
+          AND NOT t.tgdeferrable
+          AND NOT t.tginitdeferred
+          AND t.tgoldtable IS NULL
+          AND t.tgnewtable IS NULL
+          AND cardinality(t.tgattr::smallint[]) = 0
+          AND t.tgqual IS NULL
+      ) THEN
+        RAISE EXCEPTION
+          'REGISTRY GUARD: %.% does not have the exact truncate guard',
+          ${literal(physicalSchema)}, ${literal(physicalTable)}
+          USING ERRCODE = 'object_not_in_prerequisite_state';
+      END IF;
+    END
+    $yutabase$
+  `;
 }
 
 function textArrayLiteral(values: readonly string[] | undefined): string {
@@ -1172,6 +1367,15 @@ function textArrayLiteral(values: readonly string[] | undefined): string {
 function validateClaim(label: string, how: string, src: readonly string[] | undefined): void {
   const claimKinds = new Set(["witnessed", "live", "cached", "computed", "declared"]);
   if (!claimKinds.has(how)) throw new Error(`${label}: unknown claim kind ${how}`);
+  if (
+    src !== undefined &&
+    (!Array.isArray(src) ||
+      Array.from(src).some(
+        (locator) => !isNonblankText(locator),
+      ))
+  ) {
+    throw new Error(`${label}: src entries must be non-blank strings without NUL`);
+  }
   if ((how === "cached" || how === "computed") && (!src || src.length === 0)) {
     throw new Error(`${label}: how=${how} requires a non-empty src`);
   }
@@ -1180,8 +1384,9 @@ function validateClaim(label: string, how: string, src: readonly string[] | unde
 function parseLogicalDeckRef(value: string): [string, string] {
   const parts = value.split("/");
   if (parts.length !== 2) throw new Error("BAD DECK REF: expected book/deck");
-  ident(parts[0]);
-  ident(parts[1]);
+  if (!isLogicalIdentifier(parts[0]) || !isLogicalIdentifier(parts[1])) {
+    throw new Error("BAD DECK REF: book and deck must be lower_snake");
+  }
   return [parts[0], parts[1]];
 }
 
@@ -1201,24 +1406,26 @@ function printHelp(): void {
   console.log("  You speak, and reality listens.");
   console.log("");
   console.log("Commands:");
-  console.log("  init                     Install the yu schema + starter lexicon");
+  console.log("  init                     Install or upgrade the yu schema and starter lexicon");
+  console.log("                           Fresh installs may create fixed cluster roles");
   console.log("  repl                     Interactive YOUSPEAK session");
-  console.log("  hello                    Installed identity, words, and decks");
+  console.log("  hello [--json]           Installed identity, words, and deck mappings");
   console.log("  card <ref>               Fetch one card by ref");
-  console.log("  cards <book/deck> [...]  List cards with optional filter");
+  console.log("  cards <book/deck> [...]  List cards (default 100, max 1000)");
   console.log('  query "<youspeak>"       Run any YOUSPEAK sentence');
   console.log("  thread <from --word--> to>  Create a thread");
   console.log("  sever <id> how <claim>   End a thread");
   console.log('  explain "<youspeak>"     Print logical SQL before registry resolution');
   console.log("  doctor                   Vocabulary health check");
   console.log("  check                    fsck: orphaned threads");
-  console.log("  deck new <book/deck>    Create a native deck with honesty header");
+  console.log("  deck new <book/deck>     Create a native deck with honesty header");
   console.log("  deck annex <tbl> as <book/deck>  Annex a legacy table");
+  console.log("  deck list [--json]       List logical -> physical deck mappings");
   console.log("  word add <word> ...      Coin a word (requires --gloss, --inverse, --from, --to)");
   console.log("  word retire <word> how <claim> [src ...]  Retire with a new claim");
   console.log("  stale                    Freshness audit: cached/computed past TTL");
-  console.log("  words [--export]         List the lexicon / export to LEXICON.md");
-  console.log("  decks                    List registered decks");
+  console.log("  words [--export [--output <path>] [--force]]");
+  console.log("                           List words; export defaults to stdout");
   console.log("");
   console.log("Options:");
   console.log("  --conn <url>             Connection string (default: keychain)");
@@ -1227,7 +1434,7 @@ function printHelp(): void {
   console.log("Examples:");
   console.log("  yuta init --conn postgresql://localhost/mydb");
   console.log("  yuta repl --conn postgresql://localhost/mydb");
-  console.log("  yuta hello");
+  console.log("  yuta hello --json");
   console.log("  yuta card tradein/submissions/01977c2e-0000-7000-8000-000000000001");
   console.log("  yuta query 'tradein/submissions/01977c2e-0000-7000-8000-000000000001 -> contains'");
   console.log("  yuta explain \"cards tradein/submissions newest 5\"");
@@ -1244,22 +1451,76 @@ if (!args[0] || args[0] === "--help" || args[0] === "-h") {
 const { conn, by, positional } = parseCliArgs(args);
 const cmd = positional[0];
 const rest = positional.slice(1).join(" ");
+const CONNECTED_COMMANDS = new Set([
+  "hello",
+  "card",
+  "cards",
+  "query",
+  "thread",
+  "sever",
+  "doctor",
+  "check",
+  "words",
+  "deck",
+  "word",
+  "stale",
+]);
 
 async function main() {
+  if (!cmd) {
+    throw new Error("MISSING COMMAND: run 'yuta --help' for usage.");
+  }
+
   if (cmd === "init") {
+    if (positional.length !== 1 || by !== undefined) {
+      throw new Error("USAGE: yuta init [--conn <url>]");
+    }
     await doInit(conn);
     return;
   }
 
   if (cmd === "repl") {
+    if (positional.length !== 1) {
+      throw new Error(
+        "USAGE: yuta repl [--conn <url>] [--by <claimant>]",
+      );
+    }
     await doRepl(conn, by);
     return;
   }
 
   if (cmd === "explain") {
+    if (!rest) {
+      throw new Error('USAGE: yuta explain "<youspeak>"');
+    }
     const queryStr = rest.replace(/^["']|["']$/g, "");
     console.log(explain(queryStr));
     return;
+  }
+
+  if (!CONNECTED_COMMANDS.has(cmd)) {
+    throw new Error(`UNKNOWN COMMAND: ${cmd}. Run 'yuta --help' for usage.`);
+  }
+
+  // Parse closed mutating grammars before opening a database connection. A
+  // misspelled flag must never be mistaken for an instruction with defaults.
+  const deckCommand = cmd === "deck"
+    ? parseDeckCommand(positional.slice(1))
+    : undefined;
+  const wordCommand = cmd === "word"
+    ? parseWordCommand(positional.slice(1))
+    : undefined;
+  const helloJson = cmd === "hello"
+    ? readJsonFlag(positional.slice(1), "yuta hello [--json]")
+    : false;
+  const lexiconExportOptions = cmd === "words"
+    ? parseLexiconExportOptions(positional.slice(1))
+    : undefined;
+  if (["doctor", "check", "stale"].includes(cmd) && positional.length !== 1) {
+    throw new Error(`USAGE: yuta ${cmd}`);
+  }
+  if (cmd === "card" && positional.length !== 2) {
+    throw new Error("USAGE: yuta card <book/deck/full-uuid>");
   }
 
   const yuta = new Yuta({ connectionString: conn, claimant: by });
@@ -1268,7 +1529,11 @@ async function main() {
   switch (cmd) {
     case "hello": {
       const hello = await yuta.hello();
-      printHello(hello);
+      if (helloJson) {
+        console.log(JSON.stringify(hello, null, 2));
+      } else {
+        printHello(hello);
+      }
       break;
     }
 
@@ -1386,9 +1651,9 @@ async function main() {
       }
 
       // 4. thread count
-      const total = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.threads` as any[];
-      const wordCount = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.lexicon WHERE status = 'live'` as any[];
-      const deckCount = await yuta.sqlTag`SELECT count(*)::int AS n FROM yu.registry` as any[];
+      const total = await yuta.sqlTag`SELECT count(*)::text AS n FROM yu.threads` as any[];
+      const wordCount = await yuta.sqlTag`SELECT count(*)::text AS n FROM yu.lexicon WHERE status = 'live'` as any[];
+      const deckCount = await yuta.sqlTag`SELECT count(*)::text AS n FROM yu.registry` as any[];
 
       if (issues === 0) {
         console.log("check: all clear — " + total[0].n + " threads, " + wordCount[0].n + " live words, " + deckCount[0].n + " decks registered");
@@ -1399,61 +1664,39 @@ async function main() {
     }
 
     case "words": {
-      const result = await yuta.sqlTag`SELECT l.word, l.gloss, l.inverse, l.from_deck, l.to_deck, l.to_one, l.status, count(t.id)::int AS usage FROM yu.lexicon l LEFT JOIN yu.threads t ON t.word = l.word GROUP BY l.word, l.gloss, l.inverse, l.from_deck, l.to_deck, l.to_one, l.status ORDER BY l.word` as any[];
+      const result = await yuta.sqlTag`SELECT l.word, l.gloss, l.inverse, l.from_deck, l.to_deck, l.to_one, l.status, count(t.id)::text AS usage FROM yu.lexicon l LEFT JOIN yu.threads t ON t.word = l.word GROUP BY l.word, l.gloss, l.inverse, l.from_deck, l.to_deck, l.to_one, l.status ORDER BY l.word` as unknown as LexiconSnapshotWord[];
 
-      // Check for --export flag
-      if (positional.includes("--export")) {
-        let md = "# LEXICON — the words and their meanings\n\n";
-        md += "_The vocabulary lives with the data. Glosses versioned (never silently edited). Words are retired (never deleted). No one overwrites anyone else's meaning._\n\n";
-        md += "---\n\n";
-
-        // Group: starter words (those with non-*/* endpoints) vs kingdom words (all */*)
-        const starter = result.filter(w => w.from_deck !== "*/*" || w.to_deck !== "*/*");
-        const general = result.filter(w => w.from_deck === "*/*" && w.to_deck === "*/*" && w.status === "live");
-        const retired = result.filter(w => w.status === "retired");
-
-        if (starter.length > 0) {
-          md += "## domain words\n\n";
-          for (const w of starter) {
-            const one = w.to_one ? " [to_one]" : "";
-            md += "### " + w.word + one + "\n";
-            md += "**inverse:** " + w.inverse + "\n";
-            md += "**meaning:** " + w.gloss + "\n";
-            md += "**endpoints:** " + w.from_deck + " → " + w.to_deck + "\n";
-            if (w.usage > 0) md += "**threads:** " + w.usage + "\n";
-            md += "\n";
-          }
+      if (lexiconExportOptions) {
+        const hello = await yuta.hello();
+        const snapshot = renderLexiconSnapshot(
+          {
+            standard: hello.standard,
+            profile: hello.profile,
+            version: hello.version,
+            revision: hello.revision,
+            observedAt: new Date().toISOString(),
+          },
+          result,
+        );
+        if (
+          lexiconExportOptions.output === undefined ||
+          lexiconExportOptions.output === "-"
+        ) {
+          process.stdout.write(snapshot);
+        } else {
+          writeLexiconSnapshotFile(
+            lexiconExportOptions.output,
+            snapshot,
+            lexiconExportOptions.force,
+          );
+          console.log(
+            `exported ${result.length} words to ${lexiconExportOptions.output}`,
+          );
         }
-
-        if (general.length > 0) {
-          md += "## general words\n\n";
-          for (const w of general) {
-            const one = w.to_one ? " [to_one]" : "";
-            md += "### " + w.word + one + "\n";
-            md += "**inverse:** " + w.inverse + "\n";
-            md += "**meaning:** " + w.gloss + "\n";
-            if (w.usage > 0) md += "**threads:** " + w.usage + "\n";
-            md += "\n";
-          }
-        }
-
-        if (retired.length > 0) {
-          md += "## retired words\n\n";
-          for (const w of retired) {
-            md += "### " + w.word + " (retired)\n";
-            md += "**was:** " + w.gloss + "\n";
-            md += "_Retired words refuse new threads. Old threads keep their meaning._\n\n";
-          }
-        }
-
-        md += "_" + result.length + " words. Glosses versioned, words retired (never deleted). No one overwrites anyone else's meaning._\n";
-
-        writeFileSync("LEXICON.md", md);
-        console.log("exported " + result.length + " words to LEXICON.md");
       } else {
         for (const w of result) {
           const one = w.to_one ? " [to_one]" : "";
-          const use = w.usage > 0 ? " (" + w.usage + " threads)" : "";
+          const use = w.usage !== "0" ? " (" + w.usage + " threads)" : "";
           console.log("  " + w.word.padEnd(18) + w.inverse.padEnd(18) + " " + w.from_deck + " -> " + w.to_deck + one + " (" + w.status + ")" + use);
           console.log("  " + " ".repeat(20) + w.gloss);
         }
@@ -1461,23 +1704,13 @@ async function main() {
       break;
     }
 
-    case "decks": {
-      const result = await yuta.sqlTag`SELECT book, deck, native, ttl FROM yu.registry ORDER BY book, deck` as any[];
-      for (const d of result) {
-        const kind = d.native ? "native" : "annexed";
-        const ttl = d.ttl ? " ttl=" + d.ttl : "";
-        console.log("  " + d.book + "/" + d.deck + " (" + kind + ttl + ")");
-      }
-      break;
-    }
-
     case "deck": {
-      await doDeck(yuta, positional.slice(1));
+      await doDeck(yuta, deckCommand!);
       break;
     }
 
     case "word": {
-      await doWord(yuta, positional.slice(1));
+      await doWord(yuta, wordCommand!);
       break;
     }
 
