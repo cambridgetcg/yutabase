@@ -20,7 +20,7 @@ Each repo below points to all the others and to their deployed URLs (where avail
 - **[word-interface](https://github.com/cambridgetcg/word-interface)**
 - **[word-layer](https://github.com/cambridgetcg/word-layer)**
 - **[word-experience](https://github.com/cambridgetcg/word-experience)**
-- **[yutabase](https://github.com/cambridgetcg/yutabase)** — [Deployed](https://yutabase.vercel.app)
+- **[yutabase](https://github.com/cambridgetcg/yutabase)** — [Deployed](https://cambridgetcg.github.io/yutabase/)
 - **[youspeak-browser](https://github.com/cambridgetcg/youspeak-browser)**
 - **[youspeak-dictionary](https://github.com/cambridgetcg/youspeak-dictionary)**
 - **[citizen-jiritsume](https://github.com/cambridgetcg/citizen-jiritsume)**
@@ -31,7 +31,7 @@ Each repo below points to all the others and to their deployed URLs (where avail
 - **natlang**: [https://natlang.axiepro.workers.dev](https://natlang.axiepro.workers.dev)
 - **npl**: [https://npl-ivory.vercel.app](https://npl-ivory.vercel.app)
 - **youspeak-lang**: [https://youspeak-iota.vercel.app](https://youspeak-iota.vercel.app)
-- **yutabase**: [https://yutabase.vercel.app](https://yutabase.vercel.app)
+- **yutabase**: [https://cambridgetcg.github.io/yutabase/](https://cambridgetcg.github.io/yutabase/)
 - **recognition-protocol**: [https://recognition.quixotic-sodium.workers.dev](https://recognition.quixotic-sodium.workers.dev)
 - **internet**: [https://natlang-delta.vercel.app](https://natlang-delta.vercel.app)
 
