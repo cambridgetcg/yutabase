@@ -17,7 +17,7 @@ Two versions are visible and name different things:
 | Coordinate | Current value | What it versions |
 |---|---|---|
 | database profile | `0.1.0-candidate.1`, revision `5` | installed PostgreSQL semantics and catalog shape |
-| optional SDK/CLI source | `yutabase@0.1.0-candidate.3` (not yet published) | client packaging and behavior |
+| optional SDK/CLI release | `yutabase@0.1.0-candidate.3` (GitHub artifact public; npm mirror pending) | client packaging and behavior |
 
 ## Start here
 

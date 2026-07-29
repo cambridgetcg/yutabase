@@ -5,11 +5,11 @@ candidate. It keeps ordinary PostgreSQL accessible while adding full logical
 refs, governed word relations, explicit claim kinds, UUIDv7 generation, and the
 small YOUSPEAK compiler.
 
-This source prepares `0.1.0-candidate.3`; it is not a finished standard or
-evidence that this version has been published. Package and database versions
-are intentionally separate: this SDK expects the exact database identity
-`YUTABASE/postgres@0.1.0-candidate.1` revision 5. Confirm that the exact package
-version exists before selecting a registry tag.
+This source is `0.1.0-candidate.3`; it is not a finished standard. Package and
+database versions are intentionally separate: this SDK expects the exact
+database identity `YUTABASE/postgres@0.1.0-candidate.1` revision 5. The exact
+candidate.3 GitHub artifact is public; its npm mirror is pending, so confirm
+registry availability before selecting a registry tag.
 
 ## Start and inspect from source
 
@@ -28,10 +28,15 @@ narrow `yu_appender` role has the thread-append capability but cannot sever or
 mutate threads. `hello` is the read-only inspection command. Back up and
 rehearse any real upgrade.
 
-After `0.1.0-candidate.3` is actually published, the equivalent registry start
-will be `npm install yutabase@0.1.0-candidate.3` followed by
-`npm exec -- yuta ...`. Do not select the older package candidate merely to
-make an install command succeed against a revision-5 database.
+Until the npm mirror reports candidate.3, install the exact GitHub artifact:
+
+```sh
+npm install https://github.com/cambridgetcg/yutabase/releases/download/v0.1.0-candidate.3/yutabase-0.1.0-candidate.3.tgz
+```
+
+Once the mirror is public, use `npm install yutabase@0.1.0-candidate.3`
+followed by `npm exec -- yuta ...`. Do not select the older package candidate
+merely to make an install command succeed against a revision-5 database.
 
 `init` requires an operator able to create the candidate extension and schemas.
 For the cluster-wide role hierarchy it needs a superuser, or `CREATEROLE` plus
