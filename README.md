@@ -36,6 +36,7 @@ Choose the shortest path for what you are doing:
 | install a disposable candidate | follow [Install a candidate database](#install-a-candidate-database) in migration order |
 | map existing application tables | use [Integration patterns](docs/INTEGRATIONS.md); annexing does not move rows or grant access |
 | project signed agent events | read [Correspondence projection](docs/CORRESPONDENCE-PROJECTION.md); the source log remains authoritative |
+| understand blindspots and future direction | read [Serving shape](docs/SERVING-SHAPE.md); it is research, not a Core promise |
 | test compatibility | use [Conformance](docs/CONFORMANCE.md), not a table-presence guess |
 
 If all you need is ordinary SQL, stop there: YOUSPEAK, AgentTool, and every

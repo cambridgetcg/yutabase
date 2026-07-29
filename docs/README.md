@@ -20,6 +20,9 @@ release claim is made.
 - [`CORRESPONDENCE-PROJECTION.md`](CORRESPONDENCE-PROJECTION.md) — signed
   Correspondence as the retained source history; YUTABASE as a rebuildable,
   non-authoritative semantic projection.
+- [`SERVING-SHAPE.md`](SERVING-SHAPE.md) — non-normative blindspot audit and
+  staged direction for observation receipts, history, plural claims,
+  post-quantum evidence continuity, and source-owned KINGDOM projections.
 - [`../THREADS.md`](../THREADS.md) — experimental language-shaped protocol
   research, not a released wire protocol.
 
