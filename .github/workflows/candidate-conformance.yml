@@ -3552,7 +3552,7 @@ jobs:
             to_book, to_deck, to_id,
             at, by, how
           ) VALUES (
-            '01990000-0000-7000-8000-000000000003', 'contains',
+            '01990000-0000-7000-8000-000000000004', 'contains',
             'tradein', 'submissions', '01977c2e-0000-7000-8000-000000000010',
             'tradein', 'items', '0197a1f4-0000-7000-8000-000000000011',
             now(), 'system:ci/writer', 'declared'
