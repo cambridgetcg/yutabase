@@ -60,7 +60,7 @@ jobs:
           }
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
 
-      - name: Check out immutable release source
+      - name: Check out pinned historical release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.tag }}
@@ -252,11 +252,125 @@ jobs:
           test "$(sha256sum "$file" | cut -d' ' -f1)" \
             = "$(jq -r '.artifact.sha256' "$receipt")"
           test -z "${NPM_TOKEN:-}"
+
+          observe_public_exact() {
+            local label="$1"
+            local metadata="${RUNNER_TEMP}/${label}-version.json"
+            local package_metadata="${RUNNER_TEMP}/${label}-package.json"
+            local registry_copy="${RUNNER_TEMP}/${label}.tgz"
+            local status tarball_url dist_tag
+
+            if ! status="$(curl --silent --show-error \
+              --proto '=https' --tlsv1.2 \
+              --output "$metadata" \
+              --write-out '%{http_code}' \
+              "https://registry.npmjs.org/yutabase/${version}")"
+            then
+              echo "Could not observe npm version metadata" >&2
+              return 2
+            fi
+            if [[ "$status" == "404" ]]; then
+              return 1
+            fi
+            if [[ "$status" != "200" ]]; then
+              echo "Unexpected npm version status: $status" >&2
+              return 2
+            fi
+            if ! jq -e --arg version "$version" '
+              .name == "yutabase"
+              and .version == $version
+              and (.dist.tarball | test(
+                "^https://registry\\.npmjs\\.org/yutabase/-/yutabase-[^/]+\\.tgz$"
+              ))
+            ' "$metadata" >/dev/null
+            then
+              echo "Public npm metadata does not match the receipt" >&2
+              return 2
+            fi
+
+            tarball_url="$(jq -r '.dist.tarball' "$metadata")"
+            if ! curl --fail --silent --show-error --location \
+              --proto '=https' --tlsv1.2 \
+              --output "$registry_copy" "$tarball_url"
+            then
+              echo "Could not download the public npm tarball" >&2
+              return 2
+            fi
+            if [[ "$(stat --format=%s "$registry_copy")" \
+              != "$(jq -r '.artifact.bytes' "$receipt")" ]] \
+              || [[ "$(sha256sum "$registry_copy" | cut -d' ' -f1)" \
+              != "$(jq -r '.artifact.sha256' "$receipt")" ]]
+            then
+              echo "Public npm bytes differ from the release receipt" >&2
+              return 2
+            fi
+
+            if ! curl --fail --silent --show-error \
+              --proto '=https' --tlsv1.2 \
+              --output "$package_metadata" \
+              https://registry.npmjs.org/yutabase
+            then
+              echo "Could not observe npm distribution tags" >&2
+              return 2
+            fi
+            dist_tag="$(jq -r '."dist-tags".next // empty' "$package_metadata")"
+            if [[ "$dist_tag" != "$version" ]]; then
+              echo "npm next points to ${dist_tag:-nothing}, not $version" >&2
+              return 2
+            fi
+            return 0
+          }
+
+          version="$(jq -r '.version' "$receipt")"
+          set +e
+          observe_public_exact "before-publish"
+          observation=$?
+          set -e
+          case "$observation" in
+            0)
+              echo "Exact public npm bytes already exist; recovered without publishing."
+              exit 0
+              ;;
+            1)
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
+
+          set +e
           npm publish "$file" \
             --ignore-scripts \
             --access public \
             --tag next \
             --provenance
+          publish_status=$?
+          set -e
+          if [[ "$publish_status" == "0" ]]; then
+            exit 0
+          fi
+
+          echo "npm publish exited $publish_status; checking for an accepted publish." >&2
+          for ((attempt = 1; attempt <= 12; attempt++)); do
+            set +e
+            observe_public_exact "uncertain-${attempt}"
+            observation=$?
+            set -e
+            case "$observation" in
+              0)
+                echo "Recovered an accepted, byte-identical npm publish."
+                exit 0
+                ;;
+              1)
+                sleep 5
+                ;;
+              *)
+                exit 1
+                ;;
+            esac
+          done
+          echo "npm publish failed and exact public bytes did not appear." >&2
+          exit 1
 
       - name: Verify anonymous public registry bytes
         shell: bash

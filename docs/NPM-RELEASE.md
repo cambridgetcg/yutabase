@@ -23,6 +23,13 @@ The workflow deliberately separates preparation from authority:
 7. the public registry metadata, `next` tag, and anonymously downloaded
    tarball must match the receipt exactly.
 
+The protected job is idempotent only for exact public state. If the version
+already exists, or if `npm publish` exits without proving whether the registry
+accepted it, the job succeeds only when anonymous registry reads show the same
+size and SHA-256 and `next` points to that version. A mismatched version,
+unexpected response, or different distribution tag fails closed. The final
+readback independently downloads and verifies the public bytes again.
+
 The workflow does not create or move a Git tag, create or replace a GitHub
 Release asset, configure npm trust, use a long-lived npm token, select
 `latest`, or publish database migrations.
@@ -39,9 +46,12 @@ The existing `yutabase` npm package must trust this exact GitHub publisher:
 | Environment | `npm-bootstrap` |
 | Allowed action | `npm publish` |
 
-In GitHub, create the `npm-bootstrap` environment with required reviewers.
-It needs no npm secret. The environment name is part of the OIDC trust tuple;
-changing it or the workflow filename requires updating npm's trusted publisher.
+Before the first dispatch, deliberately create the `npm-bootstrap` environment
+in GitHub and add required reviewers. This ordering matters: when a workflow
+references an environment that does not exist, GitHub creates it without
+protection rules. The environment needs no npm secret. Its name is part of the
+OIDC trust tuple; changing it or the workflow filename requires updating npm's
+trusted publisher.
 
 ## Release invocation
 

@@ -60,8 +60,8 @@ operational use.
 ## Release operations
 
 - [`NPM-RELEASE.md`](NPM-RELEASE.md) — the protected, OIDC-only path for
-  mirroring an existing immutable SDK candidate artifact to npm. It does not
-  create tags, GitHub releases, npm trust, or database deployments.
+  mirroring an exact SDK candidate artifact pinned and checked during the run.
+  It does not create tags, GitHub releases, npm trust, or database deployments.
 
 ## Product, policy, and tax research
 
