@@ -8,8 +8,9 @@ small YOUSPEAK compiler.
 This source is `0.1.0-candidate.3`; it is not a finished standard. Package and
 database versions are intentionally separate: this SDK expects the exact
 database identity `YUTABASE/postgres@0.1.0-candidate.1` revision 5. The exact
-candidate.3 GitHub artifact is public; its npm mirror is pending, so confirm
-registry availability before selecting a registry tag.
+candidate.3 archive is public as byte-identical GitHub and npm mirrors. npm
+`next` selects candidate.3; `latest` intentionally remains candidate.1, so pin
+the exact version.
 
 ## Start and inspect from source
 
@@ -28,15 +29,24 @@ narrow `yu_appender` role has the thread-append capability but cannot sever or
 mutate threads. `hello` is the read-only inspection command. Back up and
 rehearse any real upgrade.
 
-Until the npm mirror reports candidate.3, install the exact GitHub artifact:
+Install the exact npm mirror:
+
+```sh
+npm install --save-exact yutabase@0.1.0-candidate.3
+npm exec -- yuta ...
+```
+
+Or install the byte-identical GitHub Release artifact:
 
 ```sh
 npm install https://github.com/cambridgetcg/yutabase/releases/download/v0.1.0-candidate.3/yutabase-0.1.0-candidate.3.tgz
 ```
 
-Once the mirror is public, use `npm install yutabase@0.1.0-candidate.3`
-followed by `npm exec -- yuta ...`. Do not select the older package candidate
-merely to make an install command succeed against a revision-5 database.
+The
+[verified release receipt](https://github.com/cambridgetcg/yutabase/blob/main/docs/NPM-RELEASE.md#current-verified-mirror)
+links the protected publication run and provenance attestation. Do not select
+the older package candidate merely to make an install command succeed against
+a revision-5 database.
 
 `init` requires an operator able to create the candidate extension and schemas.
 For the cluster-wide role hierarchy it needs a superuser, or `CREATEROLE` plus
