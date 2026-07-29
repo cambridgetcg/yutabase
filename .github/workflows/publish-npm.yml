@@ -150,10 +150,47 @@ jobs:
 
           local_file="${RUNNER_TEMP}/local-pack/${FILENAME}"
           release_file="${release_dir}/${FILENAME}"
-          cmp --silent "$local_file" "$release_file" || {
-            echo "Built package differs from the GitHub Release asset" >&2
+          for archive in "$local_file" "$release_file"; do
+            archive_bytes="$(stat --format=%s "$archive")"
+            [[ "$archive_bytes" -gt 0 && "$archive_bytes" -le 5242880 ]] || {
+              echo "Package archive is outside the 5 MiB verification bound" >&2
+              exit 1
+            }
+          done
+
+          local_tar="${RUNNER_TEMP}/local-pack/package.tar"
+          release_tar="${release_dir}/package.tar"
+          bounded_gunzip() {
+            local archive="$1"
+            local output="$2"
+            local tar_bytes
+
+            if ! gzip --decompress --stdout -- "$archive" \
+              | head --bytes=16777217 > "$output"
+            then
+              tar_bytes="$(stat --format=%s "$output")"
+              if [[ "$tar_bytes" -ge 16777217 ]]; then
+                echo "Package tar stream exceeds the 16 MiB bound" >&2
+              else
+                echo "Package archive is not a complete gzip stream" >&2
+              fi
+              exit 1
+            fi
+            tar_bytes="$(stat --format=%s "$output")"
+            [[ "$tar_bytes" -gt 0 && "$tar_bytes" -le 16777216 ]] || {
+              echo "Package tar stream is outside the 16 MiB verification bound" >&2
+              exit 1
+            }
+          }
+          bounded_gunzip "$local_file" "$local_tar"
+          bounded_gunzip "$release_file" "$release_tar"
+          cmp --silent "$local_tar" "$release_tar" || {
+            echo "Built package tar content differs from the GitHub Release asset" >&2
             exit 1
           }
+
+          # The reviewed GitHub .tgz is the mirror artifact. npm's gzip wrapper
+          # can vary across platforms even when the npm tar stream is exact.
           cp "$release_file" "${transfer_dir}/${FILENAME}"
           bytes="$(stat --format=%s "$release_file")"
           sha256="$(sha256sum "$release_file" | cut -d' ' -f1)"
