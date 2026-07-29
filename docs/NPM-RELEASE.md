@@ -14,8 +14,8 @@ The workflow deliberately separates preparation from authority:
 3. the historical tag is checked out separately, then its dependencies,
    tests, type checks, browser check, build, and package smoke test run without
    npm write credentials;
-4. the newly packed bytes must exactly match the same-named asset on the
-   existing, non-draft GitHub prerelease;
+4. the newly packed archive's bounded, decompressed npm tar stream must exactly
+   match the same-named asset on the existing, non-draft GitHub prerelease;
 5. only that `.tgz` and a bounded hash receipt cross into the protected
    `npm-bootstrap` job;
 6. after environment review, the protected job anonymously re-downloads the
@@ -25,6 +25,13 @@ The workflow deliberately separates preparation from authority:
    lifecycle scripts remain disabled;
 8. the public registry metadata, `next` tag, and anonymously downloaded
    tarball must match the receipt exactly.
+
+The decompressed comparison is deliberate. npm's gzip wrapper can differ
+between macOS and Linux even when the underlying tar bytes, entries, metadata,
+and package content are identical. The workflow never publishes its rebuilt
+wrapper: it transfers and publishes the exact reviewed GitHub `.tgz`, whose
+compressed size and SHA-256 are carried in the receipt and checked again after
+approval.
 
 The second GitHub download matters because environment approval can wait after
 preparation. Missing or changed release bytes stop the run immediately before
