@@ -57,6 +57,12 @@ These are historical or exploratory notes. URLs, quotas, deployments,
 availability, pinning, and service state must be independently checked before
 operational use.
 
+## Release operations
+
+- [`NPM-RELEASE.md`](NPM-RELEASE.md) — the protected, OIDC-only path for
+  mirroring an existing immutable SDK candidate artifact to npm. It does not
+  create tags, GitHub releases, npm trust, or database deployments.
+
 ## Product, policy, and tax research
 
 - [`TAXSORTED.md`](TAXSORTED.md)
