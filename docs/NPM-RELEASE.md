@@ -40,7 +40,7 @@ readback independently downloads and verifies the public bytes again.
 
 The workflow does not create or move a Git tag, create or replace a GitHub
 Release asset, configure npm trust, use a long-lived npm token, select
-`latest`, or publish database migrations.
+`latest`, or apply database migrations.
 
 ## One-time account configuration
 
