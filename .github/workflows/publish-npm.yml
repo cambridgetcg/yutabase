@@ -290,7 +290,7 @@ jobs:
 
             tarball_url="$(jq -r '.dist.tarball' "$metadata")"
             if ! curl --fail --silent --show-error --location \
-              --proto '=https' --tlsv1.2 \
+              --proto '=https' --proto-redir '=https' --tlsv1.2 \
               --output "$registry_copy" "$tarball_url"
             then
               echo "Could not download the public npm tarball" >&2
@@ -320,6 +320,27 @@ jobs:
             fi
             return 0
           }
+
+          github_copy="${RUNNER_TEMP}/github-release-after-approval.tgz"
+          release_tag="$(jq -r '.tag' "$receipt")"
+          artifact_name="$(jq -r '.artifact.file' "$receipt")"
+          if ! curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
+            --output "$github_copy" \
+            "https://github.com/cambridgetcg/yutabase/releases/download/${release_tag}/${artifact_name}"
+          then
+            echo "Could not re-download the public GitHub Release asset" >&2
+            exit 1
+          fi
+          if [[ "$(stat --format=%s "$github_copy")" \
+            != "$(jq -r '.artifact.bytes' "$receipt")" ]] \
+            || [[ "$(sha256sum "$github_copy" | cut -d' ' -f1)" \
+            != "$(jq -r '.artifact.sha256' "$receipt")" ]] \
+            || ! cmp --silent "$file" "$github_copy"
+          then
+            echo "GitHub Release bytes changed after preparation" >&2
+            exit 1
+          fi
 
           version="$(jq -r '.version' "$receipt")"
           set +e
@@ -406,7 +427,7 @@ jobs:
             ))
           ' "$metadata" >/dev/null
           curl --fail --silent --show-error --location \
-            --proto '=https' --tlsv1.2 \
+            --proto '=https' --proto-redir '=https' --tlsv1.2 \
             --output "$registry_copy" \
             "$(jq -r '.dist.tarball' "$metadata")"
           test "$(stat --format=%s "$registry_copy")" \

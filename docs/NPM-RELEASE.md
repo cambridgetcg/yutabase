@@ -18,10 +18,18 @@ The workflow deliberately separates preparation from authority:
    existing, non-draft GitHub prerelease;
 5. only that `.tgz` and a bounded hash receipt cross into the protected
    `npm-bootstrap` job;
-6. after environment review, npm trusted publishing supplies a short-lived
-   GitHub OIDC identity. Package lifecycle scripts remain disabled;
-7. the public registry metadata, `next` tag, and anonymously downloaded
+6. after environment review, the protected job anonymously re-downloads the
+   exact public GitHub Release URL named by the validated receipt and compares
+   its size, SHA-256, and bytes again;
+7. npm trusted publishing supplies a short-lived GitHub OIDC identity. Package
+   lifecycle scripts remain disabled;
+8. the public registry metadata, `next` tag, and anonymously downloaded
    tarball must match the receipt exactly.
+
+The second GitHub download matters because environment approval can wait after
+preparation. Missing or changed release bytes stop the run immediately before
+any npm observation or publication attempt; the job does not assume that an
+asset checked earlier is permanently immutable.
 
 The protected job is idempotent only for exact public state. If the version
 already exists, or if `npm publish` exits without proving whether the registry
