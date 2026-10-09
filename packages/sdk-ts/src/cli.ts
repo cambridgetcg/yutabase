@@ -6,7 +6,7 @@
 //           explain, doctor, check, words, deck, word, stale
 
 import { Yuta, type HelloResult } from "./index.js";
-import { explain } from "./youspeak.js";
+import { compile, explain } from "./youspeak.js";
 import { parseCliArgs, redactConnectionUrl, unwrapCliQuery } from "./cli-args.js";
 import {
   parseDeckAnnexArgs,
@@ -1415,7 +1415,8 @@ function printHelp(): void {
   console.log('  query "<youspeak>"       Run any YOUSPEAK sentence');
   console.log("  thread <from --word--> to>  Create a thread");
   console.log("  sever <id> how <claim>   End a thread");
-  console.log('  explain "<youspeak>"     Print logical SQL before registry resolution');
+  console.log('  explain [--json] "<youspeak>"  Logical SQL or parameterized intermediate plan');
+  console.log("                           No connection or execution; registry and authority unresolved");
   console.log("  doctor                   Vocabulary health check");
   console.log("  check                    fsck: orphaned threads");
   console.log("  deck new <book/deck>     Create a native deck with honesty header");
@@ -1490,11 +1491,15 @@ async function main() {
   }
 
   if (cmd === "explain") {
-    if (!rest) {
-      throw new Error('USAGE: yuta explain "<youspeak>"');
+    const json = positional[1] === "--json";
+    const queryText = positional.slice(json ? 2 : 1).join(" ");
+    if (!queryText) {
+      throw new Error('USAGE: yuta explain [--json] "<youspeak>"');
     }
-    const queryStr = unwrapCliQuery(rest);
-    console.log(explain(queryStr));
+    const queryStr = unwrapCliQuery(queryText);
+    console.log(json
+      ? JSON.stringify({ stage: "logical-preview", executed: false, compiled: compile(queryStr) }, null, 2)
+      : explain(queryStr));
     return;
   }
 

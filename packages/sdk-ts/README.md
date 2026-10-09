@@ -6,8 +6,8 @@ refs, governed word relations, explicit claim kinds, UUIDv7 generation, and the
 small YOUSPEAK compiler.
 
 The latest released SDK is `0.1.0-candidate.3`; it is not a finished standard.
-This source checkout also contains post-release quoted-value fixes, not yet
-published to npm. Package and database versions are intentionally separate:
+This source checkout also contains post-release quoted-value fixes and JSON
+previews, not yet published to npm. Package and database versions are separate:
 this SDK expects the exact database identity `YUTABASE/postgres@0.1.0-candidate.1`
 revision 5. The exact released candidate.3 archive is public as byte-identical
 GitHub and npm mirrors. npm `next` selects candidate.3; `latest` intentionally
@@ -154,6 +154,34 @@ For card forms, its fixed logical-relation sentinel and `deckTarget` metadata
 must be resolved together; the intermediate SQL is not directly executable.
 Use `Yuta.query()`, `Yuta.card()`, or `Yuta.explain()` unless you are
 implementing another registry-aware adapter.
+
+### Let the agent carry the meaning
+
+From a build of this source, `yuta explain --json "<youspeak>"` exposes that
+same compiler result without scraping the human SQL preview. Put `--json`
+immediately after `explain`. Successful stdout is one JSON object:
+`{ "stage": "logical-preview", "executed": false, "compiled": ... }`.
+The `compiled` value retains `sql`, `params`, and any `deckTarget` or
+`claimantParamIndex`; it is the native intermediate plan, not executable SQL.
+Errors go to stderr with a nonzero exit and no success document.
+
+This path does not connect, look up a keychain entry, bind a claimant, resolve
+the registry, check authorization or execute anything—even for write forms.
+Thread previews generate a draft UUID and time on each compilation; neither
+is stored, and repeated previews need not be byte-identical.
+
+An agent can interpret another module's result before proposing a query:
+
+```sh
+yuta explain --json 'cards demo/resources where external_id="natural-earth" newest 5'
+```
+
+Here `natural-earth` is an external catalog ID, not a YUTABASE card ref.
+`demo/resources.external_id` is an explicitly illustrative application mapping,
+not a registered deck or a built-in Commons adapter. The agent must establish
+the real mapping before execution and retain the source's access, reuse,
+freshness and caveats separately; a query parameter is not their replacement.
+Understanding a useful connection is separate from having permission to use it.
 
 The SQL escape hatch is always available. `sqlTag` parameterizes interpolated
 values. `exec` and `execTransaction` accept trusted operator SQL and must not be

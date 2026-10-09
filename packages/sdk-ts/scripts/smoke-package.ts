@@ -59,9 +59,13 @@ try {
     [
       "--input-type=module",
       "--eval",
+      "import assert from 'node:assert/strict'; import { execFileSync } from 'node:child_process'; " +
       "import { CANDIDATE_REVISION, CANDIDATE_VERSION, compile } from 'yutabase'; " +
       "import { parseRef } from 'yutabase/browser'; " +
-      "if (CANDIDATE_VERSION !== '0.1.0-candidate.1' || CANDIDATE_REVISION !== 5 || compile('hello').sql !== 'SELECT 1' || parseRef('demo/cards/01977c2e-0000-7000-8000-000000000001').deck !== 'cards') process.exit(1);",
+      "if (CANDIDATE_VERSION !== '0.1.0-candidate.1' || CANDIDATE_REVISION !== 5 || compile('hello').sql !== 'SELECT 1' || parseRef('demo/cards/01977c2e-0000-7000-8000-000000000001').deck !== 'cards') process.exit(1); " +
+      "const query = 'cards demo/notes where title=\"the newest 20\"'; " +
+      "const preview = JSON.parse(execFileSync('./node_modules/.bin/yuta', ['explain', '--json', query], {encoding: 'utf8'})); " +
+      "assert.deepEqual(preview, {stage: 'logical-preview', executed: false, compiled: compile(query)});",
     ],
     { cwd: consumer, stdio: "pipe" },
   );
