@@ -311,7 +311,7 @@ function compile(input) {
   if (cardMatch) {
     return compileCardQuery(parseRef(cardMatch[1]));
   }
-  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+(.+?))?(?:\s+newest\s+(\S+))?$/);
+  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+((?:"[^"\r\n\u2028\u2029]*"|[^"\r\n\u2028\u2029])+?))?(?:\s+newest\s+(\S+))?$/);
   if (cardsMatch) {
     const [_, deckRef, wherePart, limitStr] = cardsMatch;
     const dp = parseDeckRef(deckRef);

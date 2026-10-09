@@ -1,6 +1,40 @@
 import { expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
 
-import { parseCliArgs, redactConnectionUrl } from "../src/cli-args.js";
+import { parseCliArgs, redactConnectionUrl, unwrapCliQuery } from "../src/cli-args.js";
+import { explain } from "../src/youspeak.js";
+
+test("CLI explain preserves quoted values through the real command boundary", () => {
+  const cli = resolve(import.meta.dir, "../src/cli.ts");
+  for (const query of [
+    'cards demo/notes where title="quiet and rest"',
+    'cards demo/notes where title="the newest 20"',
+  ]) {
+    for (const argument of [query, `"${query}"`, `'${query}'`]) {
+      const result = spawnSync(process.execPath, [cli, "explain", argument], {
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.stderr).toBe("");
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe(`${explain(query)}\n`);
+    }
+  }
+});
+
+test("CLI query unwrapping preserves unmatched quotes and whitespace", () => {
+  for (const input of [
+    "", '"', "'", '"hello', "hello'", '"hello\'',
+    ' cards demo/notes where title="rest" ',
+    'cards demo/notes where title="rest"',
+  ]) {
+    expect(unwrapCliQuery(input)).toBe(input);
+  }
+  expect(unwrapCliQuery('"hello"')).toBe("hello");
+  expect(unwrapCliQuery("'hello'")).toBe("hello");
+});
 
 test("parses global connection and claimant flags", () => {
   expect(parseCliArgs([

@@ -50,6 +50,62 @@ test("where keeps the word and inside quoted values", () => {
   expect(q.params).toEqual(["research and development", "pending", 100]);
 });
 
+test("cards keeps newest inside a quoted value rather than treating it as a limit", () => {
+  for (const title of [
+    "the newest 20",
+    "the newest 0",
+    "the newest many",
+    "rest and the newest 20",
+    "the\tnewest\t20",
+    "最新 and the newest 20",
+  ]) {
+    const input = `cards demo/notes where title="${title}"`;
+    const q = compile(input);
+    expect(q.params).toEqual([title, 100]);
+    expect(q.sql).toContain('"title" = $1');
+    expect(q.sql).toContain("LIMIT $2");
+    expect(q.sql).not.toContain(title);
+    expect(explain(input)).toContain(`"title" = '${title}'`);
+    expect(compile(`explain "${input}"`).params).toEqual([explain(input)]);
+
+    for (const space of [" ", "\t"]) {
+      const limitedInput = `${input}${space}and${space}.how="cached"${space}newest${space}7`;
+      const limited = compile(limitedInput);
+      expect(limited.params).toEqual([title, "cached", 7]);
+      expect(limited.sql).toContain('"title" = $1 AND "how" = $2');
+      expect(limited.sql).toContain("LIMIT $3");
+      expect(compile(`explain "${limitedInput}"`).params).toEqual([explain(limitedInput)]);
+    }
+    expect(() => compile(`${input} newest 0`)).toThrow(/BAD LIMIT/);
+  }
+});
+
+for (const [entrypoint, run] of [
+  ["compile", compile],
+  ["explain", explain],
+  ["explain command", (input: string) => compile(`explain "${input}"`)],
+] as const) {
+  test.each([
+    ["LF", "\n"],
+    ["CR", "\r"],
+    ["U+2028", "\u2028"],
+    ["U+2029", "\u2029"],
+  ])(`cards rejects %s in WHERE via ${entrypoint}`, (_label, terminator) => {
+    for (const where of [
+      `title="rest${terminator}and the newest 20"`,
+      `status${terminator}=pending`,
+      `status=${terminator}pending`,
+      `status=pending${terminator}and .how="cached"`,
+    ]) {
+      for (const suffix of ["", " newest 7"]) {
+        expect(() => run(`cards demo/notes where ${where}${suffix}`)).toThrow(
+          /^UNRECOGNIZED QUERY:/,
+        );
+      }
+    }
+  });
+}
+
 test("where refuses identifiers PostgreSQL would silently truncate", () => {
   const tooLong = `a${"b".repeat(63)}`;
   expect(() =>

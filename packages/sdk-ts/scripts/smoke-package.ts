@@ -66,6 +66,15 @@ try {
     { cwd: consumer, stdio: "pipe" },
   );
 
+  const cliPreview = execFileSync(
+    join(consumer, "node_modules", ".bin", "yuta"),
+    ["explain", 'cards demo/notes where title="the newest 20"'],
+    { cwd: consumer, encoding: "utf8" },
+  );
+  if (!cliPreview.includes(`"title" = 'the newest 20'`) || !cliPreview.endsWith("LIMIT 100\n")) {
+    throw new Error("package smoke: installed CLI changed a quoted value");
+  }
+
   console.log("package smoke: packed SQL assets, Node import, and installed CLI are valid");
 } finally {
   rmSync(temporaryRoot, { recursive: true, force: true });

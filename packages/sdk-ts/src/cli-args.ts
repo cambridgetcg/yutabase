@@ -20,6 +20,16 @@ export function redactConnectionUrl(url: string): string {
   }
 }
 
+/** Remove an optional matching outer pair, never a value's trailing quote. */
+export function unwrapCliQuery(input: string): string {
+  const quote = input[0];
+  return input.length >= 2 &&
+    (quote === '"' || quote === "'") &&
+    input.at(-1) === quote
+    ? input.slice(1, -1)
+    : input;
+}
+
 /**
  * Parse global CLI flags without stealing `deck annex --by <column>`.
  * A global claimant for annex must appear before `deck annex`.

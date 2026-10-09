@@ -5,12 +5,13 @@ candidate. It keeps ordinary PostgreSQL accessible while adding full logical
 refs, governed word relations, explicit claim kinds, UUIDv7 generation, and the
 small YOUSPEAK compiler.
 
-This source is `0.1.0-candidate.3`; it is not a finished standard. Package and
-database versions are intentionally separate: this SDK expects the exact
-database identity `YUTABASE/postgres@0.1.0-candidate.1` revision 5. The exact
-candidate.3 archive is public as byte-identical GitHub and npm mirrors. npm
-`next` selects candidate.3; `latest` intentionally remains candidate.1, so pin
-the exact version.
+The latest released SDK is `0.1.0-candidate.3`; it is not a finished standard.
+This source checkout also contains post-release quoted-value fixes, not yet
+published to npm. Package and database versions are intentionally separate:
+this SDK expects the exact database identity `YUTABASE/postgres@0.1.0-candidate.1`
+revision 5. The exact released candidate.3 archive is public as byte-identical
+GitHub and npm mirrors. npm `next` selects candidate.3; `latest` intentionally
+remains candidate.1, so pin the exact version.
 
 ## Start and inspect from source
 
@@ -158,6 +159,26 @@ The SQL escape hatch is always available. `sqlTag` parameterizes interpolated
 values. `exec` and `execTransaction` accept trusted operator SQL and must not be
 fed untrusted text. These raw helpers intentionally bypass candidate-binding
 checks; their caller owns compatibility, authorization, and SQL safety.
+
+## Words stay words — a functional composition
+
+The [existing compiler playground](../../apps/playground/index.html) is an
+executable encounter with one small invariant: quoted words remain data, even
+when they spell a command such as `and` or `newest`. The browser, SDK and CLI
+share the compiler; there is no second artistic implementation.
+
+From this source checkout after `bun run build`, try the connection-free path:
+
+```sh
+node dist/cli.js explain 'cards demo/notes where title="the newest 20"'
+```
+
+The logical preview preserves `'the newest 20'` and uses the default
+`LIMIT 100`. Add `newest 7` outside the quoted value to change the limit, not
+the title. `demo/notes` is an illustrative logical name, not an installed deck.
+This previews a query without a database, credentials or SQL execution. A
+connected adapter still owns physical mapping, access checks and execution.
+These source fixes are not a claim about the already published npm archive.
 
 ## Annex an existing table
 

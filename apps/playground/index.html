@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
-  <title>YOUSPEAK logical playground</title>
+  <title>Words stay words — YOUSPEAK logical playground</title>
   <style>
     :root {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -50,8 +50,12 @@
 </head>
 <body>
 <main>
-  <h1>YOUSPEAK</h1>
-  <p>Canonical, connection-free compiler playground for the candidate SDK.</p>
+  <h1>Words stay words</h1>
+  <p>
+    An executable composition in YOUSPEAK. Inside a quoted value, a word stays
+    a word. Outside it, the same word can shape a query. Change the sentence
+    and inspect what survives the passage.
+  </p>
 
   <p class="notice">
     This page does not connect to PostgreSQL or execute SQL. “Logical preview”
@@ -61,7 +65,7 @@
   </p>
 
   <label for="query">YOUSPEAK form</label>
-  <textarea id="query" spellcheck="false">cards tradein/submissions where status="pending" newest 20</textarea>
+  <textarea id="query" spellcheck="false">cards demo/notes where title="the newest 20"</textarea>
 
   <div class="actions">
     <button id="preview" type="button">Logical preview</button>
@@ -71,6 +75,9 @@
   <pre id="output" aria-live="polite"></pre>
 
   <p class="examples">
+    Add <code>newest 7</code> outside the quoted title: the limit changes;
+    the title does not. <code>demo/notes</code> is an illustrative logical name,
+    not an installed deck.<br>
     Full refs only. Try
     <code>card tradein/submissions/01977c2e-0000-7000-8000-000000000001</code>
     or
@@ -80,7 +87,7 @@
   <p>
     Source:
     <a href="https://github.com/cambridgetcg/yutabase/tree/main/packages/sdk-ts">
-      canonical SDK compiler
+      canonical SDK compiler (repository access required)
     </a>.
   </p>
 </main>

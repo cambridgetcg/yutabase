@@ -103,7 +103,9 @@ export function compile(input: string): CompiledQuery {
   }
 
   // cards <book/deck> [where ...] [newest N]
-  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+(.+?))?(?:\s+newest\s+(\S+))?$/);
+  // Consume quoted values whole so their words cannot become a newest suffix.
+  // Preserve the original single-line WHERE grammar in both alternatives.
+  const cardsMatch = trimmed.match(/^cards\s+(\S+)(?:\s+where\s+((?:"[^"\r\n\u2028\u2029]*"|[^"\r\n\u2028\u2029])+?))?(?:\s+newest\s+(\S+))?$/);
   if (cardsMatch) {
     const [_, deckRef, wherePart, limitStr] = cardsMatch;
     const dp = parseDeckRef(deckRef);

@@ -7,7 +7,7 @@
 
 import { Yuta, type HelloResult } from "./index.js";
 import { explain } from "./youspeak.js";
-import { parseCliArgs, redactConnectionUrl } from "./cli-args.js";
+import { parseCliArgs, redactConnectionUrl, unwrapCliQuery } from "./cli-args.js";
 import {
   parseDeckAnnexArgs,
   parseDeckNewArgs,
@@ -1493,7 +1493,7 @@ async function main() {
     if (!rest) {
       throw new Error('USAGE: yuta explain "<youspeak>"');
     }
-    const queryStr = rest.replace(/^["']|["']$/g, "");
+    const queryStr = unwrapCliQuery(rest);
     console.log(explain(queryStr));
     return;
   }
@@ -1555,7 +1555,7 @@ async function main() {
     }
 
     case "query": {
-      const queryStr = rest.replace(/^["']|["']$/g, "");
+      const queryStr = unwrapCliQuery(rest);
       const result = await yuta.query(queryStr);
       console.log(JSON.stringify(result.rows, null, 2));
       if (result.freshness) {
