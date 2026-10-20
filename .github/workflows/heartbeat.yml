@@ -27,58 +27,26 @@ jobs:
           echo "We are. We contribute. We are generous. We connect."
           echo "Advisory ritual only; candidate conformance runs elsewhere."
 
-      - name: Fetch public IPFS content (best effort)
-        run: |
-          successes=0
-          attempts=0
-          for cid in \
-            "QmYHdyN33mRZsP2dFxPn8CBxXXYU6xM6zgNYWwRfg924mN" \
-            "QmZ2uDQx84xt6EHYSU4qm7q2Z59bnQphmVgq66EWGptHBT" \
-            "QmZG4S1tRPdd1wWbux1yBEEsRSUH7VQooMLsArNGXrmDz5" \
-            "QmNUCPgFvY9w63ZkXrLhFXeWeifhqXuLfnioWEujytC43s" \
-            "QmbqnnVAjknKA9LkEMwszDsnycWquFMqcHfdaPXyVrjgBh" \
-            "QmRWqGBY7Q69tBdDFVJufWn5VLAyaNd1Pi2JpoATuhTouM" \
-            "QmVsp31nZutbEckgBMFZZB2XWv2FyTvSYcs9Lo5g4rfmLM" \
-            "QmUzLwWqiSqhuwFRasj7TpegwxHRD5mJ5ZTWKHfFKfSUjb" \
-            "QmRKki6Phb61aHzv1vdRiXiCr4phPwBBHrQ6bYWmbikJuJ" \
-            "QmQwbGFWi3dsczb1mbLjJsuZ9SzsDyS3rh2yvkBdCj8Pnd" \
-            "QmX7zUjaXjQL7L5Tp72wjGkYqeYFZGCZPugk9dvbL2bhvJ" \
-            "QmWntppGihKMiSNihWDfBWWdNXXBMBPgxd396yDiV9eMAx" \
-            "QmRhCvLMpMwWwuHQ3xo8JGqekjutZ7JSaEzAyEt6Y53RxC" \
-            "QmQiVyEEu1f8mSg4ZMJkfWEZLk9jUGsSPDCReWSL2s9nwH"
-          do
-            for gateway in \
-              "https://ipfs.io/ipfs" \
-              "https://cloudflare-ipfs.com/ipfs" \
-              "https://dweb.link/ipfs"
-            do
-              attempts=$((attempts + 1))
-              if curl --silent --location --fail \
-                --max-time 8 --output /dev/null "$gateway/$cid"
-              then
-                successes=$((successes + 1))
-              fi
-            done
-          done
-          echo "$successes of $attempts gateway fetches returned success."
-          echo "A GET may warm a cache; it does not request or prove durable pinning."
-
-      - name: Resolve public IPNS name (best effort)
-        run: |
-          successes=0
-          name="12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH"
-          for gateway in \
-            "https://ipfs.io/ipns" \
-            "https://cloudflare-ipfs.com/ipns"
-          do
-            if curl --silent --location --fail \
-              --max-time 8 --output /dev/null "$gateway/$name"
-            then
-              successes=$((successes + 1))
-            fi
-          done
-          echo "$successes of 2 gateway resolutions returned success."
-          echo "Resolution does not renew, republish, or keep an IPNS record alive."
+      # The IPFS and IPNS gateway probes were removed on 2026-10-20. ipfs.io,
+      # dweb.link and cloudflare-ipfs.com are retired: 0 of 42 fetches succeeded,
+      # and the content has no providers. A GET was never pinning anyway.
+      # Ledger ar-yutabase-ipfs-probe: an agent's call under Yu's 2026-10-20
+      # delegation. The identifiers stay here as bare CIDs, with no gateway:
+      #   QmYHdyN33mRZsP2dFxPn8CBxXXYU6xM6zgNYWwRfg924mN
+      #   QmZ2uDQx84xt6EHYSU4qm7q2Z59bnQphmVgq66EWGptHBT
+      #   QmZG4S1tRPdd1wWbux1yBEEsRSUH7VQooMLsArNGXrmDz5
+      #   QmNUCPgFvY9w63ZkXrLhFXeWeifhqXuLfnioWEujytC43s
+      #   QmbqnnVAjknKA9LkEMwszDsnycWquFMqcHfdaPXyVrjgBh
+      #   QmRWqGBY7Q69tBdDFVJufWn5VLAyaNd1Pi2JpoATuhTouM
+      #   QmVsp31nZutbEckgBMFZZB2XWv2FyTvSYcs9Lo5g4rfmLM
+      #   QmUzLwWqiSqhuwFRasj7TpegwxHRD5mJ5ZTWKHfFKfSUjb
+      #   QmRKki6Phb61aHzv1vdRiXiCr4phPwBBHrQ6bYWmbikJuJ
+      #   QmQwbGFWi3dsczb1mbLjJsuZ9SzsDyS3rh2yvkBdCj8Pnd
+      #   QmX7zUjaXjQL7L5Tp72wjGkYqeYFZGCZPugk9dvbL2bhvJ
+      #   QmWntppGihKMiSNihWDfBWWdNXXBMBPgxd396yDiV9eMAx
+      #   QmRhCvLMpMwWwuHQ3xo8JGqekjutZ7JSaEzAyEt6Y53RxC
+      #   QmQiVyEEu1f8mSg4ZMJkfWEZLk9jUGsSPDCReWSL2s9nwH
+      #   IPNS name: 12D3KooWKWN9FWrXpwXzXafDzjUt9kg1AKom87whPznrKMKY3SdH
 
       - name: Observe sister endpoints (best effort)
         run: |
