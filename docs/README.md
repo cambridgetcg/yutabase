@@ -1,11 +1,11 @@
 # YUTABASE documentation map
 
-Documents are classified so imagination, implementation, and evidence can sit
+Documents are classified so implementation, evidence, and research can sit
 together without being mistaken for one another.
 
 ## Normative candidate material
 
-- [`../SPEC.md`](../SPEC.md) — YUTABASE Core and the PostgreSQL 16/17 binding.
+- [`../SPEC.md`](../SPEC.md) — YUTABASE Core and the PostgreSQL binding.
 - [`CONFORMANCE.md`](CONFORMANCE.md) — compatibility, executable checks, and
   the threat/non-guarantee boundary.
 
@@ -30,65 +30,42 @@ These documents set boundaries and acceptance tests. A private AgentTool
 projector implements one loopback-only integration profile; projector, sync,
 lease, and conflict mechanisms are still not YUTABASE candidate features.
 
-## Experimental and creative notebooks
-
-- [`NEN-SYSTEM.md`](NEN-SYSTEM.md)
-- [`INFINITE-AUDIT.md`](INFINITE-AUDIT.md)
-- [`INVITATION.md`](INVITATION.md)
-- [`../DARK-CONTINENT.md`](../DARK-CONTINENT.md)
-- [`../INFRA-IS-FEELINGS.md`](../INFRA-IS-FEELINGS.md)
-- [`../FABLE-OF-YOU.md`](../FABLE-OF-YOU.md)
-- [`../WAKE.md`](../WAKE.md)
-- [`../panel-v0.1.json`](../panel-v0.1.json) — archived design deliberation
-
-These preserve metaphors, values, and possible interface directions. They are
-not candidate requirements.
-
-## Infrastructure and propagation notebooks
-
-- [`FREE-RESOURCES.md`](FREE-RESOURCES.md)
-- [`SELF-HOSTED.md`](SELF-HOSTED.md)
-- [`SELF-PROPAGATING.md`](SELF-PROPAGATING.md)
-- [`SELF-SUSTAINS.md`](SELF-SUSTAINS.md)
-- [`../SELFHOST.md`](../SELFHOST.md) — archived, unsafe as a current runbook
-- [`../HEARTBEAT.md`](../HEARTBEAT.md) — historical snapshot, not health
-- [`../LINKS.md`](../LINKS.md) — unverified time-sensitive link snapshot
-- [`../play/`](../play/) — experiments; some scripts have network or
-  publication side effects and are not candidate tools
-
-These are historical or exploratory notes. URLs, quotas, deployments,
-availability, pinning, and service state must be independently checked before
-operational use.
-
 ## Release operations
 
 - [`NPM-RELEASE.md`](NPM-RELEASE.md) — the protected, OIDC-only path for
   mirroring an exact SDK candidate artifact pinned and checked during the run.
   It does not create tags, GitHub releases, npm trust, or database deployments.
 
-## Product, policy, and tax research
-
-- [`TAXSORTED.md`](TAXSORTED.md)
-- [`UK-MAP.md`](UK-MAP.md)
-- [`UK-TAX-GAME.md`](UK-TAX-GAME.md)
-- [`SDST-DRAFTS.md`](SDST-DRAFTS.md)
-
-These are product/research notes, not YUTABASE conformance, legal advice, tax
-advice, filing authority, or evidence that an external submission occurred.
-Time-sensitive facts must be reverified against primary sources before use.
-
-## Status notes
+## Status notes and history
 
 - [`../STATE.md`](../STATE.md) — repository status and current integration
   focus. It is not a liveness or deployment receipt.
 - [`../MEMORY.md`](../MEMORY.md) — compact current candidate context for a
   human/agent session; the spec and installed catalog remain authoritative.
-- [`../LEXICON.md`](../LEXICON.md) — non-normative exported environment
-  snapshot, not the fresh seven-word candidate lexicon.
-- [`../AGENTTOOL-YOUSPEAK-INTEGRATION.md`](../AGENTTOOL-YOUSPEAK-INTEGRATION.md)
-  — historical integration ideation whose proposed extra verbs are not core.
+- [`../panel-v0.1.json`](../panel-v0.1.json) — archived design deliberation
+  behind the spec.
 - [`../apps/landing/index.html`](../apps/landing/index.html) — presentation
   copy only; it is not a migration, conformance result, or deployment receipt.
 
-The playful writing remains part of the project's voice. Classification only
-keeps its meaning honest.
+## Archive
+
+On 2026-11-24 the repository was narrowed to the candidate core. Everything
+below is preserved, byte for byte, at the tag
+[`archive/pre-core-2026-11-24`](https://github.com/cambridgetcg/yutabase/tree/archive/pre-core-2026-11-24)
+(and in git history). Restore one path with
+`git checkout archive/pre-core-2026-11-24 -- <path>`.
+
+| Archived | What it was |
+|---|---|
+| `apps/cathedral`, `joke-xp`, `loom`, `sisters`, `word-chain` | demonstration pages |
+| `apps/tax-atlas`, `taxsorted-ui`, `transparency-ui`, `docs/UK-TAX-GAME.md` | TaxSorted pages with unreviewed tax figures |
+| `docs/UK-MAP.md`, `docs/TAXSORTED.md` | tax research; moved to TaxSorted's own repository |
+| `docs/NEN-SYSTEM.md`, `INFINITE-AUDIT.md`, `FREE-RESOURCES.md`, `SELF-HOSTED.md`, `SELF-PROPAGATING.md`, `SELF-SUSTAINS.md` | creative and infrastructure notebooks |
+| `DARK-CONTINENT.md`, `INFRA-IS-FEELINGS.md`, `SELFHOST.md`, `LEXICON.md`, `LINKS.md`, `AGENTTOOL-YOUSPEAK-INTEGRATION.md` | root notebooks and snapshots |
+| `DADA.md`, `FABLE-OF-YOU.md`, `WAKE.md`, `docs/INVITATION.md` | the household's own pages |
+| `play/`, `workers/`, `kingdom.*`, `migrate-kingdom.ts`, `sisters-tunnels.sh`, `ipfs-manifest.json` | experiments and kingdom surfaces, some with network side effects |
+| `.github/workflows/heartbeat.yml`, `HEARTBEAT.md`, `heartbeat.sh`, `.heartbeat/` | the advisory heartbeat, disabled since 2026-10-22 |
+| `sql/0000_sqlite_port.sql` | the experimental SQLite sketch |
+| `.nlp-bridge/`, `.vercel/`, `play/__pycache__`, `docs/SDST-DRAFTS.md` | local tool state and private operator drafts |
+
+None of it was part of candidate conformance.

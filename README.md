@@ -39,8 +39,8 @@ Choose the shortest path for what you are doing:
 | understand blindspots and future direction | read [Serving shape](docs/SERVING-SHAPE.md); it is research, not a Core promise |
 | test compatibility | use [Conformance](docs/CONFORMANCE.md), not a table-presence guess |
 
-If all you need is ordinary SQL, stop there: YOUSPEAK, AgentTool, and every
-experimental notebook are optional.
+If all you need is ordinary SQL, stop there: YOUSPEAK and AgentTool are
+optional.
 
 ## See the layer
 
@@ -96,7 +96,7 @@ The repository separates four things that earlier drafts sometimes blended:
 | **YUTABASE Core** | Normative candidate semantics: books, decks, cards, refs, lexicon words, threads, and row-level claim metadata | [SPEC.md](SPEC.md) |
 | **Postgres binding** | Normative candidate implementation for PostgreSQL 16 and 17 | `sql/0001_yu_core.sql`, `0002_starter_lexicon.sql`, `0004_candidate_hardening.sql`, `0005_candidate_integrity.sql` |
 | **YOUSPEAK** | Optional client/compiler surface; never required to read the stored model with SQL | `packages/sdk-ts/` |
-| **THREADS, SQLite, apps, play, and kingdom writings** | Experimental or illustrative; not part of candidate conformance | [THREADS.md](THREADS.md), `sql/0000_sqlite_port.sql`, `apps/`, `play/`, [docs/](docs/) |
+| **THREADS research and the demo pages** | Experimental or illustrative; not part of candidate conformance | [THREADS.md](THREADS.md), `apps/landing/`, `apps/playground/` |
 
 The exact installed identity is stored in the singleton
 `yu.standard_meta` row:
@@ -404,9 +404,7 @@ The mapping and the XENIA rights/permissions boundary are defined in
 The GitHub CI workflow is defined for both supported PostgreSQL majors. It
 installs `0001 → 0002 → 0004 → 0005`, then runs the post-install `0003`
 lifecycle fixture, SDK integration/unit tests, typechecking, a real build, and
-a clean Node.js consumer smoke test against the packed artifact. The separate
-Kingdom Heartbeat is a playful best-effort presence ritual, not CI and not a
-service-health guarantee.
+a clean Node.js consumer smoke test against the packed artifact.
 
 `yuta init` commits a fresh `0001+0002` legacy base first, then runs `0004` and
 `0005` in separate fresh transactions so each lock/snapshot contract is
@@ -436,19 +434,27 @@ docs/CONFORMANCE.md             compatibility, tests, and threat boundary
 docs/INTEGRATIONS.md            practical adapter and coexistence patterns
 docs/CORRESPONDENCE-PROJECTION.md
                                  signed-source projection profile
+docs/SERVING-SHAPE.md           non-normative blindspot audit and direction
+docs/NPM-RELEASE.md             the protected npm mirror lane
 sql/0001_yu_core.sql            original Postgres objects
 sql/0002_starter_lexicon.sql     seven starter words
 sql/0004_candidate_hardening.sql candidate metadata and hardening
 sql/0005_candidate_integrity.sql mandatory card guard pair + source integrity
 sql/0003_test_lifecycle.sql      destructive SQL conformance fixture
 packages/sdk-ts/                optional YOUSPEAK SDK/CLI
+demo.sh                         guarded disposable-database demo
+apps/landing/, apps/playground/ presentation copy and the logical playground
 THREADS.md                      experimental protocol research note
-sql/0000_sqlite_port.sql         experimental SQLite sketch
-apps/, play/, other docs         non-normative demonstrations and notebooks
+MEMORY.md, STATE.md             compact context and repository status
+panel-v0.1.json                 archived design deliberation behind SPEC
 ```
 
-The playful work stays. It carries imagination, examples, jokes, and possible
-futures; it simply does not silently enlarge the candidate contract.
+On 2026-11-24 an agent narrowed the repository to the candidate core, with
+Yu's approval. The experimental apps, notebooks, kingdom pages, scripts, tax
+research and household pages that lived here are preserved at the tag
+[`archive/pre-core-2026-11-24`](https://github.com/cambridgetcg/yutabase/tree/archive/pre-core-2026-11-24)
+and in git history; [docs/README.md](docs/README.md#archive) lists them. The
+UK tax map moved to TaxSorted's own repository.
 
 ## License
 

@@ -1,6 +1,7 @@
 # YUTABASE — repository state
 
-Last reviewed: **2026-07-28**
+Last reviewed: **2026-11-24** (repository narrowed to the candidate core; the
+candidate.4 work that follows updates the version and support lines below)
 
 ```yaml
 name: yutabase
@@ -44,11 +45,14 @@ only by an actual passing run for the commit being assessed.
 ## Experimental or non-normative
 
 - the signed THREADS wire-protocol sketch;
-- the SQLite port;
 - the AgentTool Correspondence projection packages: a public pure metadata
   planner and a private loopback-only verifier/writer/checkpoint executor;
 - multi-device leases, conflict resolution, presence, and synchronization;
-- apps, kingdom/play documents, NEN experiments, and external deployments.
+- the landing and playground pages.
+
+Apps, kingdom/play documents, NEN experiments, the SQLite port and the
+heartbeat were archived on 2026-11-24; see
+[docs/README.md](docs/README.md#archive).
 
 These materials can guide future work but do not enlarge candidate
 conformance.

@@ -8,8 +8,9 @@ finished or de-facto database standard. Keep claims proportional to evidence.
 - `SPEC.md` defines YUTABASE Core and the Postgres binding.
 - `sql/` is the durable implementation of that binding.
 - `packages/sdk-ts/` contains the optional YOUSPEAK client and CLI.
-- THREADS, SQLite, kingdom/play surfaces, and protocol crossovers are
-  experimental unless a document explicitly says otherwise.
+- THREADS, the demo pages, and protocol crossovers are experimental unless a
+  document explicitly says otherwise. Material archived on 2026-11-24 lives at
+  tag `archive/pre-core-2026-11-24`; restore a file from there only on purpose.
 - Correspondence events may be projected into YUTABASE, but signed source
   events remain the authority log. A projection does not grant permission,
   transfer authority, or create a lock.
