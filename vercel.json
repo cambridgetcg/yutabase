@@ -10,8 +10,8 @@
       "permanent": false
     },
     {
-      "source": "/:path*",
-      "destination": "https://cambridgetcg.github.io/yutabase/:path*",
+      "source": "/:path(.*)",
+      "destination": "https://cambridgetcg.github.io/yutabase/:path",
       "permanent": false
     }
   ]
