@@ -1,9 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": {
+    "deploymentEnabled": false
+  },
   "redirects": [
     {
       "source": "/",
       "destination": "https://cambridgetcg.github.io/yutabase/",
+      "permanent": false
+    },
+    {
+      "source": "/:path*",
+      "destination": "https://cambridgetcg.github.io/yutabase/:path*",
       "permanent": false
     }
   ]
